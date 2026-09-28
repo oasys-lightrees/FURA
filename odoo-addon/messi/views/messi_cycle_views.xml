@@ -1,0 +1,126 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_messi_cycle_tree" model="ir.ui.view">
+        <field name="name">messi.cycle.tree</field>
+        <field name="model">messi.cycle</field>
+        <field name="arch" type="xml">
+            <tree decoration-danger="state == 'missed'" decoration-warning="state == 'late'"
+                  decoration-muted="state == 'skipped'">
+                <field name="module_id"/>
+                <field name="subject_name"/>
+                <field name="player_id"/>
+                <field name="period_key"/>
+                <field name="due_at"/>
+                <field name="state" widget="badge"/>
+                <field name="no_change" optional="hide"/>
+            </tree>
+        </field>
+    </record>
+
+    <record id="view_messi_cycle_form" model="ir.ui.view">
+        <field name="name">messi.cycle.form</field>
+        <field name="model">messi.cycle</field>
+        <field name="arch" type="xml">
+            <form>
+                <header>
+                    <button name="action_submit" type="object" string="Submit"
+                            class="oe_highlight" invisible="state != 'pending'"/>
+                    <button name="action_no_change" type="object" string="No change"
+                            invisible="state != 'pending'"/>
+                    <button name="action_snooze" type="object" string="Snooze"
+                            invisible="state != 'pending'"/>
+                    <field name="state" widget="statusbar"/>
+                </header>
+                <sheet>
+                    <group>
+                        <group>
+                            <field name="module_id"/>
+                            <field name="subject_name"/>
+                            <field name="player_id"/>
+                        </group>
+                        <group>
+                            <field name="period_key"/>
+                            <field name="due_at"/>
+                            <field name="triggered_by_commitment_id"
+                                   string="Asking about"
+                                   invisible="not triggered_by_commitment_id"/>
+                        </group>
+                    </group>
+                    <notebook>
+                        <page string="Answers">
+                            <field name="answer_ids">
+                                <tree editable="bottom">
+                                    <field name="question_key"/>
+                                    <field name="value_text"/>
+                                    <field name="value_number" optional="hide"/>
+                                    <field name="origin" optional="show"/>
+                                </tree>
+                            </field>
+                        </page>
+                        <page string="Promises made here">
+                            <field name="commitment_ids">
+                                <tree>
+                                    <field name="action_text"/>
+                                    <field name="due_at"/>
+                                    <field name="owner_id"/>
+                                    <field name="state" widget="badge"/>
+                                </tree>
+                            </field>
+                        </page>
+                    </notebook>
+                </sheet>
+                <div class="oe_chatter">
+                    <field name="message_ids" widget="mail_thread"/>
+                </div>
+            </form>
+        </field>
+    </record>
+
+    <record id="view_messi_cycle_search" model="ir.ui.view">
+        <field name="name">messi.cycle.search</field>
+        <field name="model">messi.cycle</field>
+        <field name="arch" type="xml">
+            <search>
+                <field name="module_id"/>
+                <field name="player_id"/>
+                <field name="subject_name"/>
+                <filter name="mine" string="Mine"
+                        domain="[('player_id', '=', uid)]"/>
+                <filter name="pending" string="Waiting for an answer"
+                        domain="[('state', '=', 'pending')]"/>
+                <filter name="missed" string="Missed" domain="[('state', '=', 'missed')]"/>
+                <separator/>
+                <group expand="0" string="Group by">
+                    <filter name="by_module" string="Module" context="{'group_by': 'module_id'}"/>
+                    <filter name="by_player" string="Player" context="{'group_by': 'player_id'}"/>
+                    <filter name="by_state" string="Status" context="{'group_by': 'state'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <!-- The player's inbox: what is waiting on them, nothing else. -->
+    <record id="action_messi_inbox" model="ir.actions.act_window">
+        <field name="name">My follow-ups</field>
+        <field name="res_model">messi.cycle</field>
+        <field name="view_mode">tree,form</field>
+        <field name="domain">[('player_id', '=', uid), ('state', '=', 'pending')]</field>
+        <field name="context">{'search_default_mine': 1}</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">Nothing is waiting on you.</p>
+            <p>Follow-ups appear here on their own schedule, and on the dates you promised.</p>
+        </field>
+    </record>
+
+    <!-- The leader's view: exceptions only. An all-green day needs no reading. -->
+    <record id="action_messi_exceptions" model="ir.actions.act_window">
+        <field name="name">Exceptions</field>
+        <field name="res_model">messi.cycle</field>
+        <field name="view_mode">tree,form</field>
+        <field name="domain">[('state', '=', 'missed')]</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">No missed follow-ups.</p>
+            <p>This list is meant to be empty. Nothing here means nothing to chase.</p>
+        </field>
+    </record>
+</odoo>

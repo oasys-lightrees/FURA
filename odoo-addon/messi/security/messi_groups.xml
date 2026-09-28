@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="module_category_messi" model="ir.module.category">
+        <field name="name">MESSI</field>
+        <field name="sequence">20</field>
+    </record>
+
+    <record id="group_messi_player" model="res.groups">
+        <field name="name">Player</field>
+        <field name="category_id" ref="module_category_messi"/>
+        <field name="comment">Answers the follow-ups they are enrolled in.</field>
+    </record>
+
+    <record id="group_messi_leader" model="res.groups">
+        <field name="name">Follow-up maker</field>
+        <field name="category_id" ref="module_category_messi"/>
+        <field name="implied_ids" eval="[(4, ref('group_messi_player'))]"/>
+        <field name="comment">Authors modules, enrols players, reads the exception dashboard.</field>
+    </record>
+
+    <!-- A player sees their own cycles; a leader sees the squad's. -->
+    <record id="rule_cycle_own" model="ir.rule">
+        <field name="name">Players see their own cycles</field>
+        <field name="model_id" ref="model_messi_cycle"/>
+        <field name="domain_force">[('player_id', '=', user.id)]</field>
+        <field name="groups" eval="[(4, ref('group_messi_player'))]"/>
+    </record>
+
+    <record id="rule_cycle_leader" model="ir.rule">
+        <field name="name">Leaders see all cycles in their company</field>
+        <field name="model_id" ref="model_messi_cycle"/>
+        <field name="domain_force">[('company_id', 'in', company_ids)]</field>
+        <field name="groups" eval="[(4, ref('group_messi_leader'))]"/>
+    </record>
+
+    <record id="rule_commitment_own" model="ir.rule">
+        <field name="name">Players see their own commitments</field>
+        <field name="model_id" ref="model_messi_commitment"/>
+        <field name="domain_force">[('owner_id', '=', user.id)]</field>
+        <field name="groups" eval="[(4, ref('group_messi_player'))]"/>
+    </record>
+
+    <record id="rule_commitment_leader" model="ir.rule">
+        <field name="name">Leaders see all commitments in their company</field>
+        <field name="model_id" ref="model_messi_commitment"/>
+        <field name="domain_force">[('company_id', 'in', company_ids)]</field>
+        <field name="groups" eval="[(4, ref('group_messi_leader'))]"/>
+    </record>
+</odoo>

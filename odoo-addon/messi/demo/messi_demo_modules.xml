@@ -1,0 +1,408 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  The four launch modules, written from the real Telegram reports of 25/09/2026.
+
+  Every question here was tested against docs/16-question-design.md section 16.2.
+  The clearest change is NADI: of its ~30 questions, everything the system can compute
+  was removed (test 4, non-redundancy). What remains are the judgement questions, which
+  are the ones that were being answered with "belum selesai" because they were buried
+  under bookkeeping.
+-->
+<odoo>
+    <data noupdate="1">
+    <record id="module_prista" model="messi.module">
+        <field name="key">PRISTA</field>
+        <field name="name">Project Issue Status</field>
+        <field name="subject_kind">project</field>
+        <field name="description">Satu cycle per project per PIC. Tiga pertanyaan inti dari format Telegram yang sudah berjalan, ditambah cause code supaya 'kenapa gantung' bisa diagregasi, bukan cuma dibaca satu per satu.</field>
+        <field name="state">active</field>
+    </record>
+    <record id="version_prista" model="messi.module.version">
+        <field name="module_id" ref="module_prista"/>
+        <field name="version">1</field>
+        <field name="questions_json">[
+  {
+    "key": "latest_update",
+    "type": "long_text",
+    "label": "Latest Update — apa yang berubah sejak update terakhir?",
+    "required": true
+  },
+  {
+    "key": "next_action",
+    "type": "long_text",
+    "label": "Next Action — langkah berikutnya apa?",
+    "required": true
+  },
+  {
+    "key": "next_due",
+    "type": "date",
+    "label": "Due Date — kapan?",
+    "required": true
+  },
+  {
+    "key": "owner",
+    "type": "user_ref",
+    "label": "PIC",
+    "required": false
+  },
+  {
+    "key": "hanging_reason",
+    "type": "cause_code",
+    "label": "Kalau belum bergerak, kenapa?",
+    "options": [
+      {
+        "code": "menunggu_approval",
+        "class": "process",
+        "label": "Menunggu approval"
+      },
+      {
+        "code": "menunggu_pihak_luar",
+        "class": "external",
+        "label": "Menunggu pihak luar / klien"
+      },
+      {
+        "code": "menunggu_dependency",
+        "class": "process",
+        "label": "Menunggu pekerjaan lain"
+      },
+      {
+        "code": "kurang_waktu",
+        "class": "resource",
+        "label": "Tidak sempat dikerjakan"
+      },
+      {
+        "code": "kurang_info",
+        "class": "process",
+        "label": "Kurang informasi / brief"
+      },
+      {
+        "code": "teknis",
+        "class": "resource",
+        "label": "Kendala teknis"
+      },
+      {
+        "code": "lainnya",
+        "class": "external",
+        "label": "Lainnya"
+      }
+    ],
+    "show_when": {
+      "question": "latest_update",
+      "op": "unchanged_from_previous"
+    },
+    "require_detail_when": [
+      "lainnya"
+    ]
+  }
+]</field>
+        <field name="cadence_json">{
+  "kind": "on_commitment",
+  "fallback": {
+    "kind": "daily",
+    "days": [
+      "mon",
+      "tue",
+      "wed",
+      "thu",
+      "fri"
+    ],
+    "at": "09:00",
+    "due_after": "PT9H"
+  }
+}</field>
+        <field name="commitment_mapping_json">{
+  "action": "next_action",
+  "due": "next_due",
+  "owner": "owner"
+}</field>
+        <field name="outcomes">task,approval,schedule</field>
+        <field name="published_at" eval="datetime.now()"/>
+    </record>
+    <record id="module_messi" model="messi.module">
+        <field name="key">MESSI</field>
+        <field name="name">Messenger Screening</field>
+        <field name="subject_kind">self</field>
+        <field name="description">Sapuan harian channel. Jumlah gantung dihitung sistem dari angka per channel — tidak diketik ulang. Thread yang gantung wajib jadi objek yang dilacak atau ditutup dengan alasan.</field>
+        <field name="state">active</field>
+    </record>
+    <record id="version_messi" model="messi.module.version">
+        <field name="module_id" ref="module_messi"/>
+        <field name="version">1</field>
+        <field name="questions_json">[
+  {
+    "key": "channels",
+    "type": "checklist",
+    "label": "Channel yang dicek",
+    "repeat_over": "enrolment.channels",
+    "fields": [
+      {
+        "key": "checked",
+        "type": "boolean",
+        "label": "Sudah dicek?"
+      },
+      {
+        "key": "total_open",
+        "type": "number",
+        "label": "Total aktif/open"
+      },
+      {
+        "key": "hanging_gt3",
+        "type": "number",
+        "label": "Gantung &gt;3 hari"
+      },
+      {
+        "key": "hanging_lt3",
+        "type": "number",
+        "label": "Gantung &lt;3 hari"
+      },
+      {
+        "key": "replied",
+        "type": "number",
+        "label": "Sudah dibalas"
+      }
+    ]
+  },
+  {
+    "key": "still_hanging",
+    "type": "number",
+    "label": "Total masih gantung",
+    "computed": "sum(channels.hanging_gt3) + sum(channels.hanging_lt3)",
+    "help": "Dihitung sistem. Tidak bisa lapor 13 open, 0 gantung, 2 gantung &gt;3 hari."
+  },
+  {
+    "key": "unresolved",
+    "type": "thread_list",
+    "label": "Yang belum selesai — jadikan apa?",
+    "convertible_to": [
+      "approval",
+      "signature",
+      "schedule",
+      "task",
+      "project"
+    ],
+    "help": "Thread gantung harus jadi objek yang dilacak, atau ditutup dengan alasan. Tidak bisa cuma hilang."
+  },
+  {
+    "key": "escalation",
+    "type": "long_text",
+    "label": "Kendala/insight yang perlu dieskalasi",
+    "required": false
+  },
+  {
+    "key": "next_action",
+    "type": "long_text",
+    "label": "Next action untuk yang masih gantung",
+    "required": false
+  },
+  {
+    "key": "next_due",
+    "type": "date",
+    "label": "Kapan?",
+    "required": false
+  }
+]</field>
+        <field name="cadence_json">{
+  "kind": "daily",
+  "days": [
+    "mon",
+    "tue",
+    "wed",
+    "thu",
+    "fri"
+  ],
+  "at": "09:00",
+  "due_after": "PT9H"
+}</field>
+        <field name="commitment_mapping_json">{
+  "action": "next_action",
+  "due": "next_due"
+}</field>
+        <field name="outcomes">approval,signature,schedule,task,project</field>
+        <field name="published_at" eval="datetime.now()"/>
+    </record>
+    <record id="module_lestari" model="messi.module">
+        <field name="key">LESTARI</field>
+        <field name="name">Leads Status Reporting</field>
+        <field name="subject_kind">partner</field>
+        <field name="description">Satu cycle per lead per sales. Cadence mengikuti janji: ditanya pada tanggal yang dia sebut sendiri.</field>
+        <field name="state">active</field>
+    </record>
+    <record id="version_lestari" model="messi.module.version">
+        <field name="module_id" ref="module_lestari"/>
+        <field name="version">1</field>
+        <field name="questions_json">[
+  {
+    "key": "latest_update",
+    "type": "long_text",
+    "label": "Terakhir gimana?",
+    "required": true
+  },
+  {
+    "key": "stage",
+    "type": "stage",
+    "label": "Sekarang di tahap mana?",
+    "stages": [
+      "contacted",
+      "qualified",
+      "proposal",
+      "negotiation",
+      "won",
+      "lost"
+    ],
+    "required": true
+  },
+  {
+    "key": "next_action",
+    "type": "long_text",
+    "label": "Next action apa?",
+    "required": true
+  },
+  {
+    "key": "next_due",
+    "type": "date",
+    "label": "Kapan?",
+    "required": true
+  },
+  {
+    "key": "owner",
+    "type": "user_ref",
+    "label": "Siapa PIC-nya?",
+    "required": false
+  },
+  {
+    "key": "stall_reason",
+    "type": "cause_code",
+    "label": "Kalau belum bergerak, kenapa?",
+    "options": [
+      {
+        "code": "menunggu_approval_internal",
+        "class": "process",
+        "label": "Menunggu approval internal"
+      },
+      {
+        "code": "customer_diam",
+        "class": "external",
+        "label": "Customer belum merespons"
+      },
+      {
+        "code": "harga",
+        "class": "strategy",
+        "label": "Harga belum cocok"
+      },
+      {
+        "code": "butuh_spek",
+        "class": "process",
+        "label": "Menunggu spesifikasi / proposal"
+      },
+      {
+        "code": "budget_klien",
+        "class": "external",
+        "label": "Budget klien belum turun"
+      },
+      {
+        "code": "belum_paham_produk",
+        "class": "capability",
+        "label": "Perlu dukungan menjelaskan produk"
+      },
+      {
+        "code": "lainnya",
+        "class": "external",
+        "label": "Lainnya"
+      }
+    ],
+    "show_when": {
+      "question": "stage",
+      "op": "unchanged_from_previous"
+    },
+    "require_detail_when": [
+      "lainnya"
+    ]
+  }
+]</field>
+        <field name="cadence_json">{
+  "kind": "on_commitment",
+  "fallback": {
+    "kind": "weekly",
+    "weekday": "mon",
+    "at": "09:00",
+    "due_after": "P1D"
+  }
+}</field>
+        <field name="commitment_mapping_json">{
+  "action": "next_action",
+  "due": "next_due",
+  "owner": "owner"
+}</field>
+        <field name="outcomes">approval,schedule,task</field>
+        <field name="published_at" eval="datetime.now()"/>
+    </record>
+    <record id="module_nadi" model="messi.module">
+        <field name="key">NADI</field>
+        <field name="name">Night Debrief</field>
+        <field name="subject_kind">self</field>
+        <field name="description">Versi ramping dari NADI. Semua pertanyaan yang jawabannya sudah ada di sistem (sudah lapor belum, total project, hanging pagi/sore, complete, +new) DIHAPUS — itu dashboard, bukan pertanyaan. Yang tersisa hanya yang butuh penilaian manusia.</field>
+        <field name="state">active</field>
+    </record>
+    <record id="version_nadi" model="messi.module.version">
+        <field name="module_id" ref="module_nadi"/>
+        <field name="version">1</field>
+        <field name="questions_json">[
+  {
+    "key": "prista_blocker",
+    "type": "long_text",
+    "label": "Dari project yang masih gantung, mana yang paling mengkhawatirkan dan kenapa?",
+    "required": true,
+    "prefill_context": "prista_summary"
+  },
+  {
+    "key": "root_fix",
+    "type": "long_text",
+    "label": "Root fix — apa yang harus berubah supaya ini tidak terulang?",
+    "required": true,
+    "help": "Fruit fix (menyelesaikan yang ini) sudah tercatat sebagai commitment di PRISTA. Yang ditanya di sini yang sistemik."
+  },
+  {
+    "key": "latin_missed_reason",
+    "type": "long_text",
+    "label": "LATIN yang terlewat hari ini — kenapa?",
+    "required": false,
+    "show_when": {
+      "question": "$computed.latin_missed",
+      "op": "gt",
+      "value": 0
+    }
+  },
+  {
+    "key": "tomorrow",
+    "type": "long_text",
+    "label": "Besok fokus ke apa?",
+    "required": true
+  },
+  {
+    "key": "next_due",
+    "type": "date",
+    "label": "Target kapan selesai?",
+    "required": false
+  }
+]</field>
+        <field name="cadence_json">{
+  "kind": "daily",
+  "days": [
+    "mon",
+    "tue",
+    "wed",
+    "thu",
+    "fri"
+  ],
+  "at": "16:30",
+  "due_after": "PT5H"
+}</field>
+        <field name="commitment_mapping_json">{
+  "action": "next_action",
+  "due": "next_due"
+}</field>
+        <field name="outcomes">task</field>
+        <field name="published_at" eval="datetime.now()"/>
+    </record>
+    </data>
+</odoo>

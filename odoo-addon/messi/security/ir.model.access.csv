@@ -1,0 +1,13 @@
+id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
+access_messi_module_player,messi.module player,model_messi_module,group_messi_player,1,0,0,0
+access_messi_module_leader,messi.module leader,model_messi_module,group_messi_leader,1,1,1,1
+access_messi_module_version_player,messi.module.version player,model_messi_module_version,group_messi_player,1,0,0,0
+access_messi_module_version_leader,messi.module.version leader,model_messi_module_version,group_messi_leader,1,1,1,1
+access_messi_enrolment_player,messi.enrolment player,model_messi_enrolment,group_messi_player,1,0,0,0
+access_messi_enrolment_leader,messi.enrolment leader,model_messi_enrolment,group_messi_leader,1,1,1,1
+access_messi_cycle_player,messi.cycle player,model_messi_cycle,group_messi_player,1,1,0,0
+access_messi_cycle_leader,messi.cycle leader,model_messi_cycle,group_messi_leader,1,1,1,1
+access_messi_answer_player,messi.answer player,model_messi_answer,group_messi_player,1,1,1,0
+access_messi_answer_leader,messi.answer leader,model_messi_answer,group_messi_leader,1,1,1,1
+access_messi_commitment_player,messi.commitment player,model_messi_commitment,group_messi_player,1,1,1,0
+access_messi_commitment_leader,messi.commitment leader,model_messi_commitment,group_messi_leader,1,1,1,1

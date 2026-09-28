@@ -1,0 +1,101 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_messi_module_tree" model="ir.ui.view">
+        <field name="name">messi.module.tree</field>
+        <field name="model">messi.module</field>
+        <field name="arch" type="xml">
+            <tree>
+                <field name="key"/>
+                <field name="name"/>
+                <field name="subject_kind"/>
+                <field name="enrolment_count" string="Players enrolled"/>
+                <field name="state" widget="badge"/>
+            </tree>
+        </field>
+    </record>
+
+    <record id="view_messi_module_form" model="ir.ui.view">
+        <field name="name">messi.module.form</field>
+        <field name="model">messi.module</field>
+        <field name="arch" type="xml">
+            <form>
+                <header>
+                    <button name="action_activate" type="object" string="Activate"
+                            class="oe_highlight" invisible="state == 'active'"/>
+                    <field name="state" widget="statusbar"/>
+                </header>
+                <sheet>
+                    <group>
+                        <group>
+                            <field name="key" placeholder="PRISTA"/>
+                            <field name="name" placeholder="Project Issue Status"/>
+                            <field name="subject_kind"/>
+                        </group>
+                        <group>
+                            <field name="current_version_id"/>
+                            <field name="enrolment_count"/>
+                        </group>
+                    </group>
+                    <field name="description" placeholder="What this follow-up is for."/>
+                    <notebook>
+                        <page string="Versions">
+                            <field name="version_ids">
+                                <tree>
+                                    <field name="version"/>
+                                    <field name="published_at"/>
+                                    <field name="outcomes"/>
+                                </tree>
+                                <form>
+                                    <group>
+                                        <field name="version"/>
+                                        <field name="outcomes"
+                                               placeholder="approval,schedule,task"/>
+                                        <field name="published_at" readonly="1"/>
+                                    </group>
+                                    <group string="Questions">
+                                        <field name="questions_json" nolabel="1"
+                                               widget="ace" options="{'mode': 'json'}"/>
+                                    </group>
+                                    <group string="Cadence">
+                                        <field name="cadence_json" nolabel="1"
+                                               widget="ace" options="{'mode': 'json'}"/>
+                                    </group>
+                                    <group string="Commitment mapping">
+                                        <field name="commitment_mapping_json" nolabel="1"
+                                               placeholder='{"action": "next_action", "due": "next_due"}'/>
+                                    </group>
+                                    <footer>
+                                        <button name="action_publish" type="object"
+                                                string="Publish" class="oe_highlight"/>
+                                    </footer>
+                                </form>
+                            </field>
+                        </page>
+                        <page string="Enrolments">
+                            <field name="enrolment_ids">
+                                <tree editable="bottom">
+                                    <field name="player_id"/>
+                                    <field name="subject_name"/>
+                                    <field name="subject_model" optional="hide"/>
+                                    <field name="subject_res_id" optional="hide"/>
+                                    <field name="cadence_json" optional="hide"/>
+                                    <field name="paused_until"/>
+                                    <field name="no_change_streak"/>
+                                </tree>
+                            </field>
+                        </page>
+                    </notebook>
+                </sheet>
+                <div class="oe_chatter">
+                    <field name="message_ids" widget="mail_thread"/>
+                </div>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_messi_module" model="ir.actions.act_window">
+        <field name="name">Modules</field>
+        <field name="res_model">messi.module</field>
+        <field name="view_mode">tree,form</field>
+    </record>
+</odoo>

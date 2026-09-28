@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <menuitem id="menu_messi_root" name="MESSI" web_icon="messi,static/description/icon.png"
+              sequence="30" groups="messi.group_messi_player"/>
+
+    <menuitem id="menu_messi_inbox" name="My follow-ups" parent="menu_messi_root"
+              action="action_messi_inbox" sequence="10"/>
+    <menuitem id="menu_messi_my_promises" name="My promises" parent="menu_messi_root"
+              action="action_messi_commitments" sequence="20"/>
+
+    <menuitem id="menu_messi_leader" name="Leader" parent="menu_messi_root"
+              sequence="40" groups="messi.group_messi_leader"/>
+    <menuitem id="menu_messi_exceptions" name="Missed follow-ups" parent="menu_messi_leader"
+              action="action_messi_exceptions" sequence="10"/>
+    <menuitem id="menu_messi_broken" name="Broken promises" parent="menu_messi_leader"
+              action="action_messi_broken" sequence="20"/>
+
+    <menuitem id="menu_messi_config" name="Configuration" parent="menu_messi_root"
+              sequence="90" groups="messi.group_messi_leader"/>
+    <menuitem id="menu_messi_modules" name="Modules" parent="menu_messi_config"
+              action="action_messi_module" sequence="10"/>
+</odoo>

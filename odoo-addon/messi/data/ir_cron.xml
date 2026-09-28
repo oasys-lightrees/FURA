@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- Generation is idempotent (unique enrolment+period_key), so firing more often
+         than needed is safe and costs one query per enrolment. -->
+    <record id="cron_generate_cycles" model="ir.cron">
+        <field name="name">MESSI: generate cycles</field>
+        <field name="model_id" ref="model_messi_cycle"/>
+        <field name="state">code</field>
+        <field name="code">model._cron_generate()</field>
+        <field name="interval_number">1</field>
+        <field name="interval_type">hours</field>
+        <field name="active" eval="True"/>
+    </record>
+
+    <record id="cron_spawn_commitment_cycles" model="ir.cron">
+        <field name="name">MESSI: ask about promises coming due</field>
+        <field name="model_id" ref="model_messi_cycle"/>
+        <field name="state">code</field>
+        <field name="code">model._cron_spawn_commitment_cycles()</field>
+        <field name="interval_number">1</field>
+        <field name="interval_type">hours</field>
+        <field name="active" eval="True"/>
+    </record>
+
+    <!-- Records what did not happen, so the leader never has to ask "did you do it?" -->
+    <record id="cron_reap" model="ir.cron">
+        <field name="name">MESSI: record missed cycles and broken promises</field>
+        <field name="model_id" ref="model_messi_cycle"/>
+        <field name="state">code</field>
+        <field name="code">model._cron_reap()</field>
+        <field name="interval_number">30</field>
+        <field name="interval_type">minutes</field>
+        <field name="active" eval="True"/>
+    </record>
+</odoo>
