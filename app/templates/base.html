@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{% block title %}MESSI{% endblock %}</title>
+<style>
+  :root {
+    --bg:#f6f7f9; --card:#fff; --ink:#15181d; --muted:#6b7280; --line:#e3e6ea;
+    --accent:#1f6feb; --ok:#15803d; --warn:#b45309; --bad:#b91c1c;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg:#0f1115; --card:#171a20; --ink:#e8eaed; --muted:#9aa3af; --line:#272b33; }
+  }
+  * { box-sizing:border-box }
+  body { margin:0; background:var(--bg); color:var(--ink);
+         font:15px/1.5 ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif; }
+  header { background:var(--card); border-bottom:1px solid var(--line); padding:.75rem 1rem;
+           display:flex; gap:1rem; align-items:center; flex-wrap:wrap; }
+  header a { color:var(--ink); text-decoration:none; padding:.3rem .6rem; border-radius:6px; }
+  header a:hover { background:var(--bg) }
+  header .brand { font-weight:700; letter-spacing:.06em; }
+  header .spacer { margin-left:auto }
+  main { max-width:840px; margin:0 auto; padding:1.25rem 1rem 4rem; }
+  h1 { font-size:1.35rem; margin:.2rem 0 1rem }
+  h2 { font-size:1.05rem; margin:1.75rem 0 .6rem }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:10px;
+          padding:1rem; margin-bottom:.75rem; }
+  .card a.title { color:var(--ink); text-decoration:none; font-weight:600 }
+  .muted { color:var(--muted); font-size:.875rem }
+  .tag { display:inline-block; font-size:.72rem; font-weight:700; letter-spacing:.04em;
+         padding:.15rem .45rem; border-radius:4px; background:var(--bg);
+         border:1px solid var(--line); }
+  .bad { color:var(--bad) } .ok { color:var(--ok) } .warn { color:var(--warn) }
+  .row { display:flex; gap:.75rem; align-items:baseline; flex-wrap:wrap }
+  label { display:block; font-weight:600; margin:1rem 0 .3rem }
+  label .help { display:block; font-weight:400; color:var(--muted); font-size:.85rem }
+  input[type=text], input[type=date], input[type=number], input[type=email],
+  input[type=password], textarea, select {
+    width:100%; padding:.55rem .65rem; border:1px solid var(--line); border-radius:7px;
+    background:var(--bg); color:var(--ink); font:inherit; }
+  textarea { min-height:5rem; resize:vertical }
+  button { font:inherit; font-weight:600; padding:.55rem 1rem; border-radius:7px;
+           border:1px solid var(--accent); background:var(--accent); color:#fff; cursor:pointer }
+  button.secondary { background:transparent; color:var(--ink); border-color:var(--line) }
+  .empty { text-align:center; padding:2.5rem 1rem; color:var(--muted) }
+  .stat { display:inline-block; margin-right:1.5rem }
+  .stat b { display:block; font-size:1.5rem }
+  .err { background:#fee; border:1px solid #fcc; color:#900; padding:.6rem .8rem;
+         border-radius:7px; margin-bottom:1rem }
+  table { width:100%; border-collapse:collapse; font-size:.9rem }
+  th,td { text-align:left; padding:.45rem .5rem; border-bottom:1px solid var(--line) }
+  th { color:var(--muted); font-weight:600 }
+</style>
+</head>
+<body>
+{% if user %}
+<header>
+  <span class="brand">MESSI</span>
+  <a href="/">Follow-up saya</a>
+  <a href="/modules">Modul</a>
+  {% if user.role in ('leader','admin') %}<a href="/leader">Leader</a>{% endif %}
+  <span class="spacer muted">{{ user.display_name }}</span>
+  <form method="post" action="/logout" style="margin:0">
+    <button class="secondary" type="submit">Keluar</button></form>
+</header>
+{% endif %}
+<main>{% block body %}{% endblock %}</main>
+</body>
+</html>

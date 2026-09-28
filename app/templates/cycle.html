@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+{% block body %}
+<p class="muted"><a href="/">&larr; Kembali</a></p>
+<h1><span class="tag">{{ c.module }}</span> {{ c.subject }}</h1>
+{% if c.asking_about %}
+<div class="card">
+  <div class="muted">Pada {{ c.promised_for.strftime('%d %b') }} kamu janji:</div>
+  <b>{{ c.asking_about }}</b>
+</div>
+{% endif %}
+{% if error %}<div class="err">{{ error }}</div>{% endif %}
+
+<form method="post" action="/cycle/{{ c.id }}/submit" class="card">
+  {% for q in c.questions %}
+    <label>
+      {{ q.label }}{% if q.required %} <span class="bad">*</span>{% endif %}
+      {% if q.help %}<span class="help">{{ q.help }}</span>{% endif %}
+      {% set val = answers.get(q.key, '') %}
+      {% if q.type == 'long_text' %}
+        <textarea name="q_{{ q.key }}">{{ val }}</textarea>
+      {% elif q.type == 'date' %}
+        <input type="date" name="q_{{ q.key }}" value="{{ val }}">
+      {% elif q.type == 'number' %}
+        <input type="number" step="any" name="q_{{ q.key }}" value="{{ val }}">
+      {% elif q.type == 'select' %}
+        <select name="q_{{ q.key }}">
+          <option value="">—</option>
+          {% for o in q.options %}
+          <option value="{{ o }}" {% if val == o %}selected{% endif %}>{{ o.replace('_',' ') }}</option>
+          {% endfor %}
+        </select>
+      {% else %}
+        <input type="text" name="q_{{ q.key }}" value="{{ val }}">
+      {% endif %}
+    </label>
+  {% endfor %}
+  <p class="row">
+    <button type="submit">Kirim</button>
+    <button type="submit" name="no_change" value="1" class="secondary">Tidak ada perubahan</button>
+  </p>
+  <p class="muted">Tanggal yang kamu isi jadi janji. Sistem akan menanyakannya pada hari itu —
+  bukan setiap hari sampai selesai.</p>
+</form>
+{% endblock %}

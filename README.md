@@ -23,6 +23,15 @@ most importantly on the *questions*, before anyone is ever asked.
 This repository currently contains the **system design** for the platform. No application
 code has been written yet; the design is the artefact under review.
 
+## Running it
+
+```bash
+./run.sh          # postgres + schema + seed + server on http://127.0.0.1:8000
+pytest -q         # 29 engine tests, no database needed
+```
+
+See [RUNNING.md](RUNNING.md) for what works today and what does not.
+
 ## Design documents
 
 | # | Document | What it answers |

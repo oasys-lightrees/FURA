@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+{% block body %}
+<h1>Modul follow-up</h1>
+<p class="muted">Modul adalah definisi, bukan formulir. Produknya mesin ini — MESSI, PRISTA,
+LESTARI dan NADI cuma empat baris di dalamnya.</p>
+{% for m in modules %}
+<div class="card">
+  <div class="row"><span class="tag">{{ m.key }}</span><b>{{ m.name }}</b>
+    <span class="muted">· subjek: {{ m.subject_kind }} · {{ m.enrolled }} enrolment</span></div>
+  <div class="muted">{{ m.description }}</div>
+  <div class="muted">Cadence: <code>{{ m.cadence.kind }}</code>
+    {%- if m.cadence.fallback %} (fallback: <code>{{ m.cadence.fallback.kind }}</code>){% endif %}
+    · {{ m.questions|length }} pertanyaan</div>
+</div>
+{% endfor %}
+{% endblock %}

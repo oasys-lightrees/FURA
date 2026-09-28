@@ -11,8 +11,8 @@ from datetime import date, datetime, timedelta
 from odoo import _, api, fields, models
 from odoo.exceptions import UserError
 
-from ..lib import cadence as cadence_lib
-from ..lib import lifecycle
+from messi_core import cadence as cadence_lib
+from messi_core import lifecycle
 
 _logger = logging.getLogger(__name__)
 

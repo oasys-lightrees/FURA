@@ -1,0 +1,11 @@
+{% extends "base.html" %}
+{% block body %}
+<h1>Masuk ke MESSI</h1>
+{% if error %}<div class="err">{{ error }}</div>{% endif %}
+<form method="post" action="/login" class="card">
+  <label>Email<input type="email" name="email" value="nicho@lightrees.com" required></label>
+  <label>Password<input type="password" name="password" value="messi" required></label>
+  <p><button type="submit">Masuk</button></p>
+  <p class="muted">Seed: nicho@lightrees.com (player) atau chief@lightrees.com (leader), password <code>messi</code>.</p>
+</form>
+{% endblock %}

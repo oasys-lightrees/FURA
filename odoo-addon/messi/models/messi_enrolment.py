@@ -9,7 +9,7 @@ import json
 from odoo import _, api, fields, models
 from odoo.exceptions import ValidationError
 
-from ..lib import cadence as cadence_lib
+from messi_core import cadence as cadence_lib
 
 
 class MessiEnrolment(models.Model):

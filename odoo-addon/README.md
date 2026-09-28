@@ -7,7 +7,7 @@ users Lightrees already keeps in Odoo.
 
 | Part | State |
 |---|---|
-| `messi/lib/` — cadence, period keys, state machines | **Written and tested.** 28 unit tests, run without Odoo |
+| Engine rules | Moved to `core/messi_core/`, shared with the standalone app. 29 tests |
 | `messi/models/` — Odoo models, cron, constraints | Written, syntax-checked, **not yet run against Odoo** |
 | `messi/views/`, `security/`, `data/`, `demo/` | Written, XML validated, **not yet loaded** |
 
@@ -19,13 +19,17 @@ and the Odoo layer needs one pass on a real instance before it can be trusted.
 ## Running the tested part
 
 ```bash
-pip install pytest
-pytest -q      # 28 passed
+pytest -q      # 29 passed, from the repo root
 ```
 
-`messi/lib/` has no Odoo imports on purpose: the rules that matter — when a cycle opens,
-which period it belongs to, when a promise counts as broken — are readable and testable
-on their own, and the Odoo models call into them rather than restating them.
+The rules live in `core/messi_core/` and have no Odoo imports on purpose: when a cycle
+opens, which period it belongs to, when a promise counts as broken — readable and testable
+on their own. The models here call into them rather than restating them, which means
+`messi_core` must be importable by the Odoo server (pip-install it, or vendor it into the
+addon at packaging time).
+
+**The standalone app in `app/` is the live implementation** (see ../RUNNING.md). This addon
+is the same engine for the day Odoo becomes the target again.
 
 ## Installing (on a real Odoo)
 
@@ -44,7 +48,6 @@ and NADI, written from the real Telegram reports of 25/09/2026.
 
 ```
 messi/
-├── lib/            pure Python, no Odoo — cadence.py, lifecycle.py
 ├── models/         Odoo models; call into lib/ rather than reimplementing rules
 ├── security/       groups (player, follow-up maker) and record rules
 ├── data/           ir.cron: generate, spawn-from-promise, reap

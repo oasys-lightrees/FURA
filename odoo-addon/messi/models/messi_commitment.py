@@ -7,7 +7,7 @@ one number that measures follow-through: commitment-kept rate (ADR-0008).
 from odoo import _, api, fields, models
 from odoo.exceptions import UserError
 
-from ..lib import lifecycle
+from messi_core import lifecycle
 
 
 class MessiCommitment(models.Model):

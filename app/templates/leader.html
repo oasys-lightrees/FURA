@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+{% block body %}
+<h1>Leader</h1>
+<div class="card">
+  <span class="stat"><b>{{ '%.0f%%'|format(response_rate*100) if response_rate is not none else '—' }}</b>
+    <span class="muted">cycle dijawab</span></span>
+  <span class="stat"><b>{{ '%.0f%%'|format(kept_rate*100) if kept_rate is not none else '—' }}</b>
+    <span class="muted">janji ditepati</span></span>
+  <span class="stat"><b class="{{ 'bad' if stats.missed else 'ok' }}">{{ stats.missed }}</b>
+    <span class="muted">cycle terlewat</span></span>
+  <span class="stat"><b class="{{ 'bad' if promises.broken else 'ok' }}">{{ promises.broken }}</b>
+    <span class="muted">janji meleset</span></span>
+  <span class="stat"><b>{{ promises.open }}</b><span class="muted">janji berjalan</span></span>
+</div>
+
+<h2>Janji yang meleset</h2>
+{% if broken %}
+<div class="card"><table>
+<tr><th>Modul</th><th>Subjek</th><th>Janji</th><th>PIC</th><th>Jatuh tempo</th></tr>
+{% for b in broken %}
+<tr><td><span class="tag">{{ b.module }}</span></td><td>{{ b.subject }}</td>
+    <td>{{ b.action_text }}</td><td>{{ b.owner }}</td>
+    <td class="bad">{{ b.due_at.strftime('%d %b') }}</td></tr>
+{% endfor %}
+</table></div>
+{% else %}<div class="card empty">Tidak ada janji yang meleset.</div>{% endif %}
+
+<h2>Cycle terlewat</h2>
+{% if missed %}
+<div class="card"><table>
+<tr><th>Modul</th><th>Subjek</th><th>Player</th><th>Periode</th></tr>
+{% for m in missed %}
+<tr><td><span class="tag">{{ m.module }}</span></td><td>{{ m.subject }}</td>
+    <td>{{ m.player }}</td><td class="bad">{{ m.period_key }}</td></tr>
+{% endfor %}
+</table></div>
+{% else %}<div class="card empty">Tidak ada yang terlewat.</div>{% endif %}
+
+<p class="muted">Halaman ini sengaja berisi pengecualian saja. Hari yang semuanya hijau
+tidak perlu dibaca.</p>
+{% endblock %}

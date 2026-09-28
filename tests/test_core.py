@@ -1,14 +1,10 @@
-"""Unit tests for the pure engine logic. These run without Odoo: `pytest odoo-addon`."""
+"""Unit tests for the engine core. No database, no web server, no Odoo."""
 
-import sys
 from datetime import datetime, timedelta, timezone
-from pathlib import Path
 
 import pytest
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "messi"))
-
-from lib import cadence, lifecycle  # noqa: E402
+from messi_core import cadence, lifecycle
 
 UTC = timezone.utc
 JKT = "Asia/Jakarta"
@@ -160,3 +156,18 @@ def test_a_resolved_commitment_cannot_be_resolved_again():
 def test_rate_is_none_not_zero_when_there_is_nothing_to_divide():
     assert lifecycle.rate(0, 0) is None
     assert lifecycle.rate(3, 4) == 0.75
+
+
+# ---------------------------------------------------- the daily-drumbeat regression
+
+def test_on_commitment_fallback_should_be_a_slow_heartbeat():
+    """A daily fallback makes on_commitment pointless: the player is asked every day
+    regardless of what they promised. Caught by running the seeded app, where PRISTA
+    generated a cycle on a day nothing was due."""
+    daily_fallback = {"kind": "on_commitment",
+                      "fallback": {"kind": "daily", "days": WEEKDAYS}}
+    weekly_fallback = {"kind": "on_commitment",
+                       "fallback": {"kind": "weekly", "weekday": "mon"}}
+    tuesday = t("2026-09-29T03:00:00+00:00")
+    assert cadence.occurrence_for(daily_fallback, tuesday, JKT) is not None
+    assert cadence.occurrence_for(weekly_fallback, tuesday, JKT) is None

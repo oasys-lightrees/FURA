@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+{% block body %}
+<h1>Yang menunggu kamu</h1>
+
+{% if overdue %}
+<h2 class="bad">Janji yang lewat tanggal</h2>
+{% for c in overdue %}
+<div class="card">
+  <div class="row"><span class="tag">{{ c.module }}</span> <b>{{ c.subject }}</b></div>
+  <div>Kamu bilang: <i>{{ c.action_text }}</i></div>
+  <div class="muted bad">Jatuh tempo {{ c.due_at.strftime('%d %b %Y %H:%M') }}</div>
+</div>
+{% endfor %}
+{% endif %}
+
+<h2>Follow-up hari ini</h2>
+{% if cycles %}
+  {% for c in cycles %}
+  <div class="card">
+    <div class="row">
+      <span class="tag">{{ c.module }}</span>
+      <a class="title" href="/cycle/{{ c.id }}">{{ c.subject }}</a>
+      <span class="spacer"></span>
+    </div>
+    {% if c.asking_about %}
+      <div>Kamu janji: <i>{{ c.asking_about }}</i> — gimana?</div>
+    {% else %}
+      <div class="muted">{{ c.module_name }}</div>
+    {% endif %}
+    <div class="muted">Periode {{ c.period_key }} · deadline {{ c.due_at.strftime('%H:%M, %d %b') }}</div>
+  </div>
+  {% endfor %}
+{% else %}
+  <div class="card empty">
+    <p><b>Tidak ada yang menunggu kamu.</b></p>
+    <p>Follow-up muncul sendiri sesuai jadwal, dan pada tanggal yang kamu janjikan.</p>
+  </div>
+{% endif %}
+{% endblock %}
