@@ -169,6 +169,10 @@ h2 { font-size:11.5px; font-weight:700; letter-spacing:.09em; text-transform:upp
 .btn.sec { background:var(--surface); color:var(--ink); border-color:var(--line); flex:0 0 auto;
            min-width:96px; }
 .saved { font-size:12.5px; color:var(--muted); text-align:center; margin-top:9px; }
+.fix { display:block; width:100%; margin:14px 0 0; padding:11px; font:inherit; font-size:14px;
+       color:var(--muted); background:none; border:1px dashed var(--line); border-radius:11px;
+       cursor:pointer; }
+.fix:hover { color:var(--ink); border-color:var(--ink); }
 .miss { background:var(--broken-bg); border:1px solid var(--line);
          border-left:3px solid var(--broken); border-radius:11px; padding:12px 14px;
          font-size:14px; margin-bottom:20px; }
@@ -487,6 +491,7 @@ function screenDone(doc) {
       <div><dt>Dibalas</dt><dd class="n">${t.reply}</dd></div>
     </div>
     ${S.showReport ? `<div class="report" id="reportText">${esc(buildReport(doc))}</div>` : ""}
+    <button class="fix" type="button" id="edit">Ada yang salah? Perbaiki laporannya</button>
     ${myPromises().length ? `<h2>Yang kamu janjikan</h2>` + myPromises().map(c => `
       <div class="card ${c.due < today() ? "bad" : "due"}"><div class="row">
         <span class="strong">${esc(c.action)}</span><span class="grow"></span>
@@ -621,6 +626,18 @@ function render() {
 
 const toTop = () => window.scrollTo({ top:0, behavior:"smooth" });
 
+/** Reopens a report that was already sent. The server accepts it as a correction to the
+ *  same day rather than a second report, and moves the promise instead of adding one. */
+function reopen() {
+  const doc = mine(today());
+  if (!doc) return;
+  S.a = { grid:JSON.parse(JSON.stringify(doc.grid || {})), detail:doc.detail || "",
+          plan:doc.plan || "", due:doc.due || "", escalation:doc.escalation || "",
+          prista:doc.prista || "", declared:false };
+  S.editing = true; S.step = 1; S.error = null; S.showReport = false;
+  saveDraft(today(), S.a); render(); toTop();
+}
+
 /* ---- events -------------------------------------------------------------- */
 function collect() {
   const g = {};
@@ -682,6 +699,9 @@ view.addEventListener("click", ev => {
 
 // Selecting on focus means tapping a cell and typing replaces the number, instead of
 // dropping the caret mid-digit and turning 13 into 173.
+view.addEventListener("click", ev => {
+  if (ev.target && ev.target.id === "edit") reopen();
+});
 view.addEventListener("focusin", ev => {
   if (ev.target.dataset && ev.target.dataset.row) ev.target.select();
 });

@@ -21,6 +21,13 @@ foreach (explode(';', $sql) as $stmt) {
     }
 }
 
+// `php tests/seed_live.php empty` leaves the database bare, which is what the setup
+// page needs to have anything to do.
+if (($argv[1] ?? '') === 'empty') {
+    echo "seeded empty, today=" . Clock::today() . "\n";
+    exit(0);
+}
+
 $joined = messi_add_days(Clock::today(), -2);
 foreach ([['nicho@example.test', 'Nicho', 'player'],
           ['rio@example.test',   'Rio',   'player'],

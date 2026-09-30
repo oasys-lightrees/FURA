@@ -19,15 +19,17 @@ if (!$user) {
     exit;
 }
 
-// The first screen needs no round trip: everything it reads is already here.
+// The first screen needs no round trip: everything it reads is already here — and
+// nothing it does not. A player gets their own reports; the squad view is a leader's.
+$mine = is_leader($user) ? null : (int) $user['id'];
 $boot = [
     'me' => [
         'id'       => uid((int) $user['id']),
         'name'     => $user['name'],
         'isLeader' => is_leader($user),
     ],
-    'cycles'      => repo_cycles(),
-    'commitments' => repo_commitments(),
+    'cycles'      => repo_cycles(90, $mine),
+    'commitments' => repo_commitments(90, $mine),
     'roster'      => repo_roster(),
 ];
 

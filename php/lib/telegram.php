@@ -10,9 +10,17 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/bootstrap.php';
 
+/** A seam, so the tests can watch what the bot would say without a token or a network.
+ *  Untouched in production, where Tg::$send stays null and the curl below runs. */
+final class Tg
+{
+    /** @var null|callable(string,string,?array):bool */
+    public static $send = null;
+}
+
 function tg_enabled(): bool
 {
-    return trim((string) cfg('telegram_token')) !== '';
+    return Tg::$send !== null || trim((string) cfg('telegram_token')) !== '';
 }
 
 /** Sends one message. Returns true on success; a failure is logged, never fatal — the
@@ -21,6 +29,9 @@ function tg_send(string $chatId, string $text, ?array $keyboard = null): bool
 {
     if (!tg_enabled() || $chatId === '') {
         return false;
+    }
+    if (Tg::$send !== null) {
+        return (Tg::$send)($chatId, $text, $keyboard);
     }
     $payload = [
         'chat_id' => $chatId,

@@ -8,6 +8,9 @@ require_once __DIR__ . '/../lib/repo.php';
 
 $user = require_login_json();
 
+// Only a leader has a screen that shows other people's reports.
+$mine = is_leader($user) ? null : (int) $user['id'];
+
 json_out([
     'ok' => true,
     'me' => [
@@ -17,7 +20,7 @@ json_out([
         'joined'   => $user['joined_on'],
     ],
     'today'       => Clock::today(),
-    'cycles'      => repo_cycles(),
-    'commitments' => repo_commitments(),
+    'cycles'      => repo_cycles(90, $mine),
+    'commitments' => repo_commitments(90, $mine),
     'roster'      => repo_roster(),
 ]);

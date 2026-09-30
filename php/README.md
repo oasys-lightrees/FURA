@@ -1,7 +1,7 @@
 # MESSI di cPanel
 
 Versi PHP + MySQL dari aplikasi di `web/`. Halamannya **sama persis** — `app.html`
-adalah salinan `web/messi.html` tanpa satu baris pun diubah, jadi 81 pemeriksaan browser
+adalah salinan `web/messi.html` tanpa satu baris pun diubah, jadi 89 pemeriksaan browser
 di `web/tests/` tetap menggambarkan apa yang dipakai squad. Yang ditulis ulang cuma
 bagian belakangnya: dulu data disimpan platform artifact, sekarang MySQL.
 
@@ -89,13 +89,15 @@ api/data.php       ambil semua data
 api/save.php       simpan satu dokumen
 api/logout.php     keluar
 api/telegram.php   webhook bot
-cron/tick.php      mesinnya
+cron/tick.php      titik masuk cron
+lib/tick.php       mesinnya: buka hari, tandai yang bolos, patahkan janji, kirim pesan
 lib/engine.php     aturan: tanggal, hitungan, lampu, validasi, format laporan
 lib/bootstrap.php  konfigurasi + koneksi database
 lib/auth.php       siapa yang sedang bertanya
 lib/repo.php       baca/tulis, dengan pemeriksaan yang tidak bisa dilewati browser
+lib/telegram.php   bot
 install.sql        enam tabel
-tests/             123 pemeriksaan
+tests/             229 pemeriksaan
 ```
 
 ## Yang diputuskan server, bukan browser
@@ -125,10 +127,20 @@ MESSI_TEST_SOCKET=/var/run/mysqld/mysqld.sock \
 
 | Berkas | Isinya |
 |--------|--------|
-| `tests/test_engine.php` | 55 pemeriksaan aturan, dicocokkan dengan `tests/test_core.py` |
-| `tests/test_repo.php` | 44 pemeriksaan terhadap MySQL sungguhan |
-| `tests/test_live.py` | 24 pemeriksaan lewat browser terhadap aplikasi yang benar-benar jalan |
+| `tests/test_engine.php` | 55 — aturan, dicocokkan dengan `tests/test_core.py` |
+| `tests/test_repo.php` | 47 — terhadap MySQL sungguhan, di database yang dia buat sendiri |
+| `tests/test_cron.php` | 47 — seminggu penuh jam demi jam, jam dibekukan, pesan bot ditangkap |
+| `tests/test_live.py` | 46 — browser terhadap aplikasi yang benar-benar jalan |
+| `tests/test_admin.py` | 34 — pemasangan pertama, tambah orang, ganti password, pasang Telegram |
 | `tests/check_sync.php` | memastikan `app.html` belum menyimpang dari `web/messi.html` |
+
+Yang dicoba juga: laporan atas nama orang lain, permintaan tanpa token, cron tanpa kunci,
+email berisi SQL, nama berisi `<script>`, cookie yang dipakai lagi setelah keluar, dan
+pemain yang mencoba menaikkan perannya sendiri. Semuanya ditolak.
+
+Satu hal yang tidak bisa diuji di sini: aturan `.htaccess`. `php -S` tidak membacanya,
+jadi yang terbukti adalah PHP-nya dijalankan, bukan dikirim sebagai teks — lapisan
+`.htaccess` baru bisa dipastikan di Apache yang sesungguhnya.
 
 Kalau `app.html` dan `web/messi.html` berbeda, samakan dengan
 `cp web/messi.html php/app.html` — sumbernya tetap satu.

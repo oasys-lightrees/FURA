@@ -3,91 +3,15 @@
  * The rules again, this time against a real MySQL — because a schema only tells the
  * truth when a database has agreed to it.
  *
- * Needs a MySQL/MariaDB it may create and drop a database on. Point it at one:
- *   MESSI_TEST_SOCKET=/var/run/mysqld/mysqld.sock php tests/test_repo.php
- *   MESSI_TEST_HOST=localhost MESSI_TEST_USER=root MESSI_TEST_PASS=secret php tests/test_repo.php
- * With none of those set it says so and exits 0, so it never fails a machine that has
- * no database to lend.
+ * See tests/bootstrap_test.php for how to point it at a database.
  */
 
 declare(strict_types=1);
 
-$socket = getenv('MESSI_TEST_SOCKET') ?: '';
-$host   = getenv('MESSI_TEST_HOST') ?: ($socket ? '' : 'localhost');
-$user   = getenv('MESSI_TEST_USER') ?: 'root';
-$pass   = getenv('MESSI_TEST_PASS') ?: '';
-$name   = getenv('MESSI_TEST_DB') ?: 'messi_test';
-
-$dsnBase = $socket ? "mysql:unix_socket=$socket" : "mysql:host=$host";
-try {
-    $root = new PDO($dsnBase . ';charset=utf8mb4', $user, $pass,
-                    [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION]);
-} catch (Throwable $e) {
-    echo "Tidak ada database untuk tes (" . $e->getMessage() . ") — dilewati.\n";
-    exit(0);
-}
-
-$root->exec("DROP DATABASE IF EXISTS `$name`");
-$root->exec("CREATE DATABASE `$name` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci");
-$root->exec("USE `$name`");
-// Comments first, then statements: a chunk that opens with a comment line is still a
-// CREATE TABLE, and skipping it leaves the next table's foreign key pointing at nothing.
-$sql = preg_replace('/^\s*--.*$/m', '', (string) file_get_contents(__DIR__ . '/../install.sql'));
-foreach (explode(';', $sql) as $stmt) {
-    if (trim($stmt) !== '') {
-        $root->exec($stmt);
-    }
-}
-
-$GLOBALS['MESSI_CONFIG'] = [
-    'db' => ['host' => $host, 'socket' => $socket, 'name' => $name, 'user' => $user, 'pass' => $pass],
-    'base_url' => 'https://example.test/messi',
-    'telegram_token' => '',
-    'cron_key' => 'test',
-    'first_day' => '2026-09-28',
-    'session_days' => 30,
-];
-
+require_once __DIR__ . '/bootstrap_test.php';
+$root = test_db('messi_test');
 require_once __DIR__ . '/../lib/auth.php';
 require_once __DIR__ . '/../lib/repo.php';
-
-$passed = 0;
-$failed = [];
-
-function ok(string $what, bool $cond): void
-{
-    global $passed, $failed;
-    if ($cond) { $passed++; return; }
-    $failed[] = $what;
-}
-
-function eq(string $what, $got, $want): void
-{
-    global $passed, $failed;
-    if ($got === $want) { $passed++; return; }
-    $failed[] = $what . "\n      got:  " . var_export($got, true)
-                      . "\n      want: " . var_export($want, true);
-}
-
-function throws(string $what, callable $fn, string $needle = ''): void
-{
-    global $passed, $failed;
-    try {
-        $fn();
-    } catch (RepoError $e) {
-        if ($needle === '' || str_contains($e->getMessage(), $needle)) { $passed++; return; }
-        $failed[] = $what . "\n      pesan: " . $e->getMessage();
-        return;
-    }
-    $failed[] = $what . ' (tidak ditolak)';
-}
-
-function make_user(string $email, string $name, string $role, string $joined): array
-{
-    q('INSERT INTO users (email, name, password_hash, role, joined_on, created_at) VALUES (?,?,?,?,?,?)',
-      [$email, $name, password_hash('kata-sandi-panjang', PASSWORD_DEFAULT), $role, $joined, Clock::nowUtcSql()]);
-    return q1('SELECT * FROM users WHERE email = ?', [$email]);
-}
 
 /* ------------------------------------------------------------------- setup */
 
@@ -214,6 +138,15 @@ ok('the page gets its own document id back',
 eq('with the answers as it wrote them',
    $cycles[uid((int) $nicho['id']) . '__2026-09-30']['detail'], 'OA003');
 
+eq('a player is handed only their own reports',
+   array_keys(repo_cycles(90, (int) $nicho['id'])),
+   [uid((int) $nicho['id']) . '__2026-09-29', uid((int) $nicho['id']) . '__2026-09-30']);
+ok('and none of anybody else\'s promises',
+   array_reduce(repo_commitments(90, (int) $nicho['id']),
+                fn($all, $c) => $all && $c['owner'] === uid((int) $nicho['id']), true));
+ok('a leader is handed the squad, which is the screen they have',
+   count(repo_cycles()) > count(repo_cycles(90, (int) $nicho['id'])));
+
 $roster = repo_roster();
 eq('the roster carries joining dates, which is what keeps new people innocent',
    $roster[uid((int) $rio['id'])]['joined'], '2026-09-30');
@@ -236,9 +169,9 @@ $_COOKIE = [];
 ok('nobody is signed in to begin with', auth_user() === null);
 
 ok('a wrong password is refused', auth_login('nicho@example.test', 'salah') === null);
-ok('an unknown address is refused', auth_login('hantu@example.test', 'kata-sandi-panjang') === null);
+ok('an unknown address is refused', auth_login('hantu@example.test', TEST_PASSWORD) === null);
 
-ok('the right password works', auth_login('nicho@example.test', 'kata-sandi-panjang') !== null);
+ok('the right password works', auth_login('nicho@example.test', TEST_PASSWORD) !== null);
 eq('and the session names the right person straight away',
    (auth_user() ?? [])['email'], 'nicho@example.test');
 
@@ -269,12 +202,5 @@ ok('a player is not', !is_leader($nicho));
 /* -------------------------------------------------------------------- done */
 
 Clock::unfreeze();
-$root->exec("DROP DATABASE `$name`");
-
-echo $passed . ' checks passed';
-if ($failed) {
-    echo ', ' . count($failed) . " FAILED\n\n";
-    foreach ($failed as $f) { echo '  FAIL  ' . $f . "\n"; }
-    exit(1);
-}
-echo ", 0 failed\n";
+$root->exec('DROP DATABASE `' . $GLOBALS['MESSI_TEST_DBNAME'] . '`');
+done();

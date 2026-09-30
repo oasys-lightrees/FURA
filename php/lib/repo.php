@@ -37,13 +37,25 @@ function repo_roster(): array
     return $out;
 }
 
-/** Cycles as the page wants them: keyed `u_7__2026-09-30`, with the answers unpacked. */
-function repo_cycles(int $sinceDays = 90): array
+/**
+ * Cycles as the page wants them: keyed `u_7__2026-09-30`, with the answers unpacked.
+ *
+ * `$onlyUser` is not an optimisation. A player's page has no screen that shows anyone
+ * else's report, so sending them one would be handing out something they cannot see but
+ * could read — and a report says what someone did all day.
+ */
+function repo_cycles(int $sinceDays = 90, ?int $onlyUser = null): array
 {
     $floor = messi_add_days(Clock::today(), -$sinceDays);
+    $where = 'day >= ?';
+    $args = [$floor];
+    if ($onlyUser !== null) {
+        $where .= ' AND user_id = ?';
+        $args[] = $onlyUser;
+    }
     $out = [];
     foreach (q('SELECT user_id, day, status, answers, submitted_at FROM cycles
-                 WHERE day >= ? ORDER BY day', [$floor]) as $r) {
+                 WHERE ' . $where . ' ORDER BY day', $args) as $r) {
         $doc = json_decode((string) $r['answers'], true);
         $doc = is_array($doc) ? $doc : [];
         $doc['owner'] = uid((int) $r['user_id']);
@@ -60,15 +72,21 @@ function repo_cycles(int $sinceDays = 90): array
     return $out;
 }
 
-function repo_commitments(int $sinceDays = 90): array
+function repo_commitments(int $sinceDays = 90, ?int $onlyUser = null): array
 {
     $floor = messi_add_days(Clock::today(), -$sinceDays);
+    $where = '(c.due_date >= ? OR c.status = ?)';
+    $args = [$floor, 'open'];
+    if ($onlyUser !== null) {
+        $where .= ' AND c.user_id = ?';
+        $args[] = $onlyUser;
+    }
     $out = [];
     foreach (q('SELECT c.id, c.user_id, c.action_text, c.due_date, c.status, c.resolved_at,
                        cy.day AS from_day
                   FROM commitments c LEFT JOIN cycles cy ON cy.id = c.cycle_id
-                 WHERE c.due_date >= ? OR c.status = ?
-                 ORDER BY c.due_date', [$floor, 'open']) as $r) {
+                 WHERE ' . $where . '
+                 ORDER BY c.due_date', $args) as $r) {
         $id = cid((int) $r['id']);
         $out[$id] = [
             'id'     => $id,

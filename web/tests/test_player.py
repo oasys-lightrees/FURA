@@ -88,6 +88,26 @@ with sync_playwright() as p:
     check("setelah refresh tetap 'sudah terkirim'", txt(pg,"h1"), "Sudah terkirim")
     check("janji tampil di layar selesai", "Balas setelah harga" in pg.inner_text("body"))
 
+    print("\n--- salah ketik, dibetulkan ---")
+    pg.click("#edit"); pg.wait_for_timeout(350)
+    check("laporan bisa dibuka lagi", txt(pg,"h1"), "Berapa banyak hari ini?")
+    check("angkanya tidak hilang, tinggal dibetulkan",
+          pg.input_value("[data-row=WAG][data-col=open]"), "13")
+    check("yang ditulis sebelumnya juga masih ada", txt(pg,"body"), lambda s: "LANGKAH 1" in s)
+    pg.fill("[data-row=GCG][data-col=open]", "9"); pg.wait_for_timeout(200)
+    pg.click("#next"); pg.wait_for_timeout(250)
+    check("yang gantung tetap terisi dari kiriman pertama",
+          pg.input_value("[name=detail]"), lambda v: v.strip() != "")
+    pg.click("#next"); pg.wait_for_timeout(250)
+    check("deklarasinya diminta lagi — angkanya sudah berubah",
+          pg.eval_on_selector("[name=declared]", "e=>e.checked"), False)
+    pg.check("[name=declared]"); pg.click("#next"); pg.wait_for_timeout(400)
+    check("perbaikan terkirim", txt(pg,"h1"), "Sudah terkirim")
+    st2 = store_of(pg)
+    check("tetap satu laporan untuk hari itu, bukan dua", len(st2["cycles"]), 1)
+    check("angka barunya yang tersimpan",
+          list(st2["cycles"].values())[0]["grid"]["GCG"]["open"], 9)
+
     open(str(SHOTS)+"/store.json","w").write(json.dumps(store_of(pg)))
     pg.screenshot(path=str(SHOTS)+"/t-user-done.png", full_page=True)
     b.close()

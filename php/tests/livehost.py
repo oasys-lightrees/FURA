@@ -1,0 +1,103 @@
+"""Starts the real thing: php -S over the php/ folder, with its own MySQL database.
+
+Used by the browser tests. Everything it makes is thrown away afterwards, and it skips
+rather than fails when there is no database to lend.
+"""
+
+from __future__ import annotations
+
+import json
+import os
+import socket
+import subprocess
+import sys
+import tempfile
+import time
+from pathlib import Path
+
+PHP_DIR = Path(__file__).resolve().parent.parent
+PASSWORD = "kata-sandi-panjang"
+
+
+def _free_port() -> int:
+    with socket.socket() as s:
+        s.bind(("127.0.0.1", 0))
+        return s.getsockname()[1]
+
+
+class Host:
+    """A running copy of the app. Use as a context manager."""
+
+    def __init__(self, db: str, seed: str = ""):
+        self.db = os.environ.get("MESSI_TEST_DB", db)
+        self.seed_arg = seed
+        self.port = _free_port()
+        self.base = f"http://127.0.0.1:{self.port}"
+        self.dir = Path(tempfile.mkdtemp(prefix="messi-live-"))
+        self.config = self.dir / "config.php"
+        socket_path = os.environ.get("MESSI_TEST_SOCKET", "")
+        # Written as JSON the PHP side decodes, rather than hand-built PHP syntax — a
+        # base_url with a "://" in it defeats naive string surgery.
+        self.config.write_text(
+            "<?php return json_decode(<<<'JSON'\n"
+            + json.dumps({
+                "db": {
+                    "host": os.environ.get("MESSI_TEST_HOST", "" if socket_path else "localhost"),
+                    "socket": socket_path,
+                    "name": self.db,
+                    "user": os.environ.get("MESSI_TEST_USER", "root"),
+                    "pass": os.environ.get("MESSI_TEST_PASS", ""),
+                },
+                "base_url": self.base,
+                "telegram_token": "",
+                "cron_key": "test-key",
+                "first_day": "2026-09-28",
+                "session_days": 30,
+            }, indent=2)
+            + "\nJSON, true);\n"
+        )
+        self.env = {**os.environ, "MESSI_CONFIG_FILE": str(self.config), "MESSI_TEST_DB": self.db}
+        self.server: subprocess.Popen | None = None
+
+    def php(self, *args: str) -> subprocess.CompletedProcess:
+        return subprocess.run(["php", *args], env=self.env, capture_output=True, text=True,
+                              cwd=str(PHP_DIR))
+
+    def __enter__(self) -> "Host":
+        seed = self.php(str(PHP_DIR / "tests" / "seed_live.php"),
+                        *( [self.seed_arg] if self.seed_arg else [] ))
+        if seed.returncode != 0:
+            print("Tidak bisa menyiapkan database — dilewati.\n"
+                  + (seed.stderr or seed.stdout).strip())
+            sys.exit(0)
+        print(seed.stdout.strip())
+
+        self.server = subprocess.Popen(
+            ["php", "-S", f"127.0.0.1:{self.port}", "-t", str(PHP_DIR)],
+            env=self.env, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        for _ in range(60):
+            try:
+                with socket.create_connection(("127.0.0.1", self.port), 0.2):
+                    return self
+            except OSError:
+                time.sleep(0.1)
+        return self
+
+    def __exit__(self, *exc) -> None:
+        if self.server:
+            self.server.terminate()
+            self.server.wait(timeout=10)
+
+
+def sign_in(ctx, base: str, email: str, password: str = PASSWORD, results=None):
+    """A browser page signed in as `email`, sitting on whatever the app showed next."""
+    pg = ctx.new_page()
+    if results is not None:
+        pg.on("pageerror", lambda e: results.append((False, "JS error: " + str(e), "")))
+    pg.goto(base + "/login.php")
+    pg.fill("#email", email)
+    pg.fill("#password", password)
+    pg.click("button[type=submit]")
+    pg.wait_for_load_state("networkidle")
+    pg.wait_for_timeout(500)
+    return pg
