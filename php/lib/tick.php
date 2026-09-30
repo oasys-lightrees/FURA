@@ -13,7 +13,7 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/auth.php';
 require_once __DIR__ . '/repo.php';
-require_once __DIR__ . '/telegram.php';
+require_once __DIR__ . '/chat.php';
 
 /** Has this job already run today? job_log is the memory that makes repeating safe. */
 function job_done(string $kind, string $day): bool
@@ -50,64 +50,52 @@ function messi_tick(): array
 
     // 09:00 — the ask.
     if (!job_done('notify_open', $today)) {
-        $did['asked'] = tick_notify_open($today);
+        $did['asked'] = (int) tick_notify_open($today);
         log_job('notify_open', $today . ' sent=' . $did['asked']);
     }
 
     // 17:00 — the nudge, and only to the people it is about.
     if ($hour >= 17 && $hour < MESSI_DUE_HOUR && !job_done('notify_due', $today)) {
-        $did['nudged'] = tick_notify_due($today);
+        $did['nudged'] = (int) tick_notify_due($today);
         log_job('notify_due', $today . ' sent=' . $did['nudged']);
     }
 
     // 18:00 — what the day came to, for whoever has to act on it.
     if ($hour >= MESSI_DUE_HOUR && !job_done('notify_leader', $today)) {
-        $did['recap'] = tick_notify_leader($today);
+        $did['recap'] = (int) tick_notify_leader($today);
         log_job('notify_leader', $today . ' sent=' . $did['recap']);
     }
 
     return $did;
 }
 
-function tick_notify_open(string $today): int
+/** One message to the space, naming what is already owed today. */
+function tick_notify_open(string $today): bool
 {
-    $sent = 0;
-    foreach (q('SELECT * FROM users WHERE active = 1 AND joined_on <= ? AND telegram_chat_id IS NOT NULL',
-               [$today]) as $u) {
-        $uid = (int) $u['id'];
-        $due = q('SELECT action_text FROM commitments WHERE user_id = ? AND status = ? AND due_date <= ?',
-                 [$uid, 'open', $today])->fetchAll();
-        $rows = [];
-        foreach (q('SELECT day, status, submitted_at FROM cycles WHERE user_id = ? AND day < ?',
-                   [$uid, $today]) as $r) {
-            $rows[$r['day']] = $r;
-        }
-        $floor = max((string) $u['joined_on'], (string) cfg('first_day'));
-        $absent = messi_missed_days($rows, $floor, $today, 5);
-        if (tg_morning($u, auth_make_login_link($uid), $due, $absent)) {
-            $sent++;
-        }
-    }
-    return $sent;
+    $due = q('SELECT u.name, c.action_text FROM commitments c JOIN users u ON u.id = c.user_id
+               WHERE c.status = ? AND c.due_date <= ? AND u.active = 1
+               ORDER BY u.name', ['open', $today])->fetchAll();
+    return chat_send(chat_morning($today, $due));
 }
 
-function tick_notify_due(string $today): int
+/** Only sent when somebody is actually missing, and it names them. */
+function tick_notify_due(string $today): bool
 {
-    $sent = 0;
-    foreach (q('SELECT u.* FROM users u
+    $names = q('SELECT u.name FROM users u
                   LEFT JOIN cycles c ON c.user_id = u.id AND c.day = ?
-                 WHERE u.active = 1 AND u.joined_on <= ? AND u.telegram_chat_id IS NOT NULL
-                   AND c.submitted_at IS NULL', [$today, $today]) as $u) {
-        if (tg_reminder($u, auth_make_login_link((int) $u['id'], 180))) {
-            $sent++;
-        }
+                 WHERE u.active = 1 AND u.joined_on <= ? AND c.submitted_at IS NULL
+                 ORDER BY u.name', [$today, $today])->fetchAll(PDO::FETCH_COLUMN);
+    if (!$names) {
+        return false;
     }
-    return $sent;
+    return chat_send(chat_reminder($names));
 }
 
-function tick_notify_leader(string $today): int
+/** 18:00 — what the day came to. Goes to the leader space when one is configured,
+ *  and to the squad space otherwise, which is where these reports always went. */
+function tick_notify_leader(string $today): bool
 {
-    $lines = ['Rekap MESSI ' . messi_fmt_day($today), ''];
+    $reported = [];
     $waiting = [];
     foreach (q('SELECT u.name, c.status, c.answers FROM users u
                   LEFT JOIN cycles c ON c.user_id = u.id AND c.day = ?
@@ -120,21 +108,20 @@ function tick_notify_leader(string $today): int
         $a = json_decode((string) $r['answers'], true) ?: [];
         $t = messi_totals($a['grid'] ?? [], array_keys(MESSI_CHANNELS));
         $mark = ['green' => '🟢', 'amber' => '🟡', 'red' => '🔴'][messi_lamp($t)['level']];
-        $lines[] = $mark . ' ' . $r['name'] . ' — ' . $t['open'] . ' aktif, '
-                 . $t['hanging'] . ' gantung' . ($r['status'] === 'late' ? ' (telat)' : '');
+        $reported[] = $mark . ' ' . $r['name'] . ' — ' . $t['open'] . ' aktif, '
+                    . $t['hanging'] . ' gantung' . ($r['status'] === 'late' ? ' (telat)' : '');
+    }
+
+    // Built from the parts that exist, so a day nobody reported does not open with two
+    // blank lines where the names should be.
+    $lines = ['*Rekap MESSI ' . messi_fmt_day($today) . '*'];
+    if ($reported) {
+        $lines[] = '';
+        $lines = array_merge($lines, $reported);
     }
     if ($waiting) {
         $lines[] = '';
         $lines[] = 'Belum lapor: ' . implode(', ', $waiting) . '.';
     }
-    $text = implode("\n", $lines);
-
-    $sent = 0;
-    foreach (q("SELECT * FROM users WHERE active = 1 AND role IN ('leader','admin')
-                 AND telegram_chat_id IS NOT NULL") as $u) {
-        if (tg_send($u['telegram_chat_id'], $text)) {
-            $sent++;
-        }
-    }
-    return $sent;
+    return chat_send(implode("\n", $lines), 'chat_webhook_leader');
 }

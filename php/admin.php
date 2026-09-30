@@ -23,7 +23,7 @@ if ($me['role'] !== 'admin') { http_response_code(403); exit('Halaman ini untuk 
 
 $notice = null;
 $error = null;
-$pairing = null;
+$oneTime = null;
 
 if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST') {
     csrf_check();
@@ -62,12 +62,11 @@ if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST') {
             $notice = 'Password diganti.';
         }
 
-    } elseif ($do === 'pair') {
-        // The code is the front of a one-time token: short enough to type into Telegram,
-        // short-lived enough that a screenshot goes stale.
-        $link = auth_make_login_link((int) $_POST['id'], 60);
-        $pairing = ['id' => (int) $_POST['id'], 'code' => substr((string) parse_url($link, PHP_URL_QUERY), 2, 8)];
-        $notice = 'Kode berlaku 60 menit.';
+    } elseif ($do === 'link') {
+        // One use, 60 minutes. Hand it over privately — in a Google Chat space it would
+        // be a login link for everyone who can read that space.
+        $oneTime = auth_make_login_link((int) $_POST['id'], 60);
+        $notice = 'Berlaku 60 menit, sekali pakai.';
 
     } elseif ($do === 'active') {
         q('UPDATE users SET active = ? WHERE id = ? AND id <> ?',
@@ -81,7 +80,7 @@ if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST') {
     }
 }
 
-$people = q('SELECT id, name, email, role, active, joined_on, telegram_chat_id
+$people = q('SELECT id, name, email, role, active, joined_on
                FROM users ORDER BY active DESC, name')->fetchAll();
 $csrf = csrf_token();
 
@@ -137,14 +136,14 @@ a { color:#1a1c1f; }
   <?php if ($notice): ?><p class="note ok"><?= h($notice) ?></p><?php endif; ?>
   <?php if ($error): ?><p class="note bad"><?= h($error) ?></p><?php endif; ?>
 
-  <?php if ($pairing): ?>
-    <p class="note ok">Kode Telegram: <code><?= h($pairing['code']) ?></code> — suruh orangnya
-       kirim <code>/mulai <?= h($pairing['code']) ?></code> ke bot.</p>
+  <?php if ($oneTime): ?>
+    <p class="note ok">Link masuk sekali pakai — kirim <strong>japri</strong>, jangan ke space:<br>
+       <code><?= h($oneTime) ?></code></p>
   <?php endif; ?>
 
   <div class="card">
   <table>
-    <tr><th>Orang</th><th>Peran</th><th>Mulai</th><th>Telegram</th><th></th></tr>
+    <tr><th>Orang</th><th>Peran</th><th>Mulai</th><th></th></tr>
     <?php foreach ($people as $p): ?>
     <tr class="<?= $p['active'] ? '' : 'off' ?>">
       <td class="who"><strong><?= h($p['name']) ?></strong><span><?= h($p['email']) ?></span></td>
@@ -165,13 +164,12 @@ a { color:#1a1c1f; }
         <?php endif; ?>
       </td>
       <td><?= h(messi_fmt_day($p['joined_on'])) ?></td>
-      <td><?= $p['telegram_chat_id'] ? 'tersambung' : '<span class="tag">belum</span>' ?></td>
       <td>
         <form class="row" method="post">
           <input type="hidden" name="csrf" value="<?= h($csrf) ?>">
-          <input type="hidden" name="do" value="pair">
+          <input type="hidden" name="do" value="link">
           <input type="hidden" name="id" value="<?= (int) $p['id'] ?>">
-          <button class="quiet" type="submit">Kode Telegram</button>
+          <button class="quiet" type="submit">Link masuk</button>
         </form>
         <form class="row" method="post">
           <input type="hidden" name="csrf" value="<?= h($csrf) ?>">

@@ -2,10 +2,14 @@
 /**
  * Who is asking.
  *
- * Two ways in: a password, and a one-time link the Telegram bot sends at 09:00. The
- * second exists because a daily report that starts with a password prompt is a daily
- * report people skip — the link is single-use and short-lived, which is what makes it
- * affordable.
+ * Two ways in: a password, and a one-time link an admin hands out privately for
+ * somebody locked out. The link is single-use and short-lived, which is what makes it
+ * affordable — and why it must never be posted into a shared Google Chat space, where
+ * spending it would be open to everyone who can read the space.
+ *
+ * Sessions last 30 days on purpose. Google Chat webhooks cannot send a private
+ * message, so there is no per-person morning link; a long session is what keeps this
+ * from becoming a daily password prompt, which is a daily report people skip.
  */
 
 declare(strict_types=1);

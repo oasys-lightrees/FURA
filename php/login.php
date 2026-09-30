@@ -15,7 +15,7 @@ messi_require_ready();
 
 $error = null;
 
-// Arriving from Telegram: spend the token and go straight in.
+// Arriving on a one-time link: spend the token and go straight in.
 if (isset($_GET['t'])) {
     if (auth_consume_login_link((string) $_GET['t'])) {
         header('Location: index.php');
@@ -85,8 +85,8 @@ button { width:100%; padding:0.6875rem; font:inherit; font-weight:600; color:#ff
     <input id="password" name="password" type="password" required autocomplete="current-password">
     <button type="submit">Masuk</button>
   </form>
-  <p class="hint">Setiap pagi bot Telegram kirim link yang langsung masuk, jadi password ini
-     jarang dipakai.</p>
+  <p class="hint">Sekali masuk, kamu tetap masuk selama 30 hari — jadi password ini
+     jarang dipakai. Lupa? Minta admin kirim link masuk.</p>
 </main>
 </body>
 </html>

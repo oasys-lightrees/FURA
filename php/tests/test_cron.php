@@ -16,10 +16,10 @@ require_once __DIR__ . '/bootstrap_test.php';
 $root = test_db('messi_cron_test');
 require_once __DIR__ . '/../lib/tick.php';
 
-/* The bot, caught in a bucket. */
+/* What would be posted to Google Chat, caught in a bucket instead. */
 $sent = [];
-Tg::$send = function (string $chat, string $text, ?array $kb) use (&$sent): bool {
-    $sent[] = ['chat' => $chat, 'text' => $text, 'kb' => $kb];
+Chat::$send = function (string $text, string $which) use (&$sent): bool {
+    $sent[] = ['text' => $text, 'space' => $which];
     return true;
 };
 
@@ -31,11 +31,6 @@ function tick_at(string $utc): array
     Clock::freeze($utc);
     messi_tick();
     return $sent;
-}
-
-function to(array $messages, string $chat): array
-{
-    return array_values(array_filter($messages, fn($m) => $m['chat'] === $chat));
 }
 
 function said(array $messages, string $needle): bool
@@ -51,11 +46,11 @@ function said(array $messages, string $needle): bool
 /* --------------------------------------------------------------- the squad */
 
 Clock::freeze('2026-09-28T01:00:00Z');
-$nicho = make_user('nicho@example.test', 'Nicho', 'player', '2026-09-28', '111');
-$chief = make_user('chief@example.test', 'Chief', 'leader', '2026-09-28', '333');
-$dita  = make_user('dita@example.test',  'Dita',  'player', '2026-09-28', null);   // tanpa Telegram
-$rio   = make_user('rio@example.test',   'Rio',   'player', '2026-09-30', '222');  // masuk Rabu
-$budi  = make_user('budi@example.test',  'Budi',  'player', '2026-09-28', '444');
+$nicho = make_user('nicho@example.test', 'Nicho', 'player', '2026-09-28');
+$chief = make_user('chief@example.test', 'Chief', 'leader', '2026-09-28');
+$dita  = make_user('dita@example.test',  'Dita',  'player', '2026-09-28');
+$rio   = make_user('rio@example.test',   'Rio',   'player', '2026-09-30');   // masuk Rabu
+$budi  = make_user('budi@example.test',  'Budi',  'player', '2026-09-28');
 q('UPDATE users SET active = 0 WHERE id = ?', [$budi['id']]);
 
 $clean = ['grid' => ['WAG' => ['open' => 6, 'reply' => 6]], 'declared' => true];
@@ -80,16 +75,17 @@ eq('Rio belum bergabung, jadi belum punya laporan',
    (int) q1('SELECT COUNT(*) n FROM cycles WHERE user_id = ?', [$rio['id']])['n'], 0);
 eq('Budi nonaktif, jadi tidak ikut dibuka',
    (int) q1('SELECT COUNT(*) n FROM cycles WHERE user_id = ?', [$budi['id']])['n'], 0);
-eq('yang punya Telegram dapat pesan pagi', count($m), 2);
-eq('Nicho dapat satu', count(to($m, '111')), 1);
-eq('Budi yang nonaktif tidak dikirimi apa-apa', count(to($m, '444')), 0);
-ok('pesannya menyapa dengan nama', said(to($m, '111'), 'Pagi, Nicho'));
-ok('dan membawa tombol yang langsung masuk',
-   ($m[0]['kb'][0][0]['url'] ?? '') !== '' && str_contains($m[0]['kb'][0][0]['url'], 'login.php?t='));
-ok('hari pertama tidak menuduh siapa pun bolos', !said($m, 'Belum terisi'));
+eq('satu pesan ke space, bukan satu per orang', count($m), 1);
+ok('pesannya menyebut tanggal hari ini', said($m, 'Sen 28 Sep'));
+ok('dan membawa link ke aplikasinya',
+   said($m, '<https://example.test/messi|Isi laporan>'));
+// The one rule a shared space imposes: never post something that logs somebody in.
+ok('TIDAK pernah menempel link masuk sekali pakai di space bersama',
+   !said($m, 'login.php?t='));
+ok('hari pertama tidak menagih janji yang belum ada', !said($m, 'jatuh tempo'));
 
 $m = tick_at('2026-09-28T02:00:00Z');                       // 09:00 lagi
-eq('cron yang jalan dua kali tidak mengirim dua kali', count($m), 0);
+eq('cron yang jalan dua kali tidak memposting dua kali', count($m), 0);
 eq('dan tidak membuat laporan kedua',
    (int) q1('SELECT COUNT(*) n FROM cycles WHERE day = ?', ['2026-09-28'])['n'], 3);
 
@@ -100,8 +96,9 @@ Clock::freeze('2026-09-28T04:00:00Z');
 repo_save_cycle($nicho, uid((int) $nicho['id']) . '__2026-09-28', hanging('2026-09-29'));
 
 $m = tick_at('2026-09-28T10:00:00Z');                       // 17:00
-eq('yang diingatkan hanya yang belum lapor', count($m), 1);
-eq('dan itu Chief, bukan Nicho yang sudah lapor', $m[0]['chat'], '333');
+eq('pengingatnya satu pesan', count($m), 1);
+ok('yang disebut hanya yang belum lapor', said($m, 'Chief') && said($m, 'Dita'));
+ok('Nicho yang sudah lapor tidak ikut disebut', !said($m, 'Nicho'));
 ok('bunyinya soal tenggat', said($m, '18:00'));
 
 $m = tick_at('2026-09-28T10:00:00Z');
@@ -111,8 +108,8 @@ Clock::freeze('2026-09-28T10:30:00Z');
 repo_save_cycle($chief, uid((int) $chief['id']) . '__2026-09-28', $clean);
 
 $m = tick_at('2026-09-28T11:00:00Z');                       // 18:00
-eq('rekap dikirim ke leader saja', count($m), 1);
-eq('dan leader itu Chief', $m[0]['chat'], '333');
+eq('rekapnya satu pesan', count($m), 1);
+eq('dan diarahkan ke space rekap', $m[0]['space'], 'chat_webhook_leader');
 ok('rekap menyebut yang sudah lapor', said($m, 'Nicho'));
 ok('rekap menandai yang gantung dengan merah', said($m, '🔴 Nicho'));
 ok('rekap menandai yang bersih dengan hijau', said($m, '🟢 Chief'));
@@ -129,11 +126,9 @@ eq('tapi yang sudah dilaporkan tidak ikut tersapu',
    q1('SELECT status FROM cycles WHERE user_id = ? AND day = ?',
       [$nicho['id'], '2026-09-28'])['status'], 'submitted');
 
-ok('Nicho diingatkan janjinya yang jatuh tempo hari ini',
-   said(to($m, '111'), 'Telepon Klien A'));
-ok('Nicho tidak dituduh bolos, karena dia lapor kemarin',
-   !said(to($m, '111'), 'Belum terisi'));
-ok('Chief juga tidak, karena dia lapor kemarin', !said(to($m, '333'), 'Belum terisi'));
+ok('janji yang jatuh tempo hari ini disebut di pesan pagi',
+   said($m, 'Telepon Klien A'));
+ok('lengkap dengan nama yang menjanjikan', said($m, 'Nicho — Telepon Klien A'));
 
 Clock::freeze('2026-09-29T04:00:00Z');
 $promise = q1('SELECT * FROM commitments WHERE user_id = ?', [$nicho['id']]);
@@ -155,20 +150,11 @@ $m = tick_at('2026-09-30T02:00:00Z');                       // 09:00
 eq('Rio yang baru masuk hari ini langsung punya laporan',
    (int) q1('SELECT COUNT(*) n FROM cycles WHERE user_id = ? AND day = ?',
             [$rio['id'], '2026-09-30'])['n'], 1);
-ok('tapi tidak ditagih hari-hari sebelum dia masuk',
-   !said(to($m, '222'), 'Belum terisi'));
-eq('yang dikirimi pagi itu bertiga: Nicho, Chief, Rio', count($m), 3);
-ok('Dita tidak dikirimi apa-apa, karena Telegram-nya belum tersambung',
-   !said($m, 'Pagi, Dita'));
+eq('tetap satu pesan, berapa pun orangnya', count($m), 1);
 
-// Dita menyambungkan Telegram-nya hari ini.
-q('UPDATE users SET telegram_chat_id = ? WHERE id = ?', ['555', $dita['id']]);
-q('DELETE FROM job_log WHERE kind = ? AND detail LIKE ?', ['notify_open', '2026-09-30%']);
-$m = tick_at('2026-09-30T02:00:00Z');
-ok('begitu tersambung, dia diberi tahu hari apa saja yang kosong',
-   said(to($m, '555'), 'Belum terisi'));
-ok('dan hari-harinya disebut dengan nama, bukan tanggal mentah',
-   said(to($m, '555'), 'Sen 28 Sep') && said(to($m, '555'), 'Sel 29 Sep'));
+// Sore hari: Rio yang baru masuk ikut disebut kalau memang belum lapor.
+$m = tick_at('2026-09-30T10:00:00Z');                       // 17:00
+ok('orang baru ikut diingatkan pada hari pertamanya', said($m, 'Rio'));
 
 /* ================================== Kamis 1 Okt — janji yang tidak ditepati */
 
@@ -179,8 +165,8 @@ eq('janji Chief yang lewat tanggal patah dengan sendirinya',
 eq('janji Nicho yang ditepati tetap ditepati',
    q1('SELECT status FROM commitments WHERE user_id = ? ORDER BY id LIMIT 1',
       [$nicho['id']])['status'], 'kept');
-ok('Chief tidak lagi diingatkan soal janji yang sudah patah',
-   !said(to($m, '333'), 'Telepon Klien A'));
+ok('janji yang sudah patah tidak lagi ditagih di pesan pagi',
+   !said($m, 'Chief — Telepon Klien A'));
 
 /* ============================================== Sabtu 3 Okt — akhir pekan */
 
@@ -193,8 +179,21 @@ eq('dan tidak ada yang diganggu', count($m), 0);
 $m = tick_at('2026-10-05T02:00:00Z');                       // Senin lagi
 ok('Senin berikutnya jalan seperti biasa',
    (int) q1('SELECT COUNT(*) n FROM cycles WHERE day = ?', ['2026-10-05'])['n'] > 0);
-ok('dan akhir pekan tidak dihitung sebagai hari bolos',
-   !said(to($m, '111'), 'Sab 3 Okt') && !said(to($m, '111'), 'Min 4 Okt'));
+ok('dan pesannya menyebut Senin, bukan akhir pekan', said($m, 'Sen 5 Okt'));
+
+/* ------------------------------------------- kalau webhook-nya belum diisi */
+
+Chat::$send = null;                       // seperti config tanpa chat_webhook
+$m2 = [];
+q('DELETE FROM job_log WHERE kind = ?', ['notify_open']);
+Clock::freeze('2026-10-06T02:00:00Z');
+$did = messi_tick();
+ok('tanpa webhook, hari tetap dibuka — pesannya saja yang tidak ada',
+   ($did['opened'] ?? 0) > 0 && ($did['asked'] ?? 0) === 0);
+Chat::$send = function (string $text, string $which) use (&$sent): bool {
+    $sent[] = ['text' => $text, 'space' => $which];
+    return true;
+};
 
 /* ------------------------------------------------------- catatan yang tertinggal */
 
@@ -203,6 +202,6 @@ eq('setiap pekerjaan meninggalkan catatan',
    $kinds, ['break_overdue', 'generate', 'notify_due', 'notify_leader', 'notify_open', 'reap']);
 
 Clock::unfreeze();
-Tg::$send = null;
+Chat::$send = null;
 $root->exec('DROP DATABASE `' . $GLOBALS['MESSI_TEST_DBNAME'] . '`');
 done();

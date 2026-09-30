@@ -9,7 +9,7 @@ cPanel -> Software -> Select PHP Version (atau MultiPHP Manager) -> pilih 8.1 / 
 0. CEK DULU HOSTINGNYA SANGGUP ATAU TIDAK
    Setelah langkah 3 (upload), buka:  https://namadomain.com/messi/cek.php
    Halaman itu memeriksa versi PHP, ekstensi yang dibutuhkan, koneksi database,
-   tabel, HTTPS, base_url, dan apakah hosting ini boleh menghubungi Telegram.
+   tabel, HTTPS, base_url, dan apakah hosting ini boleh menghubungi Google Chat.
    Setiap yang kurang disebutkan beserta cara membetulkannya, dan di bawahnya ada
    perintah cron yang sudah jadi untuk hosting ini.
 
@@ -83,18 +83,35 @@ cPanel -> Software -> Select PHP Version (atau MultiPHP Manager) -> pilih 8.1 / 
    akan pernah ditandai bolos untuk hari sebelum dia bergabung.
 
 
-TELEGRAM (boleh dilewati dulu)
-------------------------------
-Tanpa Telegram aplikasinya tetap jalan penuh; bedanya orang harus ingat sendiri
-membuka halamannya. Dengan Telegram, tiap pagi jam 09:00 bot mengirim link yang
-langsung masuk tanpa password.
+GOOGLE CHAT (boleh dilewati dulu)
+---------------------------------
+Tanpa ini aplikasinya tetap jalan penuh; bedanya tidak ada pesan otomatis.
+Dengan ini, tiap hari kerja space squad dapat tiga pesan:
 
- a. Chat @BotFather di Telegram -> /newbot -> salin tokennya ke 'telegram_token'
-    di config.php
- b. Buka sekali di browser (ganti TOKEN dan alamatnya):
-    https://api.telegram.org/botTOKEN/setWebhook?url=https://namadomain.com/messi/api/telegram.php?key=CRON_KEY
- c. Di halaman Squad klik "Kode Telegram" untuk orangnya, lalu suruh dia kirim
-    /mulai KODE ke bot. Berlaku 60 menit.
+  09:00  laporan hari ini dibuka + janji siapa saja yang jatuh tempo hari ini
+  17:00  pengingat, menyebut siapa yang belum lapor
+  18:00  rekap: siapa hijau/kuning/merah, dan siapa yang belum lapor
+
+Cara pasang, sekitar 2 menit:
+
+ a. Buka space squad di Google Chat
+ b. Klik nama space di atas -> Apps & integrations -> Webhooks -> Add webhooks
+ c. Beri nama "MESSI" -> Save -> salin URL-nya
+ d. Tempel ke 'chat_webhook' di config.php
+ e. Buka cek.php -> klik "Kirim pesan uji" -> pesan harus muncul di space
+
+Kalau mau rekap jam 18:00 masuk ke space terpisah (misal space leader), bikin
+webhook kedua di space itu dan tempel ke 'chat_webhook_leader'. Dikosongkan
+berarti rekapnya ikut ke space squad.
+
+CATATAN PENTING: webhook Google Chat itu memposting ke SATU SPACE, bukan japri
+ke tiap orang. Karena itu pesan paginya berisi link biasa, bukan link yang
+langsung memasukkan — link semacam itu di space bersama berarti siapa pun di
+space bisa masuk sebagai orang lain. Orang masuk dengan password sekali, dan
+sesinya bertahan 30 hari, jadi praktis login sebulan sekali.
+
+Ada yang lupa password? Halaman Squad -> tombol "Link masuk" -> kirim JAPRI ke
+orangnya. Berlaku 60 menit, sekali pakai.
 
 
 KALAU ADA MASALAH
@@ -119,7 +136,8 @@ Mau cek cron tanpa menunggu sejam
   Buka: https://namadomain.com/messi/cron/tick.php?key=CRON_KEY
   Dia akan menulis satu baris ringkasan apa yang barusan dikerjakan.
 
-Bot Telegram tidak mengirim apa-apa
-  Buka cek.php. Sebagian hosting memblokir koneksi keluar, dan itu membuat bot
-  diam tanpa error. cek.php menguji koneksi ke api.telegram.org dan bilang kalau
-  diblokir. Kalau memang diblokir, minta hosting membuka port 443 ke sana.
+Pesan otomatis tidak muncul di Google Chat
+  Buka cek.php dan klik "Kirim pesan uji". Dia menguji koneksi ke
+  chat.googleapis.com dan mencoba memposting betulan. Dua kemungkinan:
+  URL webhook-nya salah salin, atau hosting memblokir koneksi keluar. Kalau
+  diblokir, minta hosting membuka port 443 ke chat.googleapis.com.

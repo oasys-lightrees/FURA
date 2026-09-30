@@ -2,7 +2,7 @@
 
 The parts nobody thinks to test until the day they are needed: the first account on a
 fresh install, adding somebody, changing what they are allowed to see, resetting a
-password, and connecting a Telegram account to the right person.
+password, and handing somebody a one-time link when they are locked out.
 
     MESSI_TEST_SOCKET=/var/run/mysqld/mysqld.sock python3 php/tests/test_admin.py
 """
@@ -145,52 +145,36 @@ with Host("messi_admin_test", seed="empty") as host, sync_playwright() as p:
     check("password baru berlaku", fresh.inner_text("h1"), "Berapa banyak hari ini?")
     stale.close()
 
-    print("\n=== menyambungkan Telegram ===")
+    print("\n=== link masuk sekali pakai ===")
     chief.reload()
     chief.wait_for_load_state("networkidle")
     row = chief.locator("tr", has_text="nicho@example.test")
-    check("Telegram-nya memang belum tersambung", row.inner_text(), lambda s: "belum" in s)
-    row.locator("button:has-text('Kode Telegram')").click()
+    row.locator("button:has-text('Link masuk')").click()
     chief.wait_for_load_state("networkidle")
-    code = chief.inner_text(".ok code").strip()
-    check("kodenya pendek dan bisa diketik", code, lambda s: len(s) == 8 and s.isalnum())
+    link = chief.inner_text(".ok code").strip()
+    check("linknya lengkap dan sekali pakai", link,
+          lambda s: s.startswith(host.base) and "login.php?t=" in s)
+    # The warning belongs next to the link itself, not in the notice above it.
+    check("admin diingatkan mengirimnya japri, bukan ke space",
+          chief.locator(".note.ok", has=chief.locator("code")).inner_text(),
+          lambda s: "japri" in s)
 
-    def webhook(body, key="test-key"):
-        return chief.evaluate(
-            """async ([url, body]) => {
-                 const r = await fetch(url, { method: "POST",
-                   headers: { "Content-Type": "application/json" }, body });
-                 return r.status;
-               }""",
-            [host.base + "/api/telegram.php?key=" + key, json.dumps(body)])
+    spent = browser.new_context(viewport={"width": 400, "height": 900})
+    sp = spent.new_page()
+    sp.goto(link)
+    sp.wait_for_load_state("networkidle")
+    sp.wait_for_timeout(600)
+    check("linknya memang memasukkan orangnya", sp.inner_text("h1"),
+          lambda s: "Berapa banyak" in s or "Sudah terkirim" in s)
+    spent.close()
 
-    def update(text, chat=98765):
-        return {"message": {"chat": {"id": chat}, "text": text}}
-
-    check("webhook tanpa kunci ditolak", webhook(update("/mulai " + code), "salah"), 403)
-    check("kode yang salah tidak menyambungkan apa-apa",
-          webhook(update("/mulai " + "0" * 8)), 200)
-    chief.reload()
-    chief.wait_for_load_state("networkidle")
-    check("dan memang tidak tersambung",
-          chief.locator("tr", has_text="nicho@example.test").inner_text(),
-          lambda s: "belum" in s)
-
-    check("kode yang benar diterima", webhook(update("/mulai " + code)), 200)
-    chief.reload()
-    chief.wait_for_load_state("networkidle")
-    check("sekarang tersambung",
-          chief.locator("tr", has_text="nicho@example.test").inner_text(),
-          lambda s: "tersambung" in s)
-
-    check("kode yang sama tidak bisa dipakai orang kedua",
-          webhook(update("/mulai " + code, chat=11111)), 200)
-    linked = host.php("-r", """
-        require "lib/bootstrap.php";
-        echo (string) q1("SELECT telegram_chat_id c FROM users WHERE email = ?",
-                         ["nicho@example.test"])["c"];
-    """).stdout.strip()
-    check("dan chat yang terhubung tetap yang pertama", linked, "98765")
+    again = browser.new_context(viewport={"width": 400, "height": 900})
+    ag = again.new_page()
+    ag.goto(link)
+    ag.wait_for_load_state("networkidle")
+    check("dan tidak bisa dipakai kedua kalinya",
+          ag.inner_text(".err"), lambda s: "sudah dipakai" in s or "kedaluwarsa" in s)
+    again.close()
 
     print("\n=== menonaktifkan ===")
     chief.reload()

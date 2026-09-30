@@ -14,13 +14,11 @@ CREATE TABLE IF NOT EXISTS users (
   name            VARCHAR(120) NOT NULL,
   password_hash   VARCHAR(255) NOT NULL,
   role            ENUM('player','leader','admin') NOT NULL DEFAULT 'player',
-  telegram_chat_id VARCHAR(40) DEFAULT NULL,
   joined_on       DATE NOT NULL,
   active          TINYINT(1) NOT NULL DEFAULT 1,
   created_at      DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (id),
   UNIQUE KEY uq_users_email (email),
-  UNIQUE KEY uq_users_tg (telegram_chat_id),
   KEY ix_users_active (active, role)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
@@ -34,7 +32,9 @@ CREATE TABLE IF NOT EXISTS sessions (
   CONSTRAINT fk_sessions_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- One-time links the Telegram bot sends at 09:00, so nobody logs in every morning.
+-- One-time login links. Google Chat webhooks post to a shared space, so these are
+-- never posted there — anyone in the space could spend one. An admin hands them out
+-- privately instead, for somebody locked out.
 CREATE TABLE IF NOT EXISTS login_tokens (
   token           CHAR(64) NOT NULL,
   user_id         INT UNSIGNED NOT NULL,

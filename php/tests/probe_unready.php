@@ -15,7 +15,7 @@ $GLOBALS['MESSI_CONFIG'] = [
         'user'   => getenv('MESSI_TEST_USER') ?: 'root',
         'pass'   => getenv('MESSI_TEST_PASS') ?: '',
     ],
-    'base_url' => 'https://example.test', 'telegram_token' => '', 'cron_key' => 'x',
+    'base_url' => 'https://example.test', 'chat_webhook' => '', 'cron_key' => 'x',
     'first_day' => '2026-09-28', 'session_days' => 30,
 ];
 

@@ -214,7 +214,7 @@ $bad = sys_get_temp_dir() . '/messi-bad-config.php';
 file_put_contents($bad, '<?php return ' . var_export([
     'db' => ['host' => '127.0.0.1', 'socket' => '', 'name' => 'tidak_ada_database_ini',
              'user' => 'bukan_user', 'pass' => 'bukan_password'],
-    'base_url' => 'https://example.test', 'telegram_token' => '', 'cron_key' => 'x',
+    'base_url' => 'https://example.test', 'chat_webhook' => '', 'cron_key' => 'x',
     'first_day' => '2026-09-28', 'session_days' => 30,
 ], true) . ';');
 $out = shell_exec('cd ' . escapeshellarg(dirname(__DIR__))

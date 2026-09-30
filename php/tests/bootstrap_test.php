@@ -100,7 +100,8 @@ function test_db(string $name): PDO
     $GLOBALS['MESSI_CONFIG'] = [
         'db' => ['host' => $host, 'socket' => $socket, 'name' => $name, 'user' => $user, 'pass' => $pass],
         'base_url' => 'https://example.test/messi',
-        'telegram_token' => '',
+        'chat_webhook' => '',
+        'chat_webhook_leader' => '',
         'cron_key' => 'test',
         'first_day' => '2026-09-28',
         'session_days' => 30,
@@ -110,12 +111,11 @@ function test_db(string $name): PDO
 
 const TEST_PASSWORD = 'kata-sandi-panjang';
 
-function make_user(string $email, string $name, string $role, string $joined,
-                   ?string $chat = null): array
+function make_user(string $email, string $name, string $role, string $joined): array
 {
-    q('INSERT INTO users (email, name, password_hash, role, joined_on, telegram_chat_id, created_at)
-       VALUES (?,?,?,?,?,?,?)',
-      [$email, $name, password_hash(TEST_PASSWORD, PASSWORD_DEFAULT), $role, $joined, $chat,
+    q('INSERT INTO users (email, name, password_hash, role, joined_on, created_at)
+       VALUES (?,?,?,?,?,?)',
+      [$email, $name, password_hash(TEST_PASSWORD, PASSWORD_DEFAULT), $role, $joined,
        Clock::nowUtcSql()]);
     return q1('SELECT * FROM users WHERE email = ?', [$email]);
 }

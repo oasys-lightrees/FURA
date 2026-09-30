@@ -260,9 +260,6 @@ with Host("messi_live_test") as host, sync_playwright() as p:
 
     check("cron tanpa kunci ditolak",
           pg.evaluate("""async () => (await fetch("cron/tick.php?key=salah")).status"""), 403)
-    check("webhook Telegram tanpa kunci ditolak",
-          pg.evaluate("""async () => (await fetch("api/telegram.php?key=salah",
-                          { method: "POST", body: "{}" })).status"""), 403)
     check("halaman admin tertutup untuk pemain",
           pg.evaluate("""async () => (await fetch("admin.php")).status"""), 403)
     check("setup tertutup begitu sudah ada akun",

@@ -34,7 +34,7 @@ kurang, tiap halaman menampilkan penjelasan dan cara menggantinya
 
    Setelah upload, `cek.php` memeriksa sisanya sendiri: ekstensi, database, tabel,
    HTTPS, apakah `base_url` cocok dengan alamat yang sedang dibuka, apakah hosting
-   boleh menghubungi Telegram, dan kapan cron terakhir jalan. Buka lagi tiap selesai
+   boleh menghubungi Google Chat, dan kapan cron terakhir jalan. Buka lagi tiap selesai
    satu langkah sampai hijau semua.
 
 1. **Buat database.** cPanel → *MySQL® Databases*. Buat database, buat user, kaitkan
@@ -71,22 +71,27 @@ kurang, tiap halaman menampilkan penjelasan dan cara menggantinya
    *Mulai lapor* menentukan sejak kapan seseorang dihitung — orang baru tidak akan
    pernah ditandai bolos untuk hari sebelum dia bergabung.
 
-## Telegram (boleh dilewati)
+## Google Chat (boleh dilewati)
 
-Tanpa Telegram aplikasinya tetap jalan; bedanya orang harus ingat sendiri untuk membuka
-halamannya. Dengan Telegram, tiap pagi jam 09:00 bot mengirim link yang langsung masuk —
-satu ketuk, tidak perlu password.
+Tanpa ini aplikasinya tetap jalan; bedanya orang harus ingat sendiri membuka
+halamannya. Dengan ini, space squad dapat tiga pesan tiap hari kerja.
 
-1. Chat `@BotFather` di Telegram → `/newbot` → salin tokennya ke `telegram_token` di
-   `config.php`.
-2. Daftarkan webhook-nya, sekali:
-   `https://api.telegram.org/bot<TOKEN>/setWebhook?url=https://alamat-kamu/messi/api/telegram.php?key=CRON_KEY`
-3. Di halaman *Squad*, klik **Kode Telegram** untuk orang yang bersangkutan, lalu suruh
-   dia kirim `/mulai KODE` ke bot. Kodenya berlaku 60 menit.
+1. Buka space squad → klik nama space → *Apps & integrations* → *Webhooks* →
+   *Add webhooks* → beri nama → salin URL-nya ke `chat_webhook` di `config.php`.
+2. Buka `cek.php` → *Kirim pesan uji* → pesannya harus muncul di space.
 
-WhatsApp sengaja tidak ada. WhatsApp pribadi tidak punya API resmi, dan library yang
-mengaku punya bekerja dengan cara yang melanggar ketentuan layanan — risikonya nomor
-perusahaan sendiri yang diblokir. Lihat `docs/09-integrations.md`.
+`chat_webhook_leader` opsional: rekap 18:00 ke space terpisah. Kosong berarti ikut
+ke space squad, yang memang tempat laporan MESSI selalu diposting.
+
+**Sebuah webhook memposting ke satu space, bukan japri.** Itu satu fakta yang
+membentuk semuanya: pesan pagi membawa alamat biasa, bukan link sekali-pakai yang
+langsung memasukkan — di space bersama, link seperti itu memasukkan *siapa pun yang
+bisa membaca space itu*. Orang login dengan password, dan sesinya 30 hari, jadi
+praktis sebulan sekali. Untuk yang terkunci, halaman Squad punya tombol *Link masuk*
+yang menghasilkan link 60 menit sekali-pakai, untuk dikirim japri.
+
+WhatsApp tetap tidak ada: WhatsApp pribadi tidak punya API resmi, dan library yang
+mengaku punya berisiko nomor perusahaan sendiri diblokir. Lihat `docs/09-integrations.md`.
 
 ## Apa yang dikerjakan cron
 
@@ -95,12 +100,12 @@ Dijalankan tiap jam, dan aman kalau jalan dua kali atau terlewat satu jam:
 | Jam | Yang terjadi |
 |-----|--------------|
 | tiap jam | hari yang lewat tanpa laporan ditandai *tidak lapor*; janji yang lewat tanggal ditandai *tidak ditepati*; token kedaluwarsa dibuang |
-| 09:00 | laporan hari ini dibuka, bot mengirim link ke tiap orang |
-| 17:00 | pengingat, hanya ke yang belum lapor |
-| 18:00 | rekap hari itu ke leader |
+| 09:00 | laporan dibuka; satu pesan ke space, menyebut janji yang jatuh tempo hari ini |
+| 17:00 | pengingat, menyebut siapa yang belum lapor — tidak dikirim kalau semua sudah |
+| 18:00 | rekap hari itu |
 
-Setiap pengiriman dicatat di tabel `job_log`, jadi "kenapa saya tidak dapat pesan?"
-selalu ada jawabannya.
+Setiap pengiriman dicatat di tabel `job_log`, jadi "kenapa tidak ada pesan?" selalu
+ada jawabannya. URL webhook-nya membawa kunci sendiri, jadi tidak pernah ikut tercatat.
 
 ## Susunan file
 
@@ -110,23 +115,22 @@ app.html           salinan persis web/messi.html
 login.php          masuk: password, atau link sekali pakai dari bot
 setup.php          akun admin pertama (hapus setelah dipakai)
 cek.php            apakah hosting ini sanggup, dan apa yang masih kurang
-admin.php          daftar squad: tambah orang, ganti password, kode Telegram
+admin.php          daftar squad: tambah orang, ganti password, link masuk
 api/data.php       ambil semua data
 api/save.php       simpan satu dokumen
 api/logout.php     keluar
-api/telegram.php   webhook bot
 cron/tick.php      titik masuk cron
 lib/tick.php       mesinnya: buka hari, tandai yang bolos, patahkan janji, kirim pesan
 lib/engine.php     aturan: tanggal, hitungan, lampu, validasi, format laporan
 lib/bootstrap.php  konfigurasi + koneksi database
 lib/auth.php       siapa yang sedang bertanya
 lib/repo.php       baca/tulis, dengan pemeriksaan yang tidak bisa dilewati browser
-lib/telegram.php   bot
+lib/chat.php       Google Chat
 lib/require-php8.php  penjaga versi PHP, dibaca paling awal
 install.sql        enam tabel
 PASANG.txt         langkah pemasangan, bahasa non-teknis
 make-zip.sh        bikin messi-cpanel.zip
-tests/             241 pemeriksaan (tidak ikut ke server)
+tests/             232 pemeriksaan (tidak ikut ke server)
 ```
 
 ## Yang diputuskan server, bukan browser
@@ -164,9 +168,9 @@ menyebutkan mana yang barusan terjadi.
 |--------|--------|
 | `tests/test_engine.php` | 55 — aturan, dicocokkan dengan `tests/test_core.py` |
 | `tests/test_repo.php` | 52 — terhadap MySQL sungguhan, di database yang dia buat sendiri |
-| `tests/test_cron.php` | 47 — seminggu penuh jam demi jam, jam dibekukan, pesan bot ditangkap |
-| `tests/test_live.py` | 46 — browser terhadap aplikasi yang benar-benar jalan |
-| `tests/test_admin.py` | 41 — pemasangan pertama, tambah orang, ganti password, pasang Telegram |
+| `tests/test_cron.php` | 44 — seminggu penuh jam demi jam, jam dibekukan, pesan bot ditangkap |
+| `tests/test_live.py` | 45 — browser terhadap aplikasi yang benar-benar jalan |
+| `tests/test_admin.py` | 36 — pemasangan pertama, tambah orang, ganti password, link sekali pakai |
 | `tests/check_sync.php` | memastikan `app.html` belum menyimpang dari `web/messi.html` |
 
 Yang dicoba juga: laporan atas nama orang lain, permintaan tanpa token, cron tanpa kunci,

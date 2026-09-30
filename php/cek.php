@@ -4,7 +4,7 @@
  *
  * Built because guessing whether a shared host can run this is slower than asking it.
  * Three things vary between hosts and all three fail quietly: the PHP version, whether
- * outbound HTTPS is allowed (the Telegram bot needs it), and whether base_url matches
+ * outbound HTTPS is allowed (posting to Google Chat needs it), and whether base_url matches
  * the address people actually type.
  *
  * Open it right after uploading, before anything else. Once an admin account exists it
@@ -35,14 +35,14 @@ row('ok', 'Versi PHP', PHP_VERSION);   // require-php8.php sudah menghentikan ya
 foreach (['pdo_mysql' => 'wajib — untuk bicara ke MySQL',
           'json'      => 'wajib — untuk menyimpan jawaban',
           'mbstring'  => 'wajib — untuk nama dan teks Indonesia',
-          'curl'      => 'hanya untuk bot Telegram'] as $ext => $why) {
+          'curl'      => 'hanya untuk pesan ke Google Chat'] as $ext => $why) {
     $have = extension_loaded($ext);
     $need = $ext !== 'curl';
     row($have ? 'ok' : ($need ? 'bad' : 'warn'), 'Ekstensi ' . $ext,
         $have ? 'ada' : 'tidak ada',
         $have ? '' : ($need
             ? 'Nyalakan di cPanel &rarr; <em>Select PHP Version</em> &rarr; tab <em>Extensions</em>.'
-            : 'Tanpa ini aplikasinya tetap jalan, tapi bot Telegram tidak bisa mengirim pesan.'));
+            : 'Tanpa ini aplikasinya tetap jalan, tapi pesan ke Google Chat tidak bisa dikirim.'));
 }
 
 /* --------------------------------------------------------------- config */
@@ -120,7 +120,7 @@ if ($hasConfig) {
 /* -------------------------------------------------------- keluar jaringan */
 
 if (extension_loaded('curl')) {
-    $ch = curl_init('https://api.telegram.org/');
+    $ch = curl_init('https://chat.googleapis.com/');
     curl_setopt_array($ch, [CURLOPT_RETURNTRANSFER => true, CURLOPT_TIMEOUT => 8,
                             CURLOPT_NOBODY => true]);
     curl_exec($ch);
@@ -128,23 +128,29 @@ if (extension_loaded('curl')) {
     $code = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE);
     curl_close($ch);
     $reach = $code > 0;
-    row($reach ? 'ok' : 'warn', 'Bisa menghubungi api.telegram.org',
+    row($reach ? 'ok' : 'warn', 'Bisa menghubungi chat.googleapis.com',
         $reach ? 'bisa' : ('tidak — ' . ($err ?: 'tidak ada jawaban')),
-        $reach ? '' : 'Sebagian hosting memblokir koneksi keluar. Tanpa ini bot Telegram '
-          . 'tidak bisa mengirim apa pun; aplikasinya sendiri tetap jalan. Minta hosting '
-          . 'membuka akses keluar ke <code>api.telegram.org</code> port 443.');
+        $reach ? '' : 'Sebagian hosting memblokir koneksi keluar. Tanpa ini pesan otomatis '
+          . 'ke Google Chat tidak terkirim; aplikasinya sendiri tetap jalan. Minta hosting '
+          . 'membuka akses keluar ke <code>chat.googleapis.com</code> port 443.');
 }
 
-if ($hasConfig && trim((string) cfg('telegram_token')) !== '') {
-    $ch = curl_init('https://api.telegram.org/bot' . cfg('telegram_token') . '/getMe');
-    curl_setopt_array($ch, [CURLOPT_RETURNTRANSFER => true, CURLOPT_TIMEOUT => 8]);
-    $body = (string) curl_exec($ch);
-    curl_close($ch);
-    $me = json_decode($body, true);
-    $good = is_array($me) && !empty($me['ok']);
-    row($good ? 'ok' : 'warn', 'Token bot Telegram',
-        $good ? '@' . ($me['result']['username'] ?? '?') : 'ditolak Telegram',
-        $good ? '' : 'Cek lagi tokennya dari @BotFather.');
+if ($hasConfig) {
+    $hook = trim((string) cfg('chat_webhook'));
+    if ($hook === '') {
+        row('warn', 'Webhook Google Chat', 'belum diisi',
+            'Buka space squad &rarr; klik nama space &rarr; <em>Apps &amp; integrations</em> '
+            . '&rarr; <em>Webhooks</em> &rarr; <em>Add webhooks</em> &rarr; salin URL-nya ke '
+            . '<code>chat_webhook</code> di config.php. Tanpa ini aplikasinya tetap jalan, '
+            . 'cuma tidak ada pesan pagi, pengingat, atau rekap.');
+    } elseif (!str_starts_with($hook, 'https://chat.googleapis.com/')) {
+        row('bad', 'Webhook Google Chat', 'bukan alamat Google Chat',
+            'URL-nya harus diawali <code>https://chat.googleapis.com/v1/spaces/</code>. '
+            . 'Salin ulang dari space-nya.');
+    } else {
+        row('ok', 'Webhook Google Chat', 'terisi',
+            'Mau pastikan sampai? Klik tombol di bawah — satu pesan uji dikirim ke space.');
+    }
 }
 
 /* ------------------------------------------------------------------ cron */
@@ -161,6 +167,21 @@ if ($installed) {
             'Belum dipasang, atau baru dipasang dan belum sampai menit ke-0. '
             . 'Mau langsung coba? Buka <code>cron/tick.php?key=</code> diikuti cron_key kamu.');
     }
+}
+
+/* ------------------------------------------------------------ uji kirim */
+
+if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST' && isset($_POST['uji']) && $hasConfig) {
+    require_once __DIR__ . '/lib/chat.php';
+    $sent = chat_send('Tes dari MESSI. Kalau pesan ini kelihatan, webhook-nya sudah benar.');
+    array_unshift($rows, [
+        'state' => $sent ? 'ok' : 'bad',
+        'what'  => 'Pesan uji',
+        'found' => $sent ? 'terkirim — cek space squad' : 'gagal terkirim',
+        'fix'   => $sent ? '' : 'Salin ulang URL webhook-nya dari space. Kalau tetap gagal, '
+                   . 'lihat tabel <code>job_log</code> baris <code>chat_error</code>.',
+    ]);
+    if (!$sent) { $fatal++; }
 }
 
 /* --------------------------------------------------------------- tampilan */
@@ -232,6 +253,16 @@ a { color:#1a1c1f; }
     </div>
   <?php endforeach; ?>
   </div>
+
+  <?php if ($hasConfig && trim((string) cfg('chat_webhook')) !== ''): ?>
+  <h2>Uji kirim ke Google Chat</h2>
+  <form method="post" style="margin:0 0 .5rem">
+    <button type="submit" name="uji" value="1" style="padding:.625rem 1rem;font:inherit;
+      font-weight:600;color:#fff;background:#1a1c1f;border:0;border-radius:.5rem;cursor:pointer">
+      Kirim pesan uji</button>
+  </form>
+  <p class="sub" style="margin:0 0 1rem">Satu pesan pendek akan muncul di space squad.</p>
+  <?php endif; ?>
 
   <h2>Perintah cron untuk hosting ini</h2>
   <p class="sub" style="margin:0 0 .75rem">Salin ke cPanel &rarr; <em>Cron Jobs</em> &rarr;
