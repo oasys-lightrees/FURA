@@ -204,6 +204,23 @@ with Host("messi_admin_test", seed="empty") as host, sync_playwright() as p:
           blocked.inner_text(".err"), lambda s: "salah" in s)
     gone.close()
 
+    print("\n=== halaman cek hosting ===")
+    check("cek.php tertutup untuk yang belum masuk",
+          nicho.evaluate("""async () => { const r = await fetch("cek.php", {credentials:"omit"});
+                                          return r.status; }"""), 403)
+    chief.goto(host.base + "/cek.php")
+    chief.wait_for_load_state("networkidle")
+    body = chief.inner_text("body")
+    check("admin melihat hasilnya", body, lambda s: "Cek hosting" in s)
+    check("versi PHP diperiksa", body, lambda s: "Versi PHP" in s)
+    check("tabelnya diperiksa", body, lambda s: "lengkap, enam tabel" in s)
+    check("base_url dicocokkan dengan alamat yang sedang dibuka",
+          body, lambda s: "base_url" in s)
+    check("perintah cron dibuatkan lengkap dengan path-nya",
+          body, lambda s: "cron/tick.php" in s)
+    check("tidak pernah menampilkan password database",
+          "ganti-ini" not in body and "kata-sandi" not in body)
+
     print("\n=== yang tidak boleh terjadi ===")
     forged = chief.evaluate(
         """async url => {

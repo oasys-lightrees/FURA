@@ -32,6 +32,11 @@ kurang, tiap halaman menampilkan penjelasan dan cara menggantinya
 
 0. **Pastikan PHP 8.** cPanel → *Select PHP Version* → 8.1 atau 8.2.
 
+   Setelah upload, `cek.php` memeriksa sisanya sendiri: ekstensi, database, tabel,
+   HTTPS, apakah `base_url` cocok dengan alamat yang sedang dibuka, apakah hosting
+   boleh menghubungi Telegram, dan kapan cron terakhir jalan. Buka lagi tiap selesai
+   satu langkah sampai hijau semua.
+
 1. **Buat database.** cPanel → *MySQL® Databases*. Buat database, buat user, kaitkan
    user ke database dengan *All Privileges*. Catat tiga nama yang muncul — semuanya
    berawalan nama akun cPanel, misalnya `lightree_messi`.
@@ -104,6 +109,7 @@ index.php          halaman aplikasi + jembatan ke API
 app.html           salinan persis web/messi.html
 login.php          masuk: password, atau link sekali pakai dari bot
 setup.php          akun admin pertama (hapus setelah dipakai)
+cek.php            apakah hosting ini sanggup, dan apa yang masih kurang
 admin.php          daftar squad: tambah orang, ganti password, kode Telegram
 api/data.php       ambil semua data
 api/save.php       simpan satu dokumen
@@ -120,7 +126,7 @@ lib/require-php8.php  penjaga versi PHP, dibaca paling awal
 install.sql        enam tabel
 PASANG.txt         langkah pemasangan, bahasa non-teknis
 make-zip.sh        bikin messi-cpanel.zip
-tests/             234 pemeriksaan (tidak ikut ke server)
+tests/             241 pemeriksaan (tidak ikut ke server)
 ```
 
 ## Yang diputuskan server, bukan browser
@@ -160,7 +166,7 @@ menyebutkan mana yang barusan terjadi.
 | `tests/test_repo.php` | 52 — terhadap MySQL sungguhan, di database yang dia buat sendiri |
 | `tests/test_cron.php` | 47 — seminggu penuh jam demi jam, jam dibekukan, pesan bot ditangkap |
 | `tests/test_live.py` | 46 — browser terhadap aplikasi yang benar-benar jalan |
-| `tests/test_admin.py` | 34 — pemasangan pertama, tambah orang, ganti password, pasang Telegram |
+| `tests/test_admin.py` | 41 — pemasangan pertama, tambah orang, ganti password, pasang Telegram |
 | `tests/check_sync.php` | memastikan `app.html` belum menyimpang dari `web/messi.html` |
 
 Yang dicoba juga: laporan atas nama orang lain, permintaan tanpa token, cron tanpa kunci,

@@ -6,6 +6,18 @@ dan memberi tahu cara gantinya. Ganti dulu sebelum lanjut:
 cPanel -> Software -> Select PHP Version (atau MultiPHP Manager) -> pilih 8.1 / 8.2.
 
 
+0. CEK DULU HOSTINGNYA SANGGUP ATAU TIDAK
+   Setelah langkah 3 (upload), buka:  https://namadomain.com/messi/cek.php
+   Halaman itu memeriksa versi PHP, ekstensi yang dibutuhkan, koneksi database,
+   tabel, HTTPS, base_url, dan apakah hosting ini boleh menghubungi Telegram.
+   Setiap yang kurang disebutkan beserta cara membetulkannya, dan di bawahnya ada
+   perintah cron yang sudah jadi untuk hosting ini.
+
+   Buka lagi tiap selesai satu langkah. Kalau sudah hijau semua, selesai.
+   Setelah akun admin dibuat, halaman ini minta login admin dengan sendirinya.
+   Boleh dihapus kalau sudah tidak dipakai.
+
+
 1. BUAT DATABASE
    cPanel -> MySQL Databases
    - Create New Database: messi
@@ -106,3 +118,8 @@ Cron tidak jalan
 Mau cek cron tanpa menunggu sejam
   Buka: https://namadomain.com/messi/cron/tick.php?key=CRON_KEY
   Dia akan menulis satu baris ringkasan apa yang barusan dikerjakan.
+
+Bot Telegram tidak mengirim apa-apa
+  Buka cek.php. Sebagian hosting memblokir koneksi keluar, dan itu membuat bot
+  diam tanpa error. cek.php menguji koneksi ke api.telegram.org dan bilang kalau
+  diblokir. Kalau memang diblokir, minta hosting membuka port 443 ke sana.
