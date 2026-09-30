@@ -72,7 +72,14 @@ function test_db(string $name): PDO
         $root = new PDO($dsn . ';charset=utf8mb4', $user, $pass,
                         [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION]);
     } catch (Throwable $e) {
-        echo 'Tidak ada database untuk tes (' . $e->getMessage() . ") — dilewati.\n";
+        // Skipping quietly is right on a machine with no database, and wrong the moment
+        // somebody says where the database is: then a skip that reads like a pass is how
+        // a suite gets trusted without ever having run.
+        if (getenv('MESSI_TEST_SOCKET') || getenv('MESSI_TEST_HOST')) {
+            echo "GAGAL  database yang kamu tunjuk tidak bisa dipakai: " . $e->getMessage() . "\n";
+            exit(1);
+        }
+        echo "DILEWATI  tidak ada database (set MESSI_TEST_SOCKET atau MESSI_TEST_HOST)\n";
         exit(0);
     }
 

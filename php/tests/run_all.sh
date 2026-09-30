@@ -1,9 +1,13 @@
 #!/bin/sh
-# Every check this folder has. The ones that need a database or a browser skip
-# themselves rather than fail when there is none.
+# Every check this folder has.
 #
-#   sh php/tests/run_all.sh
+#   sh php/tests/run_all.sh                                       # tanpa database
 #   MESSI_TEST_SOCKET=/var/run/mysqld/mysqld.sock sh php/tests/run_all.sh
+#
+# Without a database, the four suites that need one say DILEWATI and the run still
+# succeeds. Point it at a database and they must run: a database that was named but
+# could not be reached is a failure, not a skip — otherwise a suite that never ran
+# reads exactly like a suite that passed.
 
 set -e
 cd "$(dirname "$0")/.."
@@ -30,3 +34,11 @@ MESSI_TEST_DB=messi_live_test python3 tests/test_live.py
 echo
 echo "== pemasangan & admin =="
 MESSI_TEST_DB=messi_admin_test python3 tests/test_admin.py
+
+echo
+if [ -n "$MESSI_TEST_SOCKET" ] || [ -n "$MESSI_TEST_HOST" ]; then
+  echo "SEMUA LOLOS — termasuk yang pakai database sungguhan."
+else
+  echo "LOLOS, TAPI SEBAGIAN DILEWATI — yang butuh database belum dijalankan."
+  echo "Jalankan lagi dengan MESSI_TEST_SOCKET=... atau MESSI_TEST_HOST=... untuk yang lengkap."
+fi

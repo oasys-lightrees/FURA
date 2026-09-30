@@ -125,6 +125,12 @@ MESSI_TEST_SOCKET=/var/run/mysqld/mysqld.sock \
   sh php/tests/run_all.sh                                 # semuanya
 ```
 
+Tanpa database, empat berkas yang membutuhkannya menulis DILEWATI dan run-nya tetap
+sukses. Begitu databasenya ditunjuk, mereka wajib jalan: database yang disebut tapi
+tidak bisa dihubungi dihitung **gagal**, bukan dilewati — kalau tidak, suite yang tidak
+pernah jalan terbaca persis seperti suite yang lolos. Baris terakhir run-nya
+menyebutkan mana yang barusan terjadi.
+
 | Berkas | Isinya |
 |--------|--------|
 | `tests/test_engine.php` | 55 — aturan, dicocokkan dengan `tests/test_core.py` |

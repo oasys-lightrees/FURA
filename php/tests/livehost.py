@@ -67,9 +67,13 @@ class Host:
         seed = self.php(str(PHP_DIR / "tests" / "seed_live.php"),
                         *( [self.seed_arg] if self.seed_arg else [] ))
         if seed.returncode != 0:
-            print("Tidak bisa menyiapkan database — dilewati.\n"
-                  + (seed.stderr or seed.stdout).strip())
-            sys.exit(0)
+            # Same rule as bootstrap_test.php: a skip is honest on a machine with no
+            # database, and a lie once somebody has pointed at one.
+            told = os.environ.get("MESSI_TEST_SOCKET") or os.environ.get("MESSI_TEST_HOST")
+            where = "GAGAL  database yang kamu tunjuk tidak bisa dipakai" if told \
+                else "DILEWATI  tidak ada database"
+            print(where + "\n" + (seed.stderr or seed.stdout).strip())
+            sys.exit(1 if told else 0)
         print(seed.stdout.strip())
 
         self.server = subprocess.Popen(
