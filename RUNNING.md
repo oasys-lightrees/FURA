@@ -52,12 +52,17 @@ PY
 ## Layout
 
 ```
+web/               THE PAGE PEOPLE USE — messi.html, plus the flow spec and the demo
+web/tests/         81 browser checks (player, manager, edge cases, keyboard)
 core/messi_core/   pure rules: cadence, period keys, state machines. No web, no ORM.
 app/               FastAPI app, schema.sql, templates, seed, CLI
 tests/             pytest over core/ — runs without a database
 odoo-addon/        the same engine as an Odoo module, written but never run (see its README)
 docs/              the design this implements
 ```
+
+`web/` and `app/` have diverged: `web/` carries the current MESSI question set and the
+stepped flow, `app/` carries the server pieces. See [web/README.md](web/README.md).
 
 `core/` is deliberately framework-free: the things most likely to be got wrong — which
 period a cycle belongs to in the player's own timezone, when a promise counts as broken —

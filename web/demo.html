@@ -1,0 +1,840 @@
+<title>MESSI Messenger Screening</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Public+Sans:ital,wght@0,400;0,500;0,600;0,700;1,400&family=IBM+Plex+Mono:wght@400;500&display=swap">
+
+<style>
+:root {
+  color-scheme: light;
+  --paper:#f5f3ef; --surface:#ffffff; --raise:#faf9f6;
+  --ink:#1a1c1f; --muted:#6b6d73; --line:#e4e1db;
+  --kept:#2f6248; --due:#9a6410; --broken:#97322a;
+  --kept-bg:#e8f0eb; --due-bg:#f7eedd; --broken-bg:#f7e7e4;
+  --ui:"Public Sans",ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif;
+  --mono:"IBM Plex Mono",ui-monospace,SFMono-Regular,Menlo,monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --paper:#14161a; --surface:#1c1f24; --raise:#22262c;
+    --ink:#e8e6e1; --muted:#979aa1; --line:#2b2f36;
+    --kept:#63a184; --due:#cf9a45; --broken:#cf6f61;
+    --kept-bg:#1b2a23; --due-bg:#2b2318; --broken-bg:#2c1d1b;
+  }
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --paper:#14161a; --surface:#1c1f24; --raise:#22262c;
+  --ink:#e8e6e1; --muted:#979aa1; --line:#2b2f36;
+  --kept:#63a184; --due:#cf9a45; --broken:#cf6f61;
+  --kept-bg:#1b2a23; --due-bg:#2b2318; --broken-bg:#2c1d1b;
+}
+
+* { box-sizing:border-box; }
+body { margin:0; background:var(--paper); color:var(--ink); font-family:var(--ui);
+       font-size:15px; line-height:1.55; -webkit-font-smoothing:antialiased; }
+.wrap { max-width:720px; margin:0 auto; padding-inline:16px; padding-block:0 72px; }
+
+.bar { position:sticky; top:env(safe-area-inset-top,0px); z-index:20;
+       background:color-mix(in srgb, var(--paper) 92%, transparent);
+       backdrop-filter:blur(8px); border-bottom:1px solid var(--line); }
+.bar-in { max-width:720px; margin:0 auto; padding:10px 16px;
+          display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
+.brand { font-weight:700; letter-spacing:.14em; font-size:13px; }
+.brand span { color:var(--muted); font-weight:500; letter-spacing:0; margin-left:8px; }
+.grow { flex:1 1 auto; }
+.clock { display:flex; align-items:center; gap:2px; background:var(--surface);
+         border:1px solid var(--line); border-radius:8px; padding:2px; }
+.clock button { font-family:var(--mono); font-size:15px; line-height:1; background:none;
+                border:0; color:var(--ink); cursor:pointer; padding:6px 9px; border-radius:6px; }
+.clock button:hover { background:var(--raise); }
+.clock .day { font-family:var(--mono); font-size:12.5px; padding:0 8px; min-width:104px;
+              text-align:center; font-variant-numeric:tabular-nums; }
+.clock .day b { display:block; font-weight:500; }
+.clock .day em { font-style:normal; color:var(--muted); font-size:11px; }
+.who { display:flex; background:var(--surface); border:1px solid var(--line);
+       border-radius:8px; overflow:hidden; }
+.who button { font:inherit; font-size:13px; font-weight:500; border:0; cursor:pointer;
+              background:none; color:var(--muted); padding:7px 12px; }
+.who button[aria-pressed="true"] { background:var(--ink); color:var(--paper); }
+
+.tabs { display:flex; gap:20px; border-bottom:1px solid var(--line); margin-bottom:22px; }
+.tabs button { font:inherit; font-size:14px; font-weight:600; background:none; border:0;
+               color:var(--muted); cursor:pointer; padding:14px 0 11px; white-space:nowrap;
+               border-bottom:2px solid transparent; margin-bottom:-1px; }
+.tabs button[aria-selected="true"] { color:var(--ink); border-bottom-color:var(--ink); }
+.tabs .count { font-family:var(--mono); font-size:11px; margin-left:5px; color:var(--paper);
+               background:var(--due); border-radius:9px; padding:1px 5px; }
+.tabs .count.bad { background:var(--broken); }
+
+h1 { font-size:20px; font-weight:700; letter-spacing:-.01em; margin:0 0 4px; text-wrap:balance; }
+.lede { color:var(--muted); font-size:13.5px; margin:0 0 18px; max-width:62ch; }
+h2 { font-size:12px; font-weight:700; letter-spacing:.08em; text-transform:uppercase;
+     color:var(--muted); margin:26px 0 10px; }
+.modmeta { font-family:var(--mono); font-size:11.5px; color:var(--muted); display:flex;
+           flex-wrap:wrap; gap:4px 14px; margin:-8px 0 20px; padding-bottom:16px;
+           border-bottom:1px solid var(--line); }
+
+.card { background:var(--surface); border:1px solid var(--line); border-radius:10px;
+        padding:16px; margin-bottom:8px; border-left:3px solid var(--line); }
+.card.is-due { border-left-color:var(--due); }
+.card.is-broken { border-left-color:var(--broken); background:var(--broken-bg); }
+.card.is-kept { border-left-color:var(--kept); }
+.card-head { display:flex; align-items:baseline; gap:9px; flex-wrap:wrap; }
+.subj { font-weight:600; }
+.meta { font-family:var(--mono); font-size:11.5px; color:var(--muted);
+        font-variant-numeric:tabular-nums; }
+.open-btn { font:inherit; font-size:13px; font-weight:600; background:none; border:0;
+            color:var(--ink); cursor:pointer; padding:0; text-decoration:underline;
+            text-underline-offset:3px; text-decoration-thickness:1px; }
+
+/* status lamp — the report's 🟢🟡🔴, derived from the numbers instead of typed */
+.lamp { display:inline-flex; align-items:center; gap:7px; font-weight:600; font-size:14px; }
+.lamp i { width:11px; height:11px; border-radius:50%; display:inline-block; flex:none; }
+.lamp.green i { background:var(--kept); } .lamp.green { color:var(--kept); }
+.lamp.amber i { background:var(--due); }  .lamp.amber { color:var(--due); }
+.lamp.red   i { background:var(--broken); } .lamp.red { color:var(--broken); }
+
+.form { display:flex; flex-direction:column; gap:18px; }
+.field > label { display:block; font-size:13.5px; font-weight:600; margin-bottom:5px; }
+.field .hint { display:block; font-weight:400; color:var(--muted); font-size:12.5px; margin-top:2px; }
+input[type=text], input[type=date], input[type=number], textarea, select {
+  width:100%; font:inherit; font-size:14px; padding:8px 10px; border-radius:7px;
+  border:1px solid var(--line); background:var(--raise); color:var(--ink); }
+textarea { min-height:60px; resize:vertical; }
+input:focus-visible, textarea:focus-visible, select:focus-visible, button:focus-visible {
+  outline:2px solid var(--ink); outline-offset:2px; }
+
+/* channel matrix */
+.matrix { width:100%; border-collapse:collapse; font-size:13.5px; }
+.matrix th { text-align:left; font-size:11px; font-weight:600; letter-spacing:.05em;
+             text-transform:uppercase; color:var(--muted); padding:0 6px 6px 0;
+             font-family:var(--ui); }
+.matrix th.n, .matrix td.n { text-align:center; width:72px; }
+.matrix td { padding:3px 6px 3px 0; }
+.matrix td:first-child { font-weight:600; font-family:var(--mono); font-size:12.5px; }
+.matrix input { padding:6px; text-align:center; font-variant-numeric:tabular-nums; }
+.mwrap { overflow-x:auto; }
+
+.derived { display:grid; grid-template-columns:repeat(auto-fit,minmax(96px,1fr)); gap:1px;
+           background:var(--line); border:1px solid var(--line); border-radius:9px;
+           overflow:hidden; }
+.derived div { background:var(--raise); padding:9px 11px; }
+.derived b { display:block; font-family:var(--mono); font-size:19px; font-weight:500;
+             line-height:1.2; font-variant-numeric:tabular-nums; }
+.derived span { font-size:11px; color:var(--muted); }
+.derived .warn b { color:var(--broken); }
+
+.declare { background:var(--raise); border:1px solid var(--line); border-radius:9px;
+           padding:12px 14px; display:flex; gap:10px; align-items:flex-start; }
+.declare input { margin-top:3px; flex:none; width:16px; height:16px; }
+.declare label { font-size:13px; line-height:1.5; }
+
+.actions { display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
+.btn { font:inherit; font-size:13.5px; font-weight:600; padding:8px 15px; border-radius:7px;
+       cursor:pointer; border:1px solid var(--ink); background:var(--ink); color:var(--paper); }
+.btn.ghost { background:none; color:var(--ink); border-color:var(--line); }
+.err { color:var(--broken); font-size:13px; }
+
+/* the generated report */
+.report { background:var(--raise); border:1px solid var(--line); border-radius:9px;
+          padding:14px 16px; font-family:var(--mono); font-size:12.5px; line-height:1.7;
+          white-space:pre-wrap; word-break:break-word; }
+
+/* 7-day trend */
+.trend { display:flex; gap:5px; align-items:flex-end; }
+.trend div { flex:1; text-align:center; }
+.trend .bar { height:44px; display:flex; align-items:flex-end; justify-content:center; }
+.trend .bar i { display:block; width:100%; border-radius:3px 3px 0 0; background:var(--kept);
+                min-height:3px; }
+.trend .bar i.has { background:var(--due); } .trend .bar i.bad { background:var(--broken); }
+.trend .bar i.none { background:var(--line); }
+.trend .lbl { font-family:var(--mono); font-size:10px; color:var(--muted); margin-top:4px; }
+.trend .val { font-family:var(--mono); font-size:11px; font-variant-numeric:tabular-nums; }
+
+.stats { display:grid; grid-template-columns:repeat(auto-fit,minmax(104px,1fr)); gap:1px;
+         background:var(--line); border:1px solid var(--line); border-radius:10px;
+         overflow:hidden; margin-bottom:6px; }
+.stat { background:var(--surface); padding:12px 14px; }
+.stat b { display:block; font-family:var(--mono); font-size:22px; font-weight:500;
+          line-height:1.1; font-variant-numeric:tabular-nums; }
+.stat span { font-size:11.5px; color:var(--muted); }
+.stat.kept b { color:var(--kept); } .stat.bad b { color:var(--broken); }
+
+.empty { background:var(--surface); border:1px dashed var(--line); border-radius:10px;
+         padding:26px 18px; text-align:center; color:var(--muted); font-size:13.5px; }
+.empty b { display:block; color:var(--ink); font-size:14.5px; margin-bottom:3px; }
+.banner { background:var(--due-bg); border:1px solid var(--line); border-left:3px solid var(--due);
+          border-radius:8px; padding:10px 13px; font-size:13px; margin-bottom:16px; }
+.note { font-size:12.5px; color:var(--muted); margin-top:22px; padding-top:14px;
+        border-top:1px solid var(--line); max-width:62ch; }
+@media (prefers-reduced-motion: reduce) { * { transition:none !important; } }
+</style>
+
+<div class="bar">
+  <div class="bar-in">
+    <span class="brand">MESSI<span>OASYS</span></span>
+    <span class="grow"></span>
+    <div class="who" role="group" aria-label="Lihat sebagai">
+      <button id="asPlayer" aria-pressed="true">Nicho</button>
+      <button id="asLeader" aria-pressed="false">Chief</button>
+    </div>
+    <div class="clock">
+      <button id="dayBack" aria-label="Mundur satu hari">&lsaquo;</button>
+      <span class="day"><b id="dayLabel">—</b><em id="dayNote">&nbsp;</em></span>
+      <button id="dayFwd" aria-label="Maju satu hari">&rsaquo;</button>
+    </div>
+  </div>
+</div>
+
+<div class="wrap">
+  <nav class="tabs" id="tabs" role="tablist"></nav>
+  <div id="view"></div>
+</div>
+
+<script>
+"use strict";
+
+/* ============================================================================
+   MESSI — Messenger Screening.
+
+   Written from the OASYS report of 25/09/2026, with each question put through
+   the five tests in docs/16-question-design.md. What changed and why:
+
+   a. "Penomoran sudah aman sesuai Rules? Yes"  — dropped. A yes/no answerable
+      without looking at anything (test 1). It told the reader nothing.
+   b. "Total WAG & TGG aktif/open"              — kept, split per channel type.
+   c. "Gantung >3 hari"  d. "Gantung <3 hari"   — kept. Real numbers.
+   e. "Berapa yang sudah tidak gantung? semua"  — now COMPUTED (test 4). The
+      system can subtract; asking invited a wrong answer from memory.
+   f. "Berapa yang sudah kita reply"            — kept.
+   g. "Kendala yang perlu dieskalasi"           — kept. Judgement (test 5).
+   h. "Yang akan masuk PRISTA baru"             — kept, and it is the seam where
+      a chat thread becomes a project once PRISTA exists.
+   + "Rencana & kapan"                          — added. Without a date nothing
+      can be chased, and the hanging threads stay hanging (test 3).
+   + Deklarasi                                  — kept as written, as a required
+      attestation rather than a line of text to copy.
+
+   The question TYPES below (matrix, computed, declaration) are engine features
+   configured by the module, not code written for MESSI. PRISTA will use the
+   same renderer with a different definition.
+   ========================================================================== */
+
+const MODULE = {
+  key: "MESSI",
+  name: "Messenger Screening",
+  subject: "self",
+  desc: "Sapuan harian channel squad. Yang gantung tidak boleh hilang begitu saja — " +
+        "harus punya rencana dan tanggal, atau dinyatakan beres.",
+  cadence: { kind:"daily", days:["mon","tue","wed","thu","fri"], at:"09:00" },
+  mapping: { action:"rencana", due:"rencana_kapan" },
+
+  questions: [
+    { key:"channels", type:"matrix", required:true,
+      label:"Channel squad hari ini",
+      hint:"Isi apa adanya. Angka turunan di bawah dihitung sistem, bukan diketik.",
+      rows:[
+        { key:"WAG", label:"WAG", note:"WhatsApp Group" },
+        { key:"TGG", label:"TGG", note:"Telegram Group" },
+        { key:"GCG", label:"GCG", note:"Google Chat Group" }],
+      fields:[
+        { key:"open",  label:"Aktif/open" },
+        { key:"gt3",   label:"Gantung >3 hari" },
+        { key:"lt3",   label:"Gantung <3 hari" },
+        { key:"reply", label:"Dibalas hari ini" }] },
+
+    { key:"derived", type:"computed",
+      items:[
+        { label:"Total open",   formula:"sum(channels.open)" },
+        { label:"Masih gantung", formula:"sum(channels.gt3) + sum(channels.lt3)", warnAbove:0 },
+        { label:"Tidak gantung", formula:"sum(channels.open) - sum(channels.gt3) - sum(channels.lt3)" },
+        { label:"Dibalas",      formula:"sum(channels.reply)" }] },
+
+    { key:"gantung_detail", type:"long_text",
+      label:"Yang masih gantung — mana saja?",
+      hint:"Sebutkan channel dan topiknya, supaya bisa ditagih satu per satu.",
+      requiredWhen:{ formula:"sum(channels.gt3) + sum(channels.lt3)", gt:0 } },
+
+    { key:"rencana", type:"long_text",
+      label:"Rencana untuk yang gantung",
+      requiredWhen:{ formula:"sum(channels.gt3) + sum(channels.lt3)", gt:0 } },
+
+    { key:"rencana_kapan", type:"date",
+      label:"Kapan beres?",
+      hint:"Tanggal ini jadi janji. Besok sistem tidak menanyakannya lagi — dia menagih pada hari itu.",
+      requiredWhen:{ formula:"sum(channels.gt3) + sum(channels.lt3)", gt:0 } },
+
+    { key:"eskalasi", type:"long_text",
+      label:"Kendala/insight yang perlu dieskalasi",
+      hint:"Kosongkan kalau tidak ada. Ini yang dibaca Chief, bukan angkanya." },
+
+    { key:"calon_prista", type:"long_text",
+      label:"Ada yang harus jadi project baru?",
+      hint:"Setelah PRISTA aktif, isian di sini langsung jadi project — tidak diketik ulang." },
+
+    { key:"deklarasi", type:"declaration", required:true,
+      text:"Saya sudah memastikan Messenger Squad saya semua terkelola dengan baik tanpa " +
+           "gantung, dan saya melaporkan laporan di atas dengan jujur sesuai kondisi sebenarnya." },
+  ],
+
+  // First match wins. The report's 🟢🟡🔴, derived instead of typed.
+  status: [
+    { formula:"sum(channels.gt3)", gt:0, level:"red",   label:"Ada yang gantung lebih dari 3 hari" },
+    { formula:"sum(channels.gt3) + sum(channels.lt3)", gt:0, level:"amber", label:"Masih ada yang gantung" },
+    { level:"green", label:"Tidak ada yang gantung" },
+  ],
+
+  checks: [
+    { left:"sum(channels.gt3) + sum(channels.lt3)", op:"lte", right:"sum(channels.open)",
+      message:"Yang gantung tidak boleh lebih banyak daripada yang open." },
+  ],
+};
+
+const START_DAY = "2026-09-28";       // a Monday in Jakarta
+const ENROLMENT = "e-messi";
+
+/* ============================================================================
+   Engine — a day-granular port of core/messi_core.
+   ========================================================================== */
+
+const DAY_NAMES = ["sun","mon","tue","wed","thu","fri","sat"];
+const ID_NAMES  = ["Min","Sen","Sel","Rab","Kam","Jum","Sab"];
+const MONTHS    = ["Jan","Feb","Mar","Apr","Mei","Jun","Jul","Agu","Sep","Okt","Nov","Des"];
+
+const d = s => new Date(s + "T00:00:00Z");
+const iso = dt => dt.toISOString().slice(0, 10);
+const addDays = (s, n) => { const t = d(s); t.setUTCDate(t.getUTCDate() + n); return iso(t); };
+const weekday = s => DAY_NAMES[d(s).getUTCDay()];
+const fmtDay = s => { const t = d(s); return ID_NAMES[t.getUTCDay()] + " " + t.getUTCDate() + " " + MONTHS[t.getUTCMonth()]; };
+const shortDay = s => { const t = d(s); return ID_NAMES[t.getUTCDay()][0] + t.getUTCDate(); };
+
+function periodKey(cad, today) {
+  if (cad.kind === "daily") return (cad.days || DAY_NAMES).includes(weekday(today)) ? today : null;
+  if (cad.kind === "weekly") return weekday(today) === (cad.weekday || "mon") ? today : null;
+  if (cad.kind === "once") return "once";
+  if (cad.kind === "on_commitment") return cad.fallback ? periodKey(cad.fallback, today) : null;
+  return null;
+}
+
+/* ---- formulas: a fixed grammar, never eval ------------------------------- */
+
+const num = v => { const n = parseFloat(v); return Number.isFinite(n) ? n : 0; };
+
+function parseMatrix(raw) { try { return JSON.parse(raw || "{}") || {}; } catch { return {}; } }
+
+function termValue(token, answers) {
+  const t = token.trim();
+  const m = /^sum\(([A-Za-z_]+)\.([A-Za-z_0-9]+)\)$/.exec(t);
+  if (!m) return num(t);
+  const grid = parseMatrix(answers[m[1]]);
+  return Object.values(grid).reduce((s, row) => s + num(row && row[m[2]]), 0);
+}
+
+function evalFormula(expr, answers) {
+  const parts = String(expr).split(/\s*([+-])\s*/).filter(p => p !== "");
+  let total = 0, sign = 1;
+  for (const p of parts) {
+    if (p === "+") { sign = 1; continue; }
+    if (p === "-") { sign = -1; continue; }
+    total += sign * termValue(p, answers);
+  }
+  return total;
+}
+
+function statusOf(answers) {
+  for (const rule of MODULE.status) {
+    if (rule.formula === undefined) return rule;
+    if (evalFormula(rule.formula, answers) > (rule.gt ?? 0)) return rule;
+  }
+  return MODULE.status[MODULE.status.length - 1];
+}
+
+/* ---- state --------------------------------------------------------------- */
+
+const state = {
+  today: START_DAY,
+  cycles: new Map(),
+  commitments: new Map(),
+  persona: "player",
+  tab: "messi",
+  editing: null,
+  error: null,
+  shared: false,
+  copied: false,
+};
+
+let db = null;
+let seq = 0;
+const nextId = () => "cm-" + (++seq) + "-" + Math.random().toString(36).slice(2, 6);
+const cycleFor = day => state.cycles.get(ENROLMENT + "__" + day);
+const openCommitments = () => [...state.commitments.values()].filter(c => c.status === "open");
+const dueCommitments = () => openCommitments().filter(c => c.due <= state.today)
+  .sort((a, b) => a.due.localeCompare(b.due));
+
+function runDay(today) {
+  const key = periodKey(MODULE.cadence, today);
+  if (key) {
+    const id = ENROLMENT + "__" + key;
+    if (!state.cycles.has(id)) {
+      const c = { id, period:key, due:key, status:"pending", answers:{}, noChange:false };
+      state.cycles.set(id, c);
+      persist("cycles", c);
+    }
+  }
+  // MESSI runs daily, so a promise coming due surfaces inside that day's sweep
+  // rather than spawning a second cycle. Only commitment-driven modules spawn.
+  for (const c of state.cycles.values()) {
+    if (c.status === "pending" && c.due < today) { c.status = "missed"; persist("cycles", c); }
+  }
+  for (const cm of state.commitments.values()) {
+    if (cm.status === "open" && cm.due < today) { cm.status = "broken"; persist("commitments", cm); }
+  }
+}
+
+function submit(cycle, answers, resolved) {
+  // Keep what was typed even when validation fails. Losing twelve numbers because a
+  // checkbox was missed is how people learn to distrust a form.
+  cycle.answers = answers;
+  persist("cycles", cycle);
+
+  const err = validate(answers);
+  if (err) return err;
+
+  cycle.status = cycle.due < state.today ? "late" : "submitted";
+  persist("cycles", cycle);
+
+  for (const id of resolved) {
+    const cm = state.commitments.get(id);
+    if (cm && cm.status === "open") {
+      cm.status = state.today <= cm.due ? "kept" : "broken";
+      persist("commitments", cm);
+    }
+  }
+
+  const action = (answers[MODULE.mapping.action] || "").trim();
+  const due = (answers[MODULE.mapping.due] || "").trim();
+  if (action && due) {
+    const cm = { id:nextId(), cycle:cycle.id, action, due, status:"open" };
+    state.commitments.set(cm.id, cm);
+    persist("commitments", cm);
+  }
+  return null;
+}
+
+function validate(answers) {
+  // Consistency first. The declaration attests that the numbers above are true, so
+  // demanding it before the numbers even add up gets the order backwards.
+  for (const c of MODULE.checks) {
+    const l = evalFormula(c.left, answers), r = evalFormula(c.right, answers);
+    if (c.op === "lte" && l > r) return c.message;
+  }
+  for (const q of MODULE.questions) {
+    if (q.type === "computed") continue;
+    const needed = q.required ||
+      (q.requiredWhen && evalFormula(q.requiredWhen.formula, answers) > (q.requiredWhen.gt ?? 0));
+    if (!needed) continue;
+    const v = answers[q.key];
+    if (q.type === "declaration") { if (v !== "1") return "Deklarasi harus dicentang."; continue; }
+    if (q.type === "matrix") {
+      const grid = parseMatrix(v);
+      const filled = MODULE.questions.find(x => x.key === q.key).rows
+        .every(r => grid[r.key] && Object.keys(grid[r.key]).length);
+      if (!filled) return "Isi semua angka channel dulu.";
+      continue;
+    }
+    if (!String(v || "").trim()) return "Belum dijawab: " + q.label;
+  }
+  return null;
+}
+
+/* ---- persistence --------------------------------------------------------- */
+
+function persist(col, doc) { if (db) db.collection(col).doc(doc.id).set({ ...doc }).catch(() => {}); }
+function persistClock() { if (db) db.doc("state/clock").set({ today: state.today }).catch(() => {}); }
+
+async function connect() {
+  try { db = await claude.use("db"); } catch { db = null; }
+  if (!db) { render(); return; }
+  state.shared = true;
+  try {
+    const clock = await db.doc("state/clock").get();
+    if (clock.exists && clock.data().today) state.today = clock.data().today;
+    const [cy, cm] = await Promise.all([
+      db.collection("cycles").get(), db.collection("commitments").get()]);
+    cy.docs.forEach(s => state.cycles.set(s.id, { ...s.data() }));
+    cm.docs.forEach(s => state.commitments.set(s.id, { ...s.data() }));
+  } catch { /* carry on as a local session */ }
+  runDay(state.today);
+  render();
+}
+
+function resetAll() {
+  const gone = [...state.cycles.keys()].map(id => ["cycles", id])
+    .concat([...state.commitments.keys()].map(id => ["commitments", id]));
+  state.cycles.clear(); state.commitments.clear();
+  state.today = START_DAY; state.editing = null; state.error = null;
+  if (db) gone.forEach(([c, id]) => db.collection(c).doc(id).delete().catch(() => {}));
+  persistClock(); runDay(state.today); render();
+}
+
+/* ============================================================================
+   Rendering
+   ========================================================================== */
+
+const esc = s => String(s == null ? "" : s)
+  .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+const el = id => document.getElementById(id);
+const view = el("view");
+
+function renderMatrix(q, answers) {
+  const grid = parseMatrix(answers[q.key]);
+  return `<div class="field">
+    <label>${esc(q.label)}${q.hint ? `<span class="hint">${esc(q.hint)}</span>` : ""}</label>
+    <div class="mwrap"><table class="matrix">
+      <tr><th>Channel</th>${q.fields.map(f => `<th class="n">${esc(f.label)}</th>`).join("")}</tr>
+      ${q.rows.map(r => `<tr>
+        <td title="${esc(r.note || "")}">${esc(r.label)}</td>
+        ${q.fields.map(f => `<td class="n"><input type="number" min="0" inputmode="numeric"
+           data-grid="${esc(q.key)}" data-row="${esc(r.key)}" data-col="${esc(f.key)}"
+           value="${esc((grid[r.key] || {})[f.key] ?? "")}"
+           aria-label="${esc(r.label + " " + f.label)}"></td>`).join("")}
+      </tr>`).join("")}
+    </table></div>
+  </div>`;
+}
+
+function renderDerived(q, answers) {
+  return `<div class="field"><div class="derived">${q.items.map(it => {
+    const v = evalFormula(it.formula, answers);
+    const warn = it.warnAbove !== undefined && v > it.warnAbove;
+    return `<div class="${warn ? "warn" : ""}"><b>${v}</b><span>${esc(it.label)}</span></div>`;
+  }).join("")}</div></div>`;
+}
+
+function renderForm(cycle) {
+  const a = cycle.answers || {};
+  const lamp = statusOf(a);
+  const due = dueCommitments();
+
+  const fields = MODULE.questions.map(q => {
+    if (q.type === "matrix")   return renderMatrix(q, a);
+    if (q.type === "computed") return renderDerived(q, a);
+    if (q.type === "declaration") return `<div class="field"><div class="declare">
+        <input type="checkbox" id="q_${esc(q.key)}" name="${esc(q.key)}" ${a[q.key] === "1" ? "checked" : ""}>
+        <label for="q_${esc(q.key)}">${esc(q.text)}</label></div></div>`;
+    const v = esc(a[q.key] || "");
+    const id = "q_" + q.key;
+    const input = q.type === "date"
+      ? `<input id="${id}" name="${esc(q.key)}" type="date" value="${v}">`
+      : `<textarea id="${id}" name="${esc(q.key)}">${v}</textarea>`;
+    return `<div class="field"><label for="${id}">${esc(q.label)}
+      ${q.hint ? `<span class="hint">${esc(q.hint)}</span>` : ""}</label>${input}</div>`;
+  }).join("");
+
+  const promises = due.length ? `<div class="field">
+    <label>Janji yang jatuh tempo</label>
+    ${due.map(c => `<div class="declare" style="margin-bottom:6px">
+      <input type="checkbox" id="r_${esc(c.id)}" data-resolve="${esc(c.id)}">
+      <label for="r_${esc(c.id)}"><b>${esc(c.action)}</b><br>
+        <span class="meta">dijanjikan ${esc(fmtDay(c.due))}${c.due < state.today ? " · sudah lewat" : ""}</span>
+        <span class="hint">Centang kalau sudah beres.</span></label>
+    </div>`).join("")}</div>` : "";
+
+  return `<form class="form" id="messiForm">
+    <div class="lamp ${lamp.level}"><i></i>${esc(lamp.label)}</div>
+    ${promises}${fields}
+    ${state.error ? `<div class="err">${esc(state.error)}</div>` : ""}
+    <div class="actions"><button class="btn" type="submit">Kirim laporan</button></div>
+  </form>`;
+}
+
+/** The MESSI Report, generated from the answers instead of typed by hand. */
+function buildReport(cycle) {
+  const a = cycle.answers || {};
+  const lamp = statusOf(a);
+  const mark = { green:"[HIJAU]", amber:"[KUNING]", red:"[MERAH]" }[lamp.level];
+  const grid = parseMatrix(a.channels);
+  const lines = [];
+
+  lines.push("MESSI Report");
+  lines.push("Date: " + fmtDay(cycle.period) + " (" + cycle.period + ")");
+  lines.push("Squad: OASYS   Report by: Nicho");
+  lines.push("");
+  lines.push(mark + " " + lamp.label);
+  lines.push("");
+
+  const chan = MODULE.questions.find(q => q.key === "channels");
+  lines.push("a. Channel aktif/open: " + chan.rows
+    .map(r => `${num((grid[r.key] || {}).open)} ${r.label}`).join(", "));
+  lines.push("b. Gantung >3 hari: " + evalFormula("sum(channels.gt3)", a));
+  lines.push("c. Gantung <3 hari: " + evalFormula("sum(channels.lt3)", a));
+  lines.push("d. Tidak gantung: " + evalFormula("sum(channels.open) - sum(channels.gt3) - sum(channels.lt3)", a));
+  lines.push("e. Sudah dibalas hari ini: " + evalFormula("sum(channels.reply)", a));
+
+  const opt = [["f. Yang masih gantung", a.gantung_detail],
+               ["g. Rencana", a.rencana && a.rencana + (a.rencana_kapan ? " (target " + fmtDay(a.rencana_kapan) + ")" : "")],
+               ["h. Eskalasi", a.eskalasi],
+               ["i. Calon PRISTA baru", a.calon_prista]];
+  opt.forEach(([label, val]) => lines.push(label + ": " + ((val || "").trim() || "Belum ada")));
+
+  lines.push("");
+  lines.push("Deklarasi: " + MODULE.questions.find(q => q.key === "deklarasi").text);
+  return lines.join("\n");
+}
+
+function renderTrend() {
+  const days = [];
+  for (let i = 6; i >= 0; i--) days.push(addDays(state.today, -i));
+  const vals = days.map(day => {
+    const c = cycleFor(day);
+    if (!c || c.status === "pending") return { day, v:null, missed:false };
+    if (c.status === "missed") return { day, v:null, missed:true };
+    return { day, v: evalFormula("sum(channels.gt3) + sum(channels.lt3)", c.answers || {}),
+             red: evalFormula("sum(channels.gt3)", c.answers || {}) > 0 };
+  });
+  const max = Math.max(1, ...vals.map(v => v.v || 0));
+  return `<h2>Gantung, 7 hari terakhir</h2>
+    <div class="card"><div class="trend">${vals.map(v => {
+      // A day with no report is a flat baseline, not a full bar — an empty day must not
+      // read as a large number.
+      const h = v.v === null ? 8 : Math.max(8, Math.round(v.v / max * 100));
+      const cls = v.v === null ? "none" : v.red ? "bad" : v.v > 0 ? "has" : "";
+      return `<div><div class="bar"><i class="${cls}" style="height:${h}%"
+        title="${esc(v.day)}"></i></div>
+        <div class="val">${v.v === null ? (v.missed ? "×" : "–") : v.v}</div>
+        <div class="lbl">${esc(shortDay(v.day))}</div></div>`;
+    }).join("")}</div>
+    <p class="meta" style="margin:10px 0 0">× = tidak dilaporkan · – = belum</p></div>`;
+}
+
+function renderMessi() {
+  const cycle = cycleFor(state.today);
+  const due = dueCommitments();
+  let html = `<h1>${esc(MODULE.name)}</h1>
+    <p class="lede">${esc(MODULE.desc)}</p>
+    <div class="modmeta"><span>cadence: harian, Sen–Jum</span><span>subjek: squad sendiri</span>
+      <span>${MODULE.questions.filter(q => q.type !== "computed").length} pertanyaan</span></div>`;
+
+  if (!cycle) {
+    html += `<div class="empty"><b>Hari ini tidak ada sapuan.</b>
+      MESSI hanya jalan Senin–Jumat. Majukan hari dengan &rsaquo;.</div>`;
+    return html + renderTrend();
+  }
+
+  if (cycle.status === "pending" || state.editing === cycle.id) {
+    if (due.length) {
+      html += `<div class="banner">Ada ${due.length} janji yang jatuh tempo.
+        Centang kalau sudah beres — kalau tidak, besok tercatat meleset.</div>`;
+    }
+    html += `<h2>Laporan ${esc(fmtDay(cycle.period))}</h2><div class="card">${renderForm(cycle)}</div>`;
+  } else if (cycle.status === "missed") {
+    html += `<div class="card is-broken"><b>Tidak dilaporkan.</b>
+      <div class="meta">Periode ${esc(cycle.period)} lewat tanpa laporan. Tercatat sebagai fakta,
+      bukan baris kosong.</div></div>`;
+  } else {
+    const lamp = statusOf(cycle.answers);
+    html += `<h2>Laporan ${esc(fmtDay(cycle.period))}${cycle.status === "late" ? " · telat" : ""}</h2>
+      <div class="card is-kept">
+        <div class="lamp ${lamp.level}" style="margin-bottom:10px"><i></i>${esc(lamp.label)}</div>
+        <div class="report" id="reportText">${esc(buildReport(cycle))}</div>
+        <div class="actions" style="margin-top:12px">
+          <button class="btn ghost" type="button" id="copyBtn">${state.copied ? "Tersalin" : "Salin laporan"}</button>
+          <button class="btn ghost" type="button" data-edit="${esc(cycle.id)}">Ubah</button>
+        </div>
+      </div>
+      <p class="meta">Laporan ini dibuat dari jawaban tadi. Selama masa transisi, salin dan
+      tempel ke Telegram seperti biasa.</p>`;
+  }
+
+  const open = openCommitments();
+  if (open.length) {
+    html += `<h2>Janji berjalan</h2>` + open.sort((a, b) => a.due.localeCompare(b.due)).map(c => `
+      <div class="card ${c.due < state.today ? "is-broken" : "is-due"}">
+        <div class="card-head"><span class="subj">${esc(c.action)}</span>
+          <span class="grow"></span><span class="meta">${esc(fmtDay(c.due))}</span></div>
+      </div>`).join("");
+  }
+  return html + renderTrend();
+}
+
+function renderLeader() {
+  const all = [...state.cycles.values()];
+  const answered = all.filter(c => c.status === "submitted" || c.status === "late");
+  const missed = all.filter(c => c.status === "missed");
+  const cms = [...state.commitments.values()];
+  const kept = cms.filter(c => c.status === "kept").length;
+  const broken = cms.filter(c => c.status === "broken");
+  const pct = (n, dn) => dn === 0 ? "—" : Math.round(n / dn * 100) + "%";
+  const last = answered.sort((a, b) => b.period.localeCompare(a.period))[0];
+
+  let html = `<h1>Pengecualian</h1>
+    <p class="lede">Yang meleset saja. Hari yang semuanya hijau tidak perlu dibaca —
+    itu ukuran apakah nanya-nanyain manual sudah berhenti.</p>
+    <div class="stats">
+      <div class="stat"><b>${pct(answered.length, answered.length + missed.length)}</b><span>hari dilaporkan</span></div>
+      <div class="stat kept"><b>${pct(kept, kept + broken.length)}</b><span>janji ditepati</span></div>
+      <div class="stat ${missed.length ? "bad" : ""}"><b>${missed.length}</b><span>hari tanpa laporan</span></div>
+      <div class="stat ${broken.length ? "bad" : ""}"><b>${broken.length}</b><span>janji meleset</span></div>
+      <div class="stat"><b>${last ? evalFormula("sum(channels.gt3) + sum(channels.lt3)", last.answers) : "—"}</b>
+        <span>gantung terakhir</span></div>
+    </div>`;
+
+  const esc_ = t => esc(t);
+  const escalations = answered.filter(c => (c.answers.eskalasi || "").trim());
+  html += `<h2>Perlu perhatian Chief</h2>`;
+  html += escalations.length ? escalations.slice(0, 6).map(c => `
+    <div class="card is-due"><div class="card-head"><span class="subj">Eskalasi</span>
+      <span class="grow"></span><span class="meta">${esc_(fmtDay(c.period))}</span></div>
+      <div style="margin-top:5px">${esc_(c.answers.eskalasi)}</div></div>`).join("")
+    : `<div class="empty"><b>Tidak ada eskalasi.</b>Tidak ada yang diangkat ke Chief.</div>`;
+
+  html += `<h2>Janji yang meleset</h2>`;
+  html += broken.length ? broken.map(c => `
+    <div class="card is-broken"><div class="card-head"><span class="subj">${esc(c.action)}</span>
+      <span class="grow"></span><span class="meta">${esc(fmtDay(c.due))}</span></div></div>`).join("")
+    : `<div class="empty"><b>Tidak ada janji yang meleset.</b>Tidak ada yang perlu dikejar.</div>`;
+
+  html += `<h2>Hari tanpa laporan</h2>`;
+  html += missed.length ? missed.sort((a, b) => b.period.localeCompare(a.period)).map(c => `
+    <div class="card"><div class="card-head"><span class="subj">${esc(fmtDay(c.period))}</span>
+      <span class="grow"></span><span class="meta">${esc(c.period)}</span></div></div>`).join("")
+    : `<div class="empty"><b>Tidak ada yang terlewat.</b>Semua hari kerja dilaporkan.</div>`;
+
+  return html + renderTrend();
+}
+
+function renderTabs() {
+  const cycle = cycleFor(state.today);
+  const waiting = (cycle && cycle.status === "pending" ? 1 : 0) + dueCommitments().length;
+  const bad = [...state.commitments.values()].filter(c => c.status === "broken").length
+            + [...state.cycles.values()].filter(c => c.status === "missed").length;
+  const items = [
+    { id:"messi",  label:"MESSI",  count:waiting, bad:dueCommitments().some(c => c.due < state.today) },
+    { id:"leader", label:"Leader", count:bad,     bad:bad > 0 },
+  ];
+  el("tabs").innerHTML = items.map(t => `
+    <button role="tab" data-tab="${t.id}" aria-selected="${state.tab === t.id}">${t.label}${
+      t.count ? `<span class="count${t.bad ? " bad" : ""}">${t.count}</span>` : ""}</button>`).join("");
+}
+
+function render() {
+  el("dayLabel").textContent = fmtDay(state.today);
+  el("dayNote").textContent = state.today === START_DAY ? "hari mulai" : state.today;
+  renderTabs();
+  el("asPlayer").setAttribute("aria-pressed", String(state.persona === "player"));
+  el("asLeader").setAttribute("aria-pressed", String(state.persona === "leader"));
+
+  let body = state.tab === "leader" ? renderLeader() : renderMessi();
+  if (state.tab === "messi" && state.persona === "leader") {
+    body = `<div class="banner">Chief tidak mengisi MESSI — dia membacanya di tab
+      <b>Leader</b>.</div>` + body;
+  }
+
+  view.innerHTML = body + `<p class="note">
+    MESSI adalah satu modul di atas mesin follow-up yang generik: tipe pertanyaan di sini
+    (matrix channel, angka turunan, deklarasi) adalah fitur mesinnya, bukan kode khusus MESSI.
+    PRISTA nanti memakai perenderan yang sama dengan definisi berbeda.
+    Jam disimulasikan supaya perilakunya kelihatan dalam hitungan detik.
+    ${state.shared ? "Data tersimpan dan dibagi ke semua yang membuka halaman ini."
+                   : "Halaman ini berjalan lokal — perubahan hilang saat ditutup."}
+    <button class="open-btn" id="resetBtn" style="margin-left:6px">Ulangi dari awal</button></p>`;
+
+  el("resetBtn").addEventListener("click", resetAll);
+  const copy = el("copyBtn");
+  if (copy) copy.addEventListener("click", doCopy);
+}
+
+function doCopy() {
+  const cycle = cycleFor(state.today);
+  if (!cycle) return;
+  const text = buildReport(cycle);
+  const done = () => { state.copied = true; render(); setTimeout(() => { state.copied = false; render(); }, 2000); };
+  try {
+    navigator.clipboard.writeText(text).then(done, selectFallback);
+  } catch { selectFallback(); }
+}
+
+function selectFallback() {
+  const node = el("reportText");
+  if (!node) return;
+  const range = document.createRange();
+  range.selectNodeContents(node);
+  const sel = window.getSelection();
+  sel.removeAllRanges(); sel.addRange(range);
+}
+
+/* ---- events -------------------------------------------------------------- */
+
+function step(n) {
+  state.today = addDays(state.today, n);
+  state.editing = null; state.error = null;
+  runDay(state.today); persistClock(); render();
+}
+
+el("dayFwd").addEventListener("click", () => step(1));
+el("dayBack").addEventListener("click", () => step(-1));
+el("asPlayer").addEventListener("click", () => { state.persona = "player"; state.tab = "messi"; render(); });
+el("asLeader").addEventListener("click", () => { state.persona = "leader"; state.tab = "leader"; render(); });
+el("tabs").addEventListener("click", ev => {
+  const btn = ev.target.closest("[data-tab]");
+  if (!btn) return;
+  state.tab = btn.dataset.tab; state.error = null; render();
+});
+
+view.addEventListener("click", ev => {
+  const edit = ev.target.closest("[data-edit]");
+  if (edit) { state.editing = edit.dataset.edit; state.error = null; render(); }
+});
+
+/* Live recompute of the derived tiles and the status lamp as numbers are typed. */
+view.addEventListener("input", ev => {
+  if (!ev.target.dataset.grid) return;
+  const cycle = cycleFor(state.today);
+  if (!cycle) return;
+  const answers = collect();
+  const derivedQ = MODULE.questions.find(q => q.type === "computed");
+  const host = view.querySelector(".derived");
+  if (host) host.outerHTML = renderDerived(derivedQ, answers).replace(/^<div class="field">|<\/div>$/g, "");
+  const lampEl = view.querySelector("#messiForm .lamp");
+  if (lampEl) {
+    const lamp = statusOf(answers);
+    lampEl.className = "lamp " + lamp.level;
+    lampEl.innerHTML = "<i></i>" + esc(lamp.label);
+  }
+});
+
+function collect() {
+  const form = el("messiForm");
+  const answers = {};
+  if (!form) return answers;
+  const grids = {};
+  form.querySelectorAll("[data-grid]").forEach(i => {
+    const g = grids[i.dataset.grid] || (grids[i.dataset.grid] = {});
+    const row = g[i.dataset.row] || (g[i.dataset.row] = {});
+    if (i.value !== "") row[i.dataset.col] = num(i.value);
+  });
+  Object.entries(grids).forEach(([k, v]) => { answers[k] = JSON.stringify(v); });
+  form.querySelectorAll("[name]").forEach(f => {
+    answers[f.name] = f.type === "checkbox" ? (f.checked ? "1" : "") : f.value;
+  });
+  return answers;
+}
+
+view.addEventListener("submit", ev => {
+  if (!ev.target.closest("#messiForm")) return;
+  ev.preventDefault();
+  const cycle = cycleFor(state.today);
+  if (!cycle) return;
+  const resolved = [...view.querySelectorAll("[data-resolve]")]
+    .filter(i => i.checked).map(i => i.dataset.resolve);
+  const err = submit(cycle, collect(), resolved);
+  state.error = err;
+  if (!err) { state.editing = null; runDay(state.today); }
+  render();
+});
+
+runDay(state.today);
+render();
+connect();
+</script>

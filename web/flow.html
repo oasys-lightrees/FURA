@@ -1,0 +1,508 @@
+<title>Alur Harian MESSI</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Public+Sans:ital,wght@0,400;0,500;0,600;0,700;1,400&family=IBM+Plex+Mono:wght@400;500&display=swap">
+
+<style>
+:root {
+  color-scheme: light;
+  --paper:#f5f3ef; --surface:#ffffff; --raise:#faf9f6; --frame:#e9e6e0;
+  --ink:#1a1c1f; --muted:#6b6d73; --line:#e4e1db;
+  --kept:#2f6248; --due:#9a6410; --broken:#97322a;
+  --kept-bg:#e8f0eb; --due-bg:#f7eedd; --broken-bg:#f7e7e4;
+  --tg:#2b7fb8; --tg-bg:#e7f1f8;
+  --ui:"Public Sans",ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif;
+  --mono:"IBM Plex Mono",ui-monospace,SFMono-Regular,Menlo,monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --paper:#111317; --surface:#1c1f24; --raise:#22262c; --frame:#2a2e35;
+    --ink:#e8e6e1; --muted:#979aa1; --line:#2b2f36;
+    --kept:#63a184; --due:#cf9a45; --broken:#cf6f61;
+    --kept-bg:#1b2a23; --due-bg:#2b2318; --broken-bg:#2c1d1b;
+    --tg:#63a8d6; --tg-bg:#17242e;
+  }
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --paper:#111317; --surface:#1c1f24; --raise:#22262c; --frame:#2a2e35;
+  --ink:#e8e6e1; --muted:#979aa1; --line:#2b2f36;
+  --kept:#63a184; --due:#cf9a45; --broken:#cf6f61;
+  --kept-bg:#1b2a23; --due-bg:#2b2318; --broken-bg:#2c1d1b;
+  --tg:#63a8d6; --tg-bg:#17242e;
+}
+
+* { box-sizing:border-box; }
+body { margin:0; background:var(--paper); color:var(--ink); font-family:var(--ui);
+       font-size:15px; line-height:1.55; -webkit-font-smoothing:antialiased; }
+.wrap { max-width:1060px; margin:0 auto; padding-inline:16px; padding-block:34px 80px; }
+
+.eyebrow { font-family:var(--mono); font-size:11.5px; letter-spacing:.1em; text-transform:uppercase;
+           color:var(--muted); margin:0 0 10px; }
+h1 { font-size:clamp(25px,4.2vw,34px); font-weight:700; letter-spacing:-.02em; margin:0 0 12px;
+     text-wrap:balance; max-width:20ch; }
+.lede { font-size:16px; color:var(--muted); max-width:60ch; margin:0 0 8px; }
+.lede b { color:var(--ink); font-weight:600; }
+
+h2 { font-size:12px; font-weight:700; letter-spacing:.09em; text-transform:uppercase;
+     color:var(--muted); margin:54px 0 18px; padding-top:22px; border-top:1px solid var(--line); }
+
+/* ---------------- step rows ---------------- */
+.step { display:grid; grid-template-columns:302px 1fr; gap:34px; align-items:start;
+        margin-bottom:46px; }
+@media (max-width:760px) { .step { grid-template-columns:1fr; gap:20px; } }
+
+.note-col { padding-top:6px; }
+.stepno { display:flex; align-items:baseline; gap:10px; margin-bottom:8px; }
+.stepno b { font-family:var(--mono); font-size:12px; font-weight:500; color:var(--paper);
+            background:var(--ink); border-radius:5px; padding:2px 7px; }
+.stepno .when { font-family:var(--mono); font-size:12px; color:var(--muted); }
+.note-col h3 { font-size:17px; font-weight:700; margin:0 0 7px; letter-spacing:-.01em; }
+.note-col p { margin:0 0 10px; font-size:14px; color:var(--muted); max-width:52ch; }
+.note-col p b { color:var(--ink); font-weight:600; }
+.behind { background:var(--raise); border:1px solid var(--line); border-left:3px solid var(--kept);
+          border-radius:8px; padding:9px 12px; font-size:13px; color:var(--muted); max-width:52ch; }
+.behind b { color:var(--ink); font-weight:600; display:block; font-size:11px;
+            letter-spacing:.07em; text-transform:uppercase; margin-bottom:3px; }
+
+/* ---------------- phone ---------------- */
+.phone { width:302px; max-width:100%; border:9px solid var(--frame); border-radius:30px;
+         background:var(--surface); overflow:hidden;
+         box-shadow:0 1px 2px rgba(0,0,0,.05), 0 10px 26px -14px rgba(0,0,0,.28); }
+.sbar { background:var(--raise); padding:5px 14px 4px; display:flex; justify-content:space-between;
+        font-family:var(--mono); font-size:9.5px; color:var(--muted); }
+.screen { padding:13px; font-size:12.5px; }
+.screen.tight { padding:0; }
+
+.apphead { display:flex; align-items:center; gap:7px; padding:9px 13px;
+           border-bottom:1px solid var(--line); background:var(--raise); }
+.apphead .logo { font-weight:700; letter-spacing:.12em; font-size:10.5px; }
+.apphead .d { font-family:var(--mono); font-size:10px; color:var(--muted); margin-left:auto; }
+.apphead .av { width:19px; height:19px; border-radius:50%; background:var(--ink); color:var(--paper);
+               font-size:9px; font-weight:700; display:grid; place-items:center; }
+
+.lamp { display:flex; align-items:center; gap:6px; font-weight:600; font-size:12px; }
+.lamp i { width:9px; height:9px; border-radius:50%; flex:none; }
+.lamp.red i{background:var(--broken)} .lamp.red{color:var(--broken)}
+.lamp.green i{background:var(--kept)} .lamp.green{color:var(--kept)}
+
+.ptitle { font-weight:700; font-size:14px; margin:0 0 2px; }
+.psub { color:var(--muted); font-size:11px; margin:0 0 11px; }
+
+table.mx { width:100%; border-collapse:collapse; font-size:11px; }
+table.mx th { font-size:8.5px; letter-spacing:.04em; text-transform:uppercase; color:var(--muted);
+              font-weight:600; padding:0 0 4px; text-align:center; }
+table.mx th:first-child { text-align:left; }
+table.mx td { padding:2px 0; }
+table.mx td:first-child { font-family:var(--mono); font-size:10.5px; font-weight:500; }
+.cell { width:100%; border:1px solid var(--line); border-radius:5px; background:var(--raise);
+        padding:5px 2px; text-align:center; font-family:var(--mono); font-size:11.5px;
+        font-variant-numeric:tabular-nums; }
+.cell.filled { border-color:var(--muted); }
+td.n { width:23%; padding-left:3px; }
+
+.tiles { display:grid; grid-template-columns:repeat(4,1fr); gap:1px; background:var(--line);
+         border:1px solid var(--line); border-radius:7px; overflow:hidden; margin:11px 0; }
+.tiles div { background:var(--raise); padding:6px 4px; text-align:center; }
+.tiles b { display:block; font-family:var(--mono); font-size:14px; font-weight:500; line-height:1.2; }
+.tiles span { font-size:8.5px; color:var(--muted); }
+.tiles .w b { color:var(--broken); }
+
+.lab { font-weight:600; font-size:11.5px; margin:11px 0 4px; }
+.lab .hint { display:block; font-weight:400; color:var(--muted); font-size:10.5px; }
+.box { border:1px solid var(--line); border-radius:6px; background:var(--raise);
+       padding:7px 8px; font-size:11px; color:var(--ink); min-height:30px; }
+.box.ph { color:var(--muted); }
+.chk { display:flex; gap:7px; align-items:flex-start; border:1px solid var(--line);
+       border-radius:7px; background:var(--raise); padding:8px 9px; font-size:10.5px; margin:10px 0; }
+.chk i { width:13px; height:13px; border:1.5px solid var(--muted); border-radius:3px; flex:none;
+         margin-top:1px; display:grid; place-items:center; font-size:9px; }
+.chk i.on { background:var(--kept); border-color:var(--kept); color:#fff; }
+.cta { display:block; width:100%; text-align:center; background:var(--ink); color:var(--paper);
+       border-radius:7px; padding:9px; font-weight:600; font-size:12.5px; margin-top:11px; }
+.cta.sec { background:transparent; color:var(--ink); border:1px solid var(--line); }
+
+.promise { border:1px solid var(--line); border-left:3px solid var(--due); background:var(--due-bg);
+           border-radius:7px; padding:8px 10px; margin-bottom:7px; font-size:11.5px; }
+.promise .m { font-family:var(--mono); font-size:10px; color:var(--muted); }
+.report { background:var(--raise); border:1px solid var(--line); border-radius:7px; padding:9px 10px;
+          font-family:var(--mono); font-size:9.5px; line-height:1.65; white-space:pre-wrap; }
+
+/* telegram-ish */
+.tg { background:var(--tg-bg); padding:13px; }
+.tgmsg { background:var(--surface); border-radius:10px 10px 10px 3px; padding:10px 11px;
+         box-shadow:0 1px 2px rgba(0,0,0,.06); font-size:12px; }
+.tgfrom { color:var(--tg); font-weight:700; font-size:10.5px; margin-bottom:4px; }
+.tgtime { text-align:right; font-family:var(--mono); font-size:9px; color:var(--muted); margin-top:5px; }
+.tglink { color:var(--tg); font-weight:600; }
+
+.stat3 { display:grid; grid-template-columns:repeat(3,1fr); gap:1px; background:var(--line);
+         border:1px solid var(--line); border-radius:7px; overflow:hidden; margin-bottom:10px; }
+.stat3 div { background:var(--raise); padding:7px 5px; }
+.stat3 b { display:block; font-family:var(--mono); font-size:15px; font-weight:500; line-height:1.15; }
+.stat3 span { font-size:8.5px; color:var(--muted); }
+.stat3 .g b{color:var(--kept)} .stat3 .r b{color:var(--broken)}
+.exc { border:1px solid var(--line); border-left:3px solid var(--due); border-radius:7px;
+       padding:8px 10px; font-size:11.5px; margin-bottom:7px; }
+.blank { border:1px dashed var(--line); border-radius:7px; padding:14px 10px; text-align:center;
+         color:var(--muted); font-size:10.5px; }
+
+/* ---------------- comparison + notes ---------------- */
+.cols { display:grid; grid-template-columns:1fr 1fr; gap:14px; }
+@media (max-width:680px) { .cols { grid-template-columns:1fr; } }
+.panel { background:var(--surface); border:1px solid var(--line); border-radius:10px; padding:16px 18px; }
+.panel h4 { margin:0 0 10px; font-size:14px; font-weight:700; }
+.panel ul { margin:0; padding-left:17px; }
+.panel li { font-size:13.5px; color:var(--muted); margin-bottom:7px; }
+.panel li b { color:var(--ink); font-weight:600; }
+.panel.gone { border-left:3px solid var(--broken); }
+.panel.new { border-left:3px solid var(--kept); }
+
+table.spec { width:100%; border-collapse:collapse; font-size:13.5px; }
+table.spec th { text-align:left; font-size:11px; letter-spacing:.06em; text-transform:uppercase;
+                color:var(--muted); font-weight:600; padding:0 12px 8px 0; }
+table.spec td { padding:9px 12px 9px 0; border-top:1px solid var(--line); vertical-align:top;
+                color:var(--muted); }
+table.spec td:first-child { color:var(--ink); font-weight:600; white-space:nowrap; }
+table.spec code { font-family:var(--mono); font-size:12px; }
+.twrap { overflow-x:auto; }
+
+.callout { background:var(--kept-bg); border:1px solid var(--line); border-left:3px solid var(--kept);
+           border-radius:9px; padding:14px 17px; margin:18px 0 0; max-width:66ch; }
+.callout b { font-weight:700; }
+.callout p { margin:0; font-size:14px; }
+.foot { margin-top:44px; padding-top:18px; border-top:1px solid var(--line);
+        font-size:13px; color:var(--muted); max-width:66ch; }
+</style>
+
+<div class="wrap">
+
+<p class="eyebrow">Spesifikasi alur &amp; layout · MESSI</p>
+<h1>Sehari bersama MESSI</h1>
+<p class="lede">Yang bisa diklik kemarin itu <b>demo</b> — ada tombol maju-mundur hari dan
+ganti persona supaya perilakunya kelihatan dalam hitungan detik. Halaman ini menunjukkan
+produk <b>sebenarnya</b>: apa yang Nicho lihat di HP-nya hari Senin, tanpa alat bantu demo.</p>
+<p class="lede">Targetnya satu angka: <b>dari notifikasi sampai laporan terkirim, di bawah
+dua menit</b>. Kalau lebih lama dari mengetik di Telegram, orang akan balik ke Telegram.</p>
+
+<h2>Alur harian — player</h2>
+
+<!-- 1 -->
+<div class="step">
+  <div class="phone">
+    <div class="sbar"><span>09:00</span><span>OASYS</span></div>
+    <div class="screen tg">
+      <div class="tgmsg">
+        <div class="tgfrom">MESSI Bot</div>
+        Pagi, Nicho. MESSI <b>Sen 28 Sep</b> sudah dibuka.<br><br>
+        ⚠ 2 janji jatuh tempo hari ini.<br>
+        Deadline isi: 18:00.<br><br>
+        <span class="tglink">Buka MESSI →</span>
+        <div class="tgtime">09:00 ✓✓</div>
+      </div>
+    </div>
+  </div>
+  <div class="note-col">
+    <div class="stepno"><b>1</b><span class="when">09:00 · otomatis</span></div>
+    <h3>Pemicunya datang ke tempat yang sudah jadi kebiasaan</h3>
+    <p>Bot Telegram mengirim DM tiap hari kerja jam 09:00. <b>Bukan aplikasi baru yang harus
+    dibuka sendiri</b> — tim sudah hidup di Telegram, jadi pemicunya lewat situ. Tidak ada
+    kebiasaan baru yang harus dibentuk, cuma isi tautannya yang berubah.</p>
+    <p>Telegram Bot API resmi dan gratis. Ini salah satu alasan Telegram dipakai lebih dulu
+    daripada WhatsApp.</p>
+    <div class="behind"><b>Di belakang layar</b>
+      Cron jam 09:00 membuat cycle untuk hari ini (idempoten — kalau jalan dua kali tetap
+      satu), lalu bot mengirim tautan bertoken yang langsung masuk tanpa login ulang.</div>
+  </div>
+</div>
+
+<!-- 2 -->
+<div class="step">
+  <div class="phone">
+    <div class="sbar"><span>09:02</span><span>▮▮▮ 84%</span></div>
+    <div class="apphead"><span class="logo">MESSI</span>
+      <span class="d">Sen 28 Sep</span><span class="av">N</span></div>
+    <div class="screen">
+      <div class="lamp red" style="margin-bottom:9px"><i></i>Ada yang gantung &gt;3 hari</div>
+      <p class="ptitle">Channel squad hari ini</p>
+      <p class="psub">Angka di bawah dihitung sistem.</p>
+      <table class="mx">
+        <tr><th>Ch</th><th>Open</th><th>&gt;3h</th><th>&lt;3h</th><th>Balas</th></tr>
+        <tr><td>WAG</td>
+          <td class="n"><div class="cell filled">13</div></td>
+          <td class="n"><div class="cell filled">2</div></td>
+          <td class="n"><div class="cell filled">1</div></td>
+          <td class="n"><div class="cell filled">5</div></td></tr>
+        <tr><td>TGG</td>
+          <td class="n"><div class="cell filled">4</div></td>
+          <td class="n"><div class="cell">0</div></td>
+          <td class="n"><div class="cell">0</div></td>
+          <td class="n"><div class="cell filled">2</div></td></tr>
+        <tr><td>GCG</td>
+          <td class="n"><div class="cell filled">4</div></td>
+          <td class="n"><div class="cell">0</div></td>
+          <td class="n"><div class="cell">0</div></td>
+          <td class="n"><div class="cell filled">1</div></td></tr>
+      </table>
+      <div class="tiles">
+        <div><b>21</b><span>open</span></div>
+        <div class="w"><b>3</b><span>gantung</span></div>
+        <div><b>18</b><span>aman</span></div>
+        <div><b>8</b><span>dibalas</span></div>
+      </div>
+    </div>
+  </div>
+  <div class="note-col">
+    <div class="stepno"><b>2</b><span class="when">±40 detik</span></div>
+    <h3>Dua belas angka, satu layar</h3>
+    <p>Matrix channel adalah bagian terberat, jadi ditaruh paling atas selagi orang masih
+    fokus. Keyboard angka langsung muncul, dan <b>Tab pindah ke kolom sebelah</b> — bukan
+    lompat ke pertanyaan lain.</p>
+    <p>Empat kotak turunan hidup saat diketik. Lampu merah/kuning/hijau ikut berubah sendiri.
+    <b>Tidak ada satu pun dari empat angka itu yang bisa diketik manual.</b></p>
+    <div class="behind"><b>Di belakang layar</b>
+      Kalau jumlah gantung melebihi jumlah open, tombol kirim menolak sebelum menyentuh
+      pertanyaan lain — angka yang mustahil diberitahu duluan, bukan belakangan.</div>
+  </div>
+</div>
+
+<!-- 3 -->
+<div class="step">
+  <div class="phone">
+    <div class="sbar"><span>09:03</span><span>▮▮▮ 84%</span></div>
+    <div class="apphead"><span class="logo">MESSI</span>
+      <span class="d">Sen 28 Sep</span><span class="av">N</span></div>
+    <div class="screen">
+      <p class="ptitle" style="font-size:12px">Janji yang jatuh tempo</p>
+      <div class="chk"><i class="on">✓</i>
+        <div><b>Balas Klien A soal harga</b><br>
+        <span class="m" style="font-family:var(--mono);font-size:9.5px;color:var(--muted)">
+        dijanjikan Jum 25 Sep · sudah lewat</span></div></div>
+      <div class="chk"><i></i>
+        <div><b>Kirim revisi jadwal ke Vendor B</b><br>
+        <span class="m" style="font-family:var(--mono);font-size:9.5px;color:var(--muted)">
+        dijanjikan Sen 28 Sep</span></div></div>
+
+      <p class="lab" style="margin-top:14px">Yang masih gantung — mana saja?</p>
+      <div class="box">WAG Klien A — nunggu approve harga.<br>TGG Vendor B — minta revisi jadwal.</div>
+      <p class="lab">Rencana untuk yang gantung</p>
+      <div class="box">Balas Klien A begitu harga di-approve, kunci jadwal Vendor B.</div>
+      <p class="lab">Kapan beres?
+        <span class="hint">Tanggal ini jadi janji.</span></p>
+      <div class="box" style="min-height:0">01/10/2026</div>
+    </div>
+  </div>
+  <div class="note-col">
+    <div class="stepno"><b>3</b><span class="when">±50 detik</span></div>
+    <h3>Janji kemarin ditutup dulu, janji baru dibuka</h3>
+    <p>Janji yang jatuh tempo muncul <b>di dalam sapuan hari ini</b>, bukan jadi notifikasi
+    terpisah. Centang kalau beres. Yang tidak dicentang dan sudah lewat tanggal otomatis
+    tercatat meleset — tidak perlu ada yang menagih.</p>
+    <p>Kolom tanggal di bawah melahirkan janji berikutnya. Tanpa tanggal, yang gantung akan
+    tetap gantung dan tidak ada yang bisa ditagih.</p>
+    <div class="behind"><b>Di belakang layar</b>
+      Tiga kolom ini cuma muncul kalau jumlah gantung &gt; 0. Hari bersih = form-nya
+      pendek. Sistem menanyakan lebih sedikit saat memang tidak ada masalah.</div>
+  </div>
+</div>
+
+<!-- 4 -->
+<div class="step">
+  <div class="phone">
+    <div class="sbar"><span>09:04</span><span>▮▮▮ 84%</span></div>
+    <div class="apphead"><span class="logo">MESSI</span>
+      <span class="d">Sen 28 Sep</span><span class="av">N</span></div>
+    <div class="screen">
+      <p class="lab">Kendala yang perlu dieskalasi
+        <span class="hint">Ini yang dibaca Chief, bukan angkanya.</span></p>
+      <div class="box">Butuh Chief approve harga Klien A sebelum bisa dibalas.</div>
+      <p class="lab">Ada yang harus jadi project baru?</p>
+      <div class="box ph">Kosongkan kalau tidak ada</div>
+      <div class="chk" style="margin-top:14px"><i class="on">✓</i>
+        <div>Saya sudah memastikan Messenger Squad saya semua terkelola dengan baik tanpa
+        gantung, dan saya melaporkan laporan di atas dengan jujur sesuai kondisi
+        sebenarnya.</div></div>
+      <div class="cta">Kirim laporan</div>
+    </div>
+  </div>
+  <div class="note-col">
+    <div class="stepno"><b>4</b><span class="when">±20 detik</span></div>
+    <h3>Deklarasi tetap ada, persis kata-katanya</h3>
+    <p>Ini bagian budaya, bukan teknis, jadi tidak saya sentuh. Bedanya sekarang jadi
+    <b>centang wajib</b>, bukan kalimat yang disalin. Tidak bisa terkirim tanpa itu.</p>
+    <p>Kolom eskalasi sengaja ditaruh tepat sebelum deklarasi — saat orang sedang bersiap
+    menyatakan semuanya benar, itu momen paling pas untuk ingat apa yang belum beres.</p>
+    <div class="behind"><b>Di belakang layar</b>
+      Kalau validasi gagal, semua yang sudah diketik tetap tersimpan. Kehilangan dua belas
+      angka gara-gara lupa centang adalah cara tercepat membuat orang benci formulir.</div>
+  </div>
+</div>
+
+<!-- 5 -->
+<div class="step">
+  <div class="phone">
+    <div class="sbar"><span>09:05</span><span>▮▮▮ 84%</span></div>
+    <div class="apphead"><span class="logo">MESSI</span>
+      <span class="d">Sen 28 Sep</span><span class="av">N</span></div>
+    <div class="screen">
+      <div class="lamp red" style="margin-bottom:9px"><i></i>Terkirim · 09:05</div>
+      <div class="report">MESSI Report
+Date: Sen 28 Sep
+Squad: OASYS  by: Nicho
+
+[MERAH] Gantung &gt;3 hari
+
+a. Open: 13 WAG, 4 TGG, 4 GCG
+b. Gantung &gt;3 hari: 2
+c. Gantung &lt;3 hari: 1
+d. Tidak gantung: 18
+e. Dibalas hari ini: 8
+f. Gantung: WAG Klien A…
+g. Rencana: … (target 1 Okt)
+h. Eskalasi: Butuh Chief…</div>
+      <div class="cta sec">Salin laporan</div>
+      <div class="cta sec" style="margin-top:6px">Kirim ke Telegram grup</div>
+    </div>
+  </div>
+  <div class="note-col">
+    <div class="stepno"><b>5</b><span class="when">selesai · 09:05</span></div>
+    <h3>Laporannya jadi sendiri</h3>
+    <p>Format yang sama persis dengan yang biasa diketik tangan. Selama masa transisi tinggal
+    <b>Kirim ke Telegram grup</b> — bot yang menempelkan, jadi grup tetap ramai seperti biasa
+    dan tidak ada yang merasa kehilangan.</p>
+    <p>Ini penting untuk adopsi: minggu-minggu pertama, MESSI cuma <b>mengetikkan</b> laporan
+    yang tadinya diketik manual. Grup tidak berubah. Yang berubah cuma siapa yang mengetik.</p>
+    <div class="behind"><b>Di belakang layar</b>
+      Janji baru (1 Okt) dicatat. Sistem tidak menanyakan Klien A lagi Selasa, Rabu atau
+      Kamis — dia menagih hari Kamis, pada janji itu sendiri.</div>
+  </div>
+</div>
+
+<!-- 6 -->
+<div class="step">
+  <div class="phone">
+    <div class="sbar"><span>17:30</span><span>OASYS</span></div>
+    <div class="screen tg">
+      <div class="tgmsg">
+        <div class="tgfrom">MESSI Bot</div>
+        Nicho, MESSI hari ini <b>belum diisi</b>.<br>
+        Deadline 18:00 — 30 menit lagi.<br><br>
+        <span class="tglink">Isi sekarang →</span>
+        <div class="tgtime">17:30 ✓✓</div>
+      </div>
+      <div class="tgmsg" style="margin-top:9px;opacity:.65">
+        <div class="tgfrom">MESSI Bot</div>
+        Lewat 19:00: tercatat <b>tidak dilaporkan</b>, dan muncul di halaman Chief.
+        <div class="tgtime">besok 09:00</div>
+      </div>
+    </div>
+  </div>
+  <div class="note-col">
+    <div class="stepno"><b>6</b><span class="when">17:30 · kalau belum</span></div>
+    <h3>Satu pengingat, lalu konsekuensinya</h3>
+    <p><b>Satu</b> pengingat, bukan tiga. Pengingat yang beruntun akan di-mute, dan begitu
+    di-mute semua pemicu lain ikut mati.</p>
+    <p>Lewat masa tenggang, hari itu tercatat <b>tidak dilaporkan</b> — sebagai fakta di
+    catatan, bukan baris kosong yang tak kelihatan. Itu yang menggantikan Chief bertanya
+    "sudah lapor belum?".</p>
+    <div class="behind"><b>Di belakang layar</b>
+      Reaper jam 19:00 menandai cycle yang lewat sebagai <code>missed</code>, dan janji yang
+      lewat tanggal sebagai <code>broken</code>. Tidak ada yang perlu melapor bahwa dia lupa.</div>
+  </div>
+</div>
+
+<h2>Alur harian — leader</h2>
+
+<div class="step">
+  <div class="phone">
+    <div class="sbar"><span>09:40</span><span>▮▮▮ 84%</span></div>
+    <div class="apphead"><span class="logo">MESSI</span>
+      <span class="d">Sen 28 Sep</span><span class="av">C</span></div>
+    <div class="screen">
+      <p class="ptitle" style="font-size:13px">Pengecualian</p>
+      <p class="psub">Squad OASYS · 6 player</p>
+      <div class="stat3">
+        <div class="g"><b>5/6</b><span>sudah lapor</span></div>
+        <div class="r"><b>2</b><span>janji meleset</span></div>
+        <div class="r"><b>1</b><span>belum lapor</span></div>
+      </div>
+      <p class="lab">Perlu perhatian</p>
+      <div class="exc"><b>Nicho</b> — butuh approve harga Klien A
+        <div style="font-family:var(--mono);font-size:9.5px;color:var(--muted);margin-top:2px">
+        eskalasi · Sen 28 Sep</div></div>
+      <div class="exc" style="border-left-color:var(--broken)"><b>Rio</b> — belum lapor
+        <div style="font-family:var(--mono);font-size:9.5px;color:var(--muted);margin-top:2px">
+        2 hari berturut-turut</div></div>
+      <p class="lab">Sisanya</p>
+      <div class="blank">4 player hijau.<br>Tidak perlu dibaca.</div>
+    </div>
+  </div>
+  <div class="note-col">
+    <div class="stepno"><b>7</b><span class="when">±30 detik, sekali sehari</span></div>
+    <h3>Chief membaca pengecualian, bukan laporan</h3>
+    <p>Chief <b>tidak membuka enam laporan</b>. Dia melihat dua kartu: satu eskalasi yang
+    memang butuh keputusannya, satu orang yang dua hari tidak lapor. Empat player hijau
+    sengaja diringkas jadi satu baris.</p>
+    <p>Inilah ukurannya. Kalau Chief masih merasa perlu membaca semua laporan satu per satu,
+    berarti produknya belum menggantikan apa pun — cuma memindahkan tempat mengetik.</p>
+    <div class="behind"><b>Di belakang layar</b>
+      Semua angka di sini dihitung dari status baris, bukan dilaporkan orang. "5/6 sudah
+      lapor" tidak pernah ditanyakan ke siapa pun.</div>
+  </div>
+</div>
+
+<h2>Beda demo dengan produk asli</h2>
+
+<div class="cols">
+  <div class="panel gone">
+    <h4>Hilang dari demo</h4>
+    <ul>
+      <li><b>Tombol maju-mundur hari.</b> Alat bantu supaya perilaku lintas hari kelihatan
+        dalam hitungan detik. Produk asli pakai jam beneran.</li>
+      <li><b>Ganti persona Nicho/Chief.</b> Diganti login — Anda melihat apa yang jadi hak Anda.</li>
+      <li><b>Tombol "Ulangi dari awal".</b> Data operasional tidak boleh bisa dihapus semudah itu.</li>
+      <li><b>Tab Leader untuk semua orang.</b> Player tidak melihat angka player lain.</li>
+    </ul>
+  </div>
+  <div class="panel new">
+    <h4>Ditambahkan di produk asli</h4>
+    <ul>
+      <li><b>Bot Telegram.</b> Pemicu 09:00, pengingat 17:30, dan kirim laporan ke grup.</li>
+      <li><b>Login &amp; peran.</b> Player, leader, admin — dengan tautan bertoken dari bot
+        supaya tidak perlu login tiap pagi.</li>
+      <li><b>Banyak player.</b> Demo cuma Nicho; aslinya satu squad, dan halaman Chief
+        menghitung lintas orang.</li>
+      <li><b>Riwayat.</b> Laporan kemarin bisa dibuka; sekarang cuma strip 7 hari.</li>
+      <li><b>Mobile-first.</b> Nicho mengisi dari HP, jadi HP yang jadi acuan — bukan
+        desktop yang dikecilkan.</li>
+    </ul>
+  </div>
+</div>
+
+<div class="callout"><p><b>Satu aturan yang menentukan adopsi:</b> selama enam minggu pertama,
+laporan tetap masuk ke grup Telegram seperti biasa. MESSI cuma yang mengetikkannya. Kalau
+grup tiba-tiba sepi karena "sudah pindah sistem", orang merasa kehilangan sesuatu dan
+menyalahkan sistemnya — padahal yang hilang cuma kebiasaan melihat laporan lewat.</p></div>
+
+<h2>Spesifikasi layout</h2>
+
+<div class="twrap"><table class="spec">
+  <tr><th>Hal</th><th>Keputusan</th></tr>
+  <tr><td>Acuan</td><td>Mobile-first, 360–430px. Nicho mengisi dari HP di tengah kerja, bukan duduk di depan laptop.</td></tr>
+  <tr><td>Satu layar, satu tugas</td><td>Matrix → gantung &amp; janji → deklarasi. Digulir, bukan wizard: orang perlu melihat seluruh laporan sebelum bersumpah isinya benar.</td></tr>
+  <tr><td>Urutan</td><td>Yang terberat (dua belas angka) paling atas selagi masih fokus. Pertanyaan judgement di bawah, saat konteksnya sudah lengkap.</td></tr>
+  <tr><td>Target sentuh</td><td>Minimal 44px. Kolom angka <code>inputmode="numeric"</code> supaya keypad angka yang muncul.</td></tr>
+  <tr><td>Angka turunan</td><td>Selalu terlihat, selalu dihitung, tidak pernah bisa diketik. Ini yang membuat laporan tidak bisa saling bertentangan.</td></tr>
+  <tr><td>Warna</td><td>Hijau/kuning/merah hanya untuk status, bukan hiasan. Sisanya netral hangat supaya yang merah benar-benar menonjol.</td></tr>
+  <tr><td>Kondisional</td><td>Kolom gantung cuma muncul kalau ada yang gantung. Hari bersih = form pendek.</td></tr>
+  <tr><td>Halaman Chief</td><td>Pengecualian saja. Yang hijau diringkas satu baris. Hari yang semuanya beres tidak perlu dibaca.</td></tr>
+  <tr><td>Offline</td><td>Isian tersimpan lokal sambil diketik. Sinyal di lapangan tidak stabil, dan kehilangan isian sekali saja cukup untuk membuat orang berhenti pakai.</td></tr>
+</table></div>
+
+<p class="foot">Angka waktu di tiap langkah adalah target, bukan hasil pengukuran — belum ada
+yang memakai ini. Yang harus diukur sejak minggu pertama justru bukan angka di layar,
+melainkan berapa kali Chief masih bertanya manual di luar sistem. Kalau itu tidak turun,
+sisanya tidak ada artinya.</p>
+
+</div>

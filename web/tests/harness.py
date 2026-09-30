@@ -1,0 +1,106 @@
+"""Browser-test harness for the MESSI web app.
+
+The page runs as a claude.ai artifact, where `window.claude` supplies the shared
+database and the viewer's identity. Here both are faked (see stub.js) with an
+in-memory store kept in localStorage, so the player and the manager can be driven
+against the SAME data — which is what most of these tests are actually about.
+
+Run one suite:   python3 web/tests/test_player.py
+Run all:         python3 web/tests/run_all.py
+Needs: pip install playwright   (Chromium must already be available)
+"""
+
+from __future__ import annotations
+
+import json
+import os
+import sys
+import tempfile
+from pathlib import Path
+
+from playwright.sync_api import sync_playwright  # noqa: F401  (re-exported)
+
+HERE = Path(__file__).resolve().parent
+WEB = HERE.parent
+APP = WEB / "messi.html"
+STUB = (HERE / "stub.js").read_text()
+SHOTS = Path(tempfile.gettempdir()) / "messi-shots"
+SHOTS.mkdir(exist_ok=True)
+
+# The artifact host wraps the page in this skeleton at publish time; reproduce it so
+# the local render matches what a viewer sees.
+_SKELETON = (
+    "<!doctype html><html><head><meta charset=utf8>"
+    '<meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover">'
+    "<style>:root{color-scheme:light}body{margin:0;font:14px system-ui;background:#fafaf9}"
+    "img{max-width:100%}[hidden]{display:none!important}</style></head><body>{body}</body></html>"
+)
+
+# Freezes the clock, so weekend / before-opening / after-deadline behaviour is testable.
+_CLOCK = """(function(){ const F=new Date(%s).getTime(), R=Date;
+  function D(...a){ return a.length ? new R(...a) : new R(F); }
+  D.now=()=>F; D.parse=R.parse; D.UTC=R.UTC; D.prototype=R.prototype; window.Date=D; })();"""
+
+
+def preview_url() -> str:
+    out = SHOTS / "preview.html"
+    out.write_text(_SKELETON.replace("{body}", APP.read_text()))
+    return "file://" + str(out)
+
+
+def launch(pw):
+    """Playwright's own Chromium when it is installed, otherwise one supplied by the
+    environment (MESSI_CHROMIUM, or the image's pre-installed build)."""
+    for path in (os.environ.get("MESSI_CHROMIUM"), "/opt/pw-browsers/chromium"):
+        if path and Path(path).exists():
+            return pw.chromium.launch(executable_path=path)
+    return pw.chromium.launch()
+
+
+results: list[tuple[bool, str, object]] = []
+
+
+def check(label, got, want=True):
+    ok = want(got) if callable(want) else (got == want)
+    results.append((ok, label, got))
+    print(("PASS " if ok else "FAIL ") + label + ("" if ok else f"   -> {got!r}"))
+    return ok
+
+
+def new_page(ctx, who, store=None, reset=True, at=None):
+    """A page acting as `who`. `store` seeds the shared database; `at` freezes the clock.
+
+    Pages created from the SAME context share localStorage, which is how the
+    cross-person tests prove one person's submission reaches another's screen.
+    """
+    pg = ctx.new_page()
+    pg.on("pageerror", lambda e: results.append((False, "JS error: " + str(e), "")))
+    if at:
+        pg.add_init_script(_CLOCK % json.dumps(at))
+    pg.add_init_script(
+        f"window.__WHO__={json.dumps(who)};"
+        f"window.__SEED__={json.dumps(store or {})};"
+        f"window.__RESET__={json.dumps(reset)};"
+    )
+    pg.add_init_script(STUB)
+    pg.goto(preview_url())
+    pg.wait_for_timeout(900)
+    return pg
+
+
+def context(browser):
+    return browser.new_context(viewport={"width": 400, "height": 860})
+
+
+def store_of(pg):
+    return pg.evaluate("window.__STORE__")
+
+
+def txt(pg, sel):
+    return pg.inner_text(sel) if pg.query_selector(sel) else ""
+
+
+def report(title=""):
+    bad = [r for r in results if not r[0]]
+    print(f"\n{len(results) - len(bad)}/{len(results)} lolos{(' — ' + title) if title else ''}")
+    return 1 if bad else 0
