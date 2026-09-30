@@ -54,6 +54,8 @@ PY
 ```
 web/               THE PAGE PEOPLE USE — messi.html, plus the flow spec and the demo
 web/tests/         81 browser checks (player, manager, edge cases, keyboard)
+php/               the same page, deployable: PHP + MySQL, cPanel, Telegram, hourly cron
+php/tests/         123 checks — rules, a real MySQL, and the running app in a browser
 core/messi_core/   pure rules: cadence, period keys, state machines. No web, no ORM.
 app/               FastAPI app, schema.sql, templates, seed, CLI
 tests/             pytest over core/ — runs without a database
@@ -64,6 +66,12 @@ docs/              the design this implements
 `web/` and `app/` have diverged: `web/` carries the current MESSI question set and the
 stepped flow, `app/` carries the server pieces. See [web/README.md](web/README.md).
 
+[`php/`](php/README.md) is the one meant to go live. It serves `web/messi.html` unchanged
+— a byte-for-byte copy, checked by `php/tests/check_sync.php` — so the 81 browser checks
+keep describing what ships, and replaces only what was underneath it. Unlike `app/`, it is
+built to face a network: every write is re-checked server-side, the day and the deadline
+come from the server's clock, and the pages that are not pages are blocked by `.htaccess`.
+
 `core/` is deliberately framework-free: the things most likely to be got wrong — which
 period a cycle belongs to in the player's own timezone, when a promise counts as broken —
 are readable and testable on their own, and both the app and the Odoo addon call into it
@@ -71,10 +79,11 @@ rather than restating the rules.
 
 ## Not done yet, in the order it matters
 
-1. **Security.** Sessions and scrypt passwords work, but there is no MFA, no refresh-token
-   rotation, no CSRF token, no rate limiting, and no row-level security. `organization_id`
-   is on every table but queries do not yet filter by it — the app assumes one org. **Do
-   not expose this to a network.**
+1. **Security in `app/`.** Sessions and scrypt passwords work, but there is no MFA, no
+   refresh-token rotation, no CSRF token, no rate limiting, and no row-level security.
+   `organization_id` is on every table but queries do not yet filter by it — the app
+   assumes one org. **Do not expose `app/` to a network**; `php/` is the build meant for
+   that, and its remaining gaps are login rate limiting and MFA.
 2. **Migrations.** One `schema.sql` applied with `CREATE TABLE IF NOT EXISTS`. Needs
    ordered migration files before any data matters.
 3. **No scheduler.** `run.sh` ticks once at startup; `POST /tick` runs it on demand. Needs

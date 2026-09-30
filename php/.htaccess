@@ -1,0 +1,25 @@
+# MESSI — Apache, the way cPanel serves it.
+
+DirectoryIndex index.php
+
+# config.php holds the database password; lib/ and tests/ are not pages. Apache should
+# never hand any of them out, whatever the URL says.
+<FilesMatch "^(config\.php|config\.example\.php)$">
+  Require all denied
+</FilesMatch>
+
+RedirectMatch 404 ^/.*/(lib|tests)/
+RedirectMatch 404 ^/.*/app\.html$
+
+<IfModule mod_headers.c>
+  Header set X-Content-Type-Options "nosniff"
+  Header set Referrer-Policy "same-origin"
+  Header set X-Frame-Options "SAMEORIGIN"
+</IfModule>
+
+# The page and the API are per-person and change through the day; none of it should be
+# served from a cache.
+<IfModule mod_expires.c>
+  ExpiresActive On
+  ExpiresByType text/html "access plus 0 seconds"
+</IfModule>

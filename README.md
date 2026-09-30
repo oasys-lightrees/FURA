@@ -20,19 +20,23 @@ sugar mill asking about daily output is the same machinery with different questi
 An AI layer sits over the top, applied only where it produces measurable operational value —
 most importantly on the *questions*, before anyone is ever asked.
 
-This repository currently contains the **system design** for the platform. No application
-code has been written yet; the design is the artefact under review.
+This repository holds the **system design** for the platform, and a working build of its
+first module.
 
 ## Running it
 
 ```bash
 python3 web/tests/run_all.py   # 81 browser checks against the live page
 pytest -q                      # 29 engine-rule tests, no browser or database
+sh php/tests/run_all.sh        # 123 checks on the PHP + MySQL build
 ./run.sh                       # the FastAPI + Postgres build on :8000
 ```
 
-The page people use is [`web/messi.html`](web/README.md) — mobile-first, published as an
-artifact. See [RUNNING.md](RUNNING.md) for what works today and what does not.
+The page people use is [`web/messi.html`](web/README.md) — mobile-first, one question per
+screen. [`php/`](php/README.md) is the same page with a PHP + MySQL back end, meant to be
+uploaded to cPanel: it adds accounts, a database, the hourly job that opens each day and
+chases what was promised, and a Telegram bot that sends the morning link. See
+[RUNNING.md](RUNNING.md) for what works today and what does not.
 
 ## Design documents
 

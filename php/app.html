@@ -1,0 +1,738 @@
+<title>MESSI Squad OASYS</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Public+Sans:ital,wght@0,400;0,500;0,600;0,700;1,400&family=IBM+Plex+Mono:wght@400;500&display=swap">
+
+<style>
+:root {
+  color-scheme: light;
+  --paper:#f5f3ef; --surface:#ffffff; --raise:#faf9f6;
+  --ink:#1a1c1f; --muted:#6b6d73; --line:#e4e1db;
+  --kept:#2f6248; --due:#9a6410; --broken:#97322a;
+  --kept-bg:#e8f0eb; --due-bg:#f7eedd; --broken-bg:#f7e7e4;
+  --ui:"Public Sans",ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif;
+  --mono:"IBM Plex Mono",ui-monospace,SFMono-Regular,Menlo,monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) { color-scheme: dark;
+    --paper:#111317; --surface:#1c1f24; --raise:#22262c;
+    --ink:#e8e6e1; --muted:#979aa1; --line:#2b2f36;
+    --kept:#63a184; --due:#cf9a45; --broken:#cf6f61;
+    --kept-bg:#1b2a23; --due-bg:#2b2318; --broken-bg:#2c1d1b; }
+}
+:root[data-theme="dark"] { color-scheme: dark;
+  --paper:#111317; --surface:#1c1f24; --raise:#22262c;
+  --ink:#e8e6e1; --muted:#979aa1; --line:#2b2f36;
+  --kept:#63a184; --due:#cf9a45; --broken:#cf6f61;
+  --kept-bg:#1b2a23; --due-bg:#2b2318; --broken-bg:#2c1d1b; }
+
+* { box-sizing:border-box; }
+html, body { height:100%; }
+body { margin:0; background:var(--paper); color:var(--ink); font-family:var(--ui);
+       font-size:16px; line-height:1.5; -webkit-font-smoothing:antialiased;
+       -webkit-text-size-adjust:100%; }
+.app { max-width:500px; margin:0 auto; }
+main { padding:22px 16px 132px; }
+
+/* header */
+.top { position:sticky; top:env(safe-area-inset-top,0px); z-index:30;
+       background:color-mix(in srgb,var(--paper) 94%,transparent); backdrop-filter:blur(10px);
+       border-bottom:1px solid var(--line); }
+.top-in { max-width:500px; margin:0 auto; padding:11px 16px; display:flex;
+          align-items:center; gap:10px; }
+.logo { font-weight:700; letter-spacing:.14em; font-size:13px; }
+.when { margin-left:auto; font-family:var(--mono); font-size:12px; color:var(--muted); }
+.avatar { width:30px; height:30px; border-radius:50%; background:var(--ink); color:var(--paper);
+          display:grid; place-items:center; font-size:12px; font-weight:700; flex:none; }
+
+/* progress */
+.prog { display:flex; gap:6px; margin-bottom:20px; }
+.prog i { height:4px; flex:1; border-radius:2px; background:var(--line); }
+.prog i.on { background:var(--ink); }
+.stepno { font-family:var(--mono); font-size:11.5px; color:var(--muted); letter-spacing:.05em;
+          margin-bottom:7px; }
+
+h1 { font-size:23px; font-weight:700; letter-spacing:-.02em; margin:0 0 6px; text-wrap:balance; }
+.sub { color:var(--muted); font-size:14.5px; margin:0 0 22px; }
+.sub b { color:var(--ink); font-weight:600; }
+
+/* the counting table */
+.tbl { background:var(--surface); border:1px solid var(--line); border-radius:14px; padding:14px; }
+table.mx { width:100%; border-collapse:separate; border-spacing:6px; margin:-6px; }
+table.mx th { font-size:11px; font-weight:600; color:var(--muted); padding:0 0 2px;
+              text-align:center; line-height:1.25; }
+table.mx th:first-child { text-align:left; }
+table.mx td:first-child { font-family:var(--mono); font-size:13.5px; font-weight:500; width:46px; }
+table.mx input { width:100%; min-height:52px; font:inherit; font-size:19px; text-align:center;
+  font-variant-numeric:tabular-nums; border:1px solid var(--line); border-radius:11px;
+  background:var(--raise); color:var(--ink); padding:4px; }
+table.mx input:focus { background:var(--surface); border-color:var(--ink); }
+.legend { font-size:13px; color:var(--muted); margin:12px 0 0; }
+
+.sumline { display:flex; gap:10px; margin-top:14px; }
+.sumline div { flex:1; background:var(--raise); border:1px solid var(--line); border-radius:11px;
+               padding:10px; text-align:center; }
+.sumline b { display:block; font-family:var(--mono); font-size:22px; font-weight:500;
+             line-height:1.15; font-variant-numeric:tabular-nums; }
+.sumline span { font-size:11.5px; color:var(--muted); }
+.sumline .w b { color:var(--broken); }
+
+.lamp { display:flex; align-items:center; gap:9px; font-weight:600; font-size:15px;
+        padding:13px 15px; border-radius:12px; border:1px solid var(--line); margin-bottom:18px; }
+.lamp i { width:12px; height:12px; border-radius:50%; flex:none; }
+.lamp.green { background:var(--kept-bg); color:var(--kept); } .lamp.green i { background:var(--kept); }
+.lamp.amber { background:var(--due-bg); color:var(--due); }  .lamp.amber i { background:var(--due); }
+.lamp.red { background:var(--broken-bg); color:var(--broken); } .lamp.red i { background:var(--broken); }
+
+.fld { margin-bottom:22px; }
+.fld label { display:block; font-size:16px; font-weight:600; margin-bottom:7px; }
+.opt { font-weight:500; color:var(--muted); font-size:13.5px; }
+.hint { display:block; font-weight:400; color:var(--muted); font-size:13.5px; margin-top:3px; }
+textarea, input[type=date] { width:100%; font:inherit; font-size:16px; padding:12px 13px;
+  border-radius:11px; border:1px solid var(--line); background:var(--surface); color:var(--ink); }
+textarea { min-height:82px; resize:vertical; }
+:focus-visible { outline:2px solid var(--ink); outline-offset:2px; }
+
+.check { display:flex; gap:12px; align-items:flex-start; background:var(--surface);
+         border:1px solid var(--line); border-radius:12px; padding:14px; margin-bottom:9px;
+         cursor:pointer; }
+.check input { width:22px; height:22px; margin:0; flex:none; accent-color:var(--kept); }
+.check .t { font-size:15px; }
+.check.decl { background:var(--raise); }
+.check.decl .t { font-size:14px; line-height:1.5; }
+
+/* review */
+.rev { background:var(--surface); border:1px solid var(--line); border-radius:14px;
+       overflow:hidden; margin-bottom:18px; }
+.rev dl { margin:0; }
+.rev div { display:flex; gap:14px; padding:12px 15px; border-top:1px solid var(--line); }
+.rev div:first-child { border-top:0; }
+.rev dt { flex:0 0 96px; font-size:13.5px; color:var(--muted); }
+.rev dd { margin:0; flex:1; font-size:14.5px; }
+.rev dd.n { font-family:var(--mono); font-variant-numeric:tabular-nums; }
+.rev .edit { font:inherit; font-size:13px; font-weight:600; background:none; border:0;
+             color:var(--ink); cursor:pointer; padding:0; text-decoration:underline;
+             text-underline-offset:3px; }
+
+/* done */
+.done { text-align:center; padding:14px 0 6px; }
+.done .tick { width:62px; height:62px; border-radius:50%; background:var(--kept-bg);
+              color:var(--kept); display:grid; place-items:center; margin:0 auto 14px;
+              font-size:31px; font-weight:700; }
+.done h1 { margin-bottom:4px; }
+
+.card { background:var(--surface); border:1px solid var(--line); border-radius:13px;
+        padding:15px; margin-bottom:9px; }
+.card.due { border-left:3px solid var(--due); }
+.card.bad { border-left:3px solid var(--broken); background:var(--broken-bg); }
+.row { display:flex; align-items:baseline; gap:9px; flex-wrap:wrap; }
+.grow { flex:1 1 auto; }
+.meta { font-family:var(--mono); font-size:11.5px; color:var(--muted); }
+.strong { font-weight:600; }
+h2 { font-size:11.5px; font-weight:700; letter-spacing:.09em; text-transform:uppercase;
+     color:var(--muted); margin:28px 0 10px; }
+
+.report { background:var(--raise); border:1px solid var(--line); border-radius:11px; padding:14px;
+          font-family:var(--mono); font-size:12.5px; line-height:1.7; white-space:pre-wrap;
+          word-break:break-word; text-align:left; }
+.blank { border:1px dashed var(--line); border-radius:13px; padding:30px 18px; text-align:center;
+         color:var(--muted); font-size:14.5px; background:var(--surface); }
+.blank b { display:block; color:var(--ink); font-size:16px; margin-bottom:5px; }
+
+.stats { display:flex; gap:9px; margin-bottom:8px; }
+.stats div { flex:1; background:var(--surface); border:1px solid var(--line); border-radius:12px;
+             padding:12px 10px; }
+.stats b { display:block; font-family:var(--mono); font-size:22px; font-weight:500; line-height:1.15; }
+.stats span { font-size:11.5px; color:var(--muted); }
+.stats .g b { color:var(--kept); } .stats .r b { color:var(--broken); }
+
+.tabs { display:flex; gap:24px; border-bottom:1px solid var(--line); padding-inline:16px;
+        max-width:500px; margin:0 auto; }
+.tabs button { font:inherit; font-size:15px; font-weight:600; background:none; border:0;
+               color:var(--muted); cursor:pointer; padding:13px 0 10px; margin-bottom:-1px;
+               border-bottom:2px solid transparent; min-height:46px; }
+.tabs button[aria-selected="true"] { color:var(--ink); border-bottom-color:var(--ink); }
+.tabs .n { font-family:var(--mono); font-size:11px; margin-left:5px; color:var(--paper);
+           background:var(--broken); border-radius:9px; padding:1px 6px; }
+
+/* bottom bar */
+.bar { position:fixed; left:0; right:0; bottom:0; z-index:40;
+       background:color-mix(in srgb,var(--paper) 96%,transparent); backdrop-filter:blur(10px);
+       border-top:1px solid var(--line);
+       padding:12px 16px calc(12px + env(safe-area-inset-bottom,0px)); }
+.bar-in { max-width:500px; margin:0 auto; }
+.bar .err { color:var(--broken); font-size:14px; font-weight:600; margin-bottom:9px; }
+.btns { display:flex; gap:9px; }
+.btn { font:inherit; font-size:16px; font-weight:600; padding:14px 18px; border-radius:12px;
+       cursor:pointer; border:1px solid var(--ink); background:var(--ink); color:var(--paper);
+       min-height:52px; flex:1; }
+.btn.sec { background:var(--surface); color:var(--ink); border-color:var(--line); flex:0 0 auto;
+           min-width:96px; }
+.saved { font-size:12.5px; color:var(--muted); text-align:center; margin-top:9px; }
+.miss { background:var(--broken-bg); border:1px solid var(--line);
+         border-left:3px solid var(--broken); border-radius:11px; padding:12px 14px;
+         font-size:14px; margin-bottom:20px; }
+.note { font-size:12.5px; color:var(--muted); margin-top:28px; padding-top:14px;
+        border-top:1px solid var(--line); }
+@media (prefers-reduced-motion: reduce) { * { transition:none !important; } }
+</style>
+
+<div class="top"><div class="top-in">
+  <span class="logo">MESSI</span>
+  <span class="when" id="whenLbl">—</span>
+  <span class="avatar" id="avatar">·</span>
+</div></div>
+<nav class="tabs" id="tabs" role="tablist" hidden></nav>
+<div class="app"><main id="view"></main></div>
+<div class="bar" id="bar" hidden><div class="bar-in" id="barIn"></div></div>
+
+<script>
+"use strict";
+
+/* ============================================================================
+   MESSI — Messenger Screening.
+
+   Built to be answered on a phone, in the middle of doing something else, by
+   someone who was never trained on it. One question per screen; the report
+   format the squad knows is generated at the end rather than typed.
+   ========================================================================== */
+
+const TZ = "Asia/Jakarta", OPEN_AT = 9, DUE_AT = 18;
+const WORKDAYS = [1,2,3,4,5], FIRST_DAY = "2026-09-28", DRAFT = "messi.draft.";
+const ID_DAY = ["Minggu","Senin","Selasa","Rabu","Kamis","Jumat","Sabtu"];
+const ID_SHORT = ["Min","Sen","Sel","Rab","Kam","Jum","Sab"];
+const MON = ["Jan","Feb","Mar","Apr","Mei","Jun","Jul","Agu","Sep","Okt","Nov","Des"];
+
+const CHANNELS = [
+  { key:"WAG", label:"WAG", full:"WhatsApp Group" },
+  { key:"TGG", label:"TGG", full:"Telegram Group" },
+  { key:"GCG", label:"GCG", full:"Google Chat" },
+];
+const COLS = [
+  { key:"open",  head:"Masih<br>aktif" },
+  { key:"gt3",   head:"Gantung<br>&gt;3 hari" },
+  { key:"lt3",   head:"Gantung<br>&lt;3 hari" },
+  { key:"reply", head:"Sudah<br>dibalas" },
+];
+const DECLARATION =
+  "Saya sudah memastikan Messenger Squad saya semua terkelola dengan baik tanpa gantung, " +
+  "dan saya melaporkan laporan di atas dengan jujur sesuai kondisi sebenarnya.";
+
+/* ---- Jakarta clock ------------------------------------------------------- */
+const parts = () => Object.fromEntries(new Intl.DateTimeFormat("en-GB",
+  { timeZone:TZ, year:"numeric", month:"2-digit", day:"2-digit",
+    hour:"2-digit", minute:"2-digit", hour12:false })
+  .formatToParts(new Date()).map(x => [x.type, x.value]));
+const today = () => { const p = parts(); return `${p.year}-${p.month}-${p.day}`; };
+const nowHour = () => parseInt(parts().hour, 10);
+const nowHM = () => { const p = parts(); return `${p.hour}:${p.minute}`; };
+
+const d = s => new Date(s + "T00:00:00Z");
+const iso = t => t.toISOString().slice(0,10);
+const addDays = (s,n) => { const t = d(s); t.setUTCDate(t.getUTCDate()+n); return iso(t); };
+const isWorkday = s => WORKDAYS.includes(d(s).getUTCDay());
+const fmt = s => { const t = d(s); return `${ID_SHORT[t.getUTCDay()]} ${t.getUTCDate()} ${MON[t.getUTCMonth()]}`; };
+const fmtLong = s => { const t = d(s); return `${ID_DAY[t.getUTCDay()]}, ${t.getUTCDate()} ${MON[t.getUTCMonth()]}`; };
+function pastWorkdays(end, n) {
+  const out = []; for (let s = end; s >= FIRST_DAY && out.length < n; s = addDays(s,-1))
+    if (isWorkday(s)) out.push(s);
+  return out;
+}
+
+/* ---- numbers ------------------------------------------------------------- */
+const num = v => { const n = parseFloat(v); return Number.isFinite(n) ? n : 0; };
+const sum = (g,c) => CHANNELS.reduce((s,ch) => s + num((g[ch.key]||{})[c]), 0);
+function totals(g) {
+  g = g || {};
+  const open = sum(g,"open"), gt3 = sum(g,"gt3"), lt3 = sum(g,"lt3");
+  return { open, gt3, lt3, hanging:gt3+lt3, clear:open-gt3-lt3, reply:sum(g,"reply") };
+}
+function lampFor(g) {
+  const t = totals(g);
+  if (t.gt3 > 0)     return { level:"red",   label:"Ada yang gantung lebih dari 3 hari" };
+  if (t.hanging > 0) return { level:"amber", label:"Masih ada yang gantung" };
+  return { level:"green", label:"Tidak ada yang gantung" };
+}
+const statusOf = (day, doc) =>
+  doc && doc.submittedAt ? (doc.late ? "late" : "submitted") : (day < today() ? "missed" : "pending");
+
+/* ---- state --------------------------------------------------------------- */
+const S = { me:null, name:"", isLeader:false, cycles:new Map(), commitments:new Map(),
+            roster:new Map(), tab:"hari-ini", step:1, editing:false, error:null,
+            copied:false, showReport:false, ready:false, offline:false, a:null, savedAt:null };
+
+let db = null, users = null;
+const key = (uid,day) => uid + "__" + day;
+const mine = day => S.cycles.get(key(S.me, day));
+const myPromises = () => [...S.commitments.values()]
+  .filter(c => c.owner === S.me && c.status === "open").sort((a,b) => a.due.localeCompare(b.due));
+const duePromises = () => myPromises().filter(c => c.due <= today());
+const blank = () => ({ grid:{}, detail:"", plan:"", due:"", escalation:"", prista:"", declared:false });
+
+/* ---- drafts -------------------------------------------------------------- */
+function saveDraft(day, a) {
+  S.a = a; S.savedAt = nowHM();
+  try { localStorage.setItem(DRAFT + day, JSON.stringify(a)); } catch { /* private mode */ }
+}
+function loadDraft(day) {
+  try { const r = localStorage.getItem(DRAFT + day); return r ? JSON.parse(r) : null; } catch { return null; }
+}
+const clearDraft = day => { try { localStorage.removeItem(DRAFT + day); } catch { /* ignore */ } };
+
+/* ---- data ---------------------------------------------------------------- */
+async function boot() {
+  try { db = await claude.use("db"); } catch { db = null; }
+  try { users = await claude.use("user"); } catch { users = null; }
+  if (users) {
+    S.me = await users.id();
+    const me = await users.me();
+    S.name = (me && me.name) || "";
+    S.isLeader = (users.isOwner && users.isOwner()) || false;
+  }
+  if (!S.me) { S.me = "local"; S.offline = true; S.name = S.name || "Kamu"; }
+
+  if (db) {
+    try {
+      const [cy,cm,rs] = await Promise.all([ db.collection("cycles").get(),
+        db.collection("commitments").get(), db.collection("roster").get() ]);
+      cy.docs.forEach(s => S.cycles.set(s.id, { ...s.data() }));
+      cm.docs.forEach(s => S.commitments.set(s.id, { ...s.data() }));
+      rs.docs.forEach(s => S.roster.set(s.id, { ...s.data() }));
+    } catch { S.offline = true; }
+    if (!S.offline && !S.roster.has(S.me)) {
+      const e = { name:S.name, joined:today() };
+      S.roster.set(S.me, e);
+      db.collection("roster").doc(S.me).set(e).catch(() => {});
+    }
+  } else { S.offline = true; }
+
+  S.a = loadDraft(today()) || blank();
+  S.ready = true;
+  await names();
+  render();
+}
+async function names() {
+  if (!users || !users.profiles) return;
+  const ids = [...S.roster.keys()].filter(i => i.startsWith("u_")).slice(0,64);
+  if (!ids.length) return;
+  try { const ps = await users.profiles(ids);
+    ids.forEach(i => { const e = S.roster.get(i) || {};
+      e.name = (ps[i] && ps[i].name) || e.name || ""; S.roster.set(i, e); });
+  } catch { /* stored names stay */ }
+}
+const nameOf = u => (S.roster.get(u)||{}).name || (u === S.me ? (S.name || "Kamu") : "Seseorang");
+const joinedOn = u => (S.roster.get(u)||{}).joined || FIRST_DAY;
+/** Workdays this person did not report — never counting days before they joined. */
+const missedDays = (uid, n) => pastWorkdays(addDays(today(),-1), n)
+  .filter(dd => dd >= joinedOn(uid) && statusOf(dd, S.cycles.get(key(uid, dd))) === "missed");
+const put = (c,i,doc) => { if (db && !S.offline) db.collection(c).doc(i).set({...doc}).catch(() => { S.offline = true; }); };
+
+/* ---- steps --------------------------------------------------------------- */
+function stepList() {
+  const t = totals(S.a.grid);
+  return t.hanging > 0 ? ["angka","gantung","kirim"] : ["angka","kirim"];
+}
+const stepName = () => stepList()[S.step - 1] || "kirim";
+
+function checkStep() {
+  const t = totals(S.a.grid);
+  if (stepName() === "angka") {
+    const typed = CHANNELS.some(c => COLS.some(k => (S.a.grid[c.key]||{})[k.key] !== undefined));
+    if (!typed) return "Isi dulu angkanya. Kalau kosong semua, tulis 0.";
+    if (t.hanging > t.open) return "Yang gantung lebih banyak daripada yang masih aktif. Cek lagi angkanya.";
+  }
+  if (stepName() === "gantung") {
+    if (!S.a.detail.trim()) return "Tulis dulu yang mana saja yang gantung.";
+    if (!S.a.plan.trim())   return "Tulis rencananya.";
+    if (!S.a.due)           return "Pilih tanggalnya. Tanpa tanggal, tidak ada yang bisa mengingatkan.";
+  }
+  if (stepName() === "kirim" && !S.a.declared) return "Centang pernyataannya dulu.";
+  return null;
+}
+
+function submitNow(resolved) {
+  const day = today(), late = nowHour() >= DUE_AT;
+  const doc = { owner:S.me, day, ...S.a, submittedAt:new Date().toISOString(), late };
+  S.cycles.set(key(S.me, day), doc);
+  put("cycles", key(S.me, day), doc);
+  for (const id of resolved) {
+    const c = S.commitments.get(id);
+    if (!c || c.status !== "open") continue;
+    c.status = day <= c.due ? "kept" : "broken"; c.resolvedAt = day;
+    put("commitments", id, c);
+  }
+  if (S.a.plan && S.a.due) {
+    const id = "c-" + S.me + "-" + Date.now().toString(36);
+    const c = { id, owner:S.me, action:S.a.plan, due:S.a.due, status:"open", from:day };
+    S.commitments.set(id, c); put("commitments", id, c);
+  }
+  clearDraft(day); S.editing = false; S.step = 1;
+}
+
+/* ============================================================================
+   Render
+   ========================================================================== */
+const esc = s => String(s == null ? "" : s)
+  .replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
+const el = i => document.getElementById(i);
+const view = el("view"), bar = el("bar"), barIn = el("barIn");
+
+function progress() {
+  const steps = stepList();
+  return `<div class="prog">${steps.map((_,i) =>
+    `<i class="${i < S.step ? "on" : ""}"></i>`).join("")}</div>
+    <div class="stepno">LANGKAH ${S.step} DARI ${steps.length}</div>`;
+}
+
+function stepAngka() {
+  const t = totals(S.a.grid), lamp = lampFor(S.a.grid);
+  return `${progress()}
+    <h1>Berapa banyak hari ini?</h1>
+    <p class="sub">Hitung channel squad kamu. <b>Gantung</b> = ada yang nanya tapi belum dibalas.</p>
+    <div class="tbl">
+      <table class="mx">
+        <tr><th></th>${COLS.map(c => `<th>${c.head}</th>`).join("")}</tr>
+        ${CHANNELS.map((ch,ri) => `<tr><td title="${esc(ch.full)}">${esc(ch.label)}</td>
+          ${COLS.map((c,ci) => `<td><input type="text" inputmode="numeric" pattern="[0-9]*"
+             enterkeyhint="${(ri === CHANNELS.length-1 && ci === COLS.length-1) ? "done" : "next"}"
+             data-row="${ch.key}" data-col="${c.key}"
+             aria-label="${esc(ch.label)} ${esc(c.head.replace(/<br>/g," "))}"
+             value="${esc(((S.a.grid[ch.key]||{})[c.key]) ?? "")}"></td>`).join("")}
+        </tr>`).join("")}
+      </table>
+      <div class="sumline">
+        <div><b>${t.open}</b><span>masih aktif</span></div>
+        <div class="${t.hanging ? "w" : ""}"><b>${t.hanging}</b><span>gantung</span></div>
+        <div><b>${t.reply}</b><span>dibalas</span></div>
+      </div>
+      <p class="legend">Tiga angka ini dihitung sendiri. Kamu tidak perlu mengisinya.<br>Tekan <b>Enter</b> atau tombol panah untuk pindah kotak.</p>
+    </div>
+    <div class="lamp ${lamp.level}" style="margin-top:18px"><i></i>${esc(lamp.label)}</div>`;
+}
+
+function stepGantung() {
+  const t = totals(S.a.grid), due = duePromises(), day = today();
+  return `${progress()}
+    <h1>${t.hanging} yang masih gantung</h1>
+    <p class="sub">Supaya tidak keskip, tiga hal ini perlu diisi.</p>
+    ${due.length ? `<h2>Janji kamu kemarin</h2>` + due.map(c => `
+      <label class="check"><input type="checkbox" data-resolve="${esc(c.id)}">
+        <span class="t"><span class="strong">${esc(c.action)}</span><br>
+        <span class="meta">janji ${esc(fmt(c.due))}${c.due < day ? " · sudah lewat" : ""} — sudah beres?</span>
+        </span></label>`).join("") : ""}
+    <div class="fld" style="margin-top:${due.length ? 22 : 0}px">
+      <label for="detail">Yang mana saja?</label>
+      <textarea id="detail" name="detail" placeholder="WAG Klien A — belum dibalas 4 hari">${esc(S.a.detail)}</textarea>
+    </div>
+    <div class="fld"><label for="plan">Mau diapakan?</label>
+      <textarea id="plan" name="plan" placeholder="Balas setelah harga di-approve">${esc(S.a.plan)}</textarea></div>
+    <div class="fld"><label for="due">Kapan beres?
+      <span class="hint">Nanti kamu diingatkan tepat di tanggal ini — bukan tiap hari.</span></label>
+      <input id="due" name="due" type="date" min="${esc(day)}" value="${esc(S.a.due)}"></div>`;
+}
+
+function stepKirim() {
+  const t = totals(S.a.grid), lamp = lampFor(S.a.grid);
+  const row = (label, val, mono) => `<div><dt>${esc(label)}</dt>
+    <dd class="${mono ? "n" : ""}">${esc(val)}</dd></div>`;
+  return `${progress()}
+    <h1>Cek sebentar</h1>
+    <p class="sub">Kalau sudah benar, kirim. Nanti laporannya dibuatkan sendiri.</p>
+    <div class="lamp ${lamp.level}"><i></i>${esc(lamp.label)}</div>
+    <div class="rev">
+      ${row("Masih aktif", `${t.open}  (${CHANNELS.map(c => `${num((S.a.grid[c.key]||{}).open)} ${c.label}`).join(", ")})`, true)}
+      ${row("Gantung", t.hanging === 0 ? "tidak ada" : `${t.hanging}  (${t.gt3} lebih dari 3 hari)`, true)}
+      ${row("Dibalas", String(t.reply), true)}
+      ${t.hanging > 0 ? row("Yang gantung", S.a.detail) : ""}
+      ${t.hanging > 0 ? row("Rencana", S.a.plan + (S.a.due ? ` — ${fmt(S.a.due)}` : "")) : ""}
+      <div><dt></dt><dd><button class="edit" type="button" data-goto="1">Ubah angka</button></dd></div>
+    </div>
+    <div class="fld"><label for="escalation">Ada yang perlu Chief tahu?
+      <span class="opt">— boleh dikosongkan</span>
+      <span class="hint">Ini yang dia baca. Angkanya sudah otomatis.</span></label>
+      <textarea id="escalation" name="escalation" placeholder="Butuh approve harga Klien A">${esc(S.a.escalation)}</textarea></div>
+    <div class="fld"><label for="prista">Ada yang perlu jadi project?
+      <span class="opt">— boleh dikosongkan</span></label>
+      <textarea id="prista" name="prista" placeholder="Revisi jadwal Vendor B">${esc(S.a.prista)}</textarea></div>
+    <label class="check decl"><input type="checkbox" name="declared" ${S.a.declared ? "checked" : ""}>
+      <span class="t">${esc(DECLARATION)}</span></label>`;
+}
+
+function buildReport(doc) {
+  const t = totals(doc.grid), lamp = lampFor(doc.grid), g = doc.grid || {};
+  const tag = { green:"[HIJAU]", amber:"[KUNING]", red:"[MERAH]" }[lamp.level];
+  const ln = (k,v) => `${k}: ${(v||"").toString().trim() || "Belum ada"}`;
+  return ["MESSI Report", "Date: " + fmt(doc.day) + " (" + doc.day + ")",
+    "Squad: OASYS   Report by: " + nameOf(doc.owner), "", tag + " " + lamp.label, "",
+    "a. Channel aktif/open: " + CHANNELS.map(c => `${num((g[c.key]||{}).open)} ${c.label}`).join(", "),
+    "b. Gantung >3 hari: " + t.gt3, "c. Gantung <3 hari: " + t.lt3,
+    "d. Tidak gantung: " + t.clear, "e. Sudah dibalas hari ini: " + t.reply,
+    ln("f. Yang masih gantung", doc.detail),
+    ln("g. Rencana", doc.plan && doc.plan + (doc.due ? ` (target ${fmt(doc.due)})` : "")),
+    ln("h. Eskalasi", doc.escalation), ln("i. Calon PRISTA baru", doc.prista), "",
+    "Deklarasi: " + DECLARATION].join("\n");
+}
+
+function screenDone(doc) {
+  const t = totals(doc.grid), lamp = lampFor(doc.grid);
+  return `<div class="done">
+      <div class="tick">✓</div>
+      <h1>Sudah terkirim</h1>
+      <p class="sub">${esc(fmtLong(doc.day))}${doc.late ? " · setelah jam 18:00" : ""}</p>
+    </div>
+    <div class="lamp ${lamp.level}"><i></i>${esc(lamp.label)}</div>
+    <div class="rev">
+      <div><dt>Masih aktif</dt><dd class="n">${t.open}</dd></div>
+      <div><dt>Gantung</dt><dd class="n">${t.hanging === 0 ? "tidak ada" : t.hanging}</dd></div>
+      <div><dt>Dibalas</dt><dd class="n">${t.reply}</dd></div>
+    </div>
+    ${S.showReport ? `<div class="report" id="reportText">${esc(buildReport(doc))}</div>` : ""}
+    ${myPromises().length ? `<h2>Yang kamu janjikan</h2>` + myPromises().map(c => `
+      <div class="card ${c.due < today() ? "bad" : "due"}"><div class="row">
+        <span class="strong">${esc(c.action)}</span><span class="grow"></span>
+        <span class="meta">${esc(fmt(c.due))}</span></div></div>`).join("") : ""}
+    ${recent()}`;
+}
+
+function recent() {
+  const days = pastWorkdays(addDays(today(),-1), 4);
+  if (!days.length) return "";
+  return `<h2>Beberapa hari lalu</h2>` + days.map(day => {
+    const doc = S.cycles.get(key(S.me, day)), st = statusOf(day, doc);
+    const t = doc ? totals(doc.grid) : null;
+    return `<div class="card ${st === "missed" ? "bad" : ""}"><div class="row">
+      <span class="strong">${esc(fmt(day))}</span><span class="grow"></span>
+      <span class="meta">${st === "missed" ? "tidak lapor"
+        : t.hanging === 0 ? "aman" : t.hanging + " gantung"}${st === "late" ? " · telat" : ""}</span>
+    </div></div>`;
+  }).join("");
+}
+
+function screenPlayer() {
+  const day = today(), doc = mine(day), st = statusOf(day, doc);
+
+  if (!isWorkday(day)) return `<div class="blank"><b>Hari ini libur.</b>
+    MESSI diisi Senin sampai Jumat. Sampai ketemu Senin pagi.</div>` + recent();
+  if (nowHour() < OPEN_AT && !doc) return `<div class="blank"><b>Belum dibuka.</b>
+    Pengisian dibuka jam ${OPEN_AT}:00. Nanti ada pesan dari bot.</div>` + recent();
+
+  if (st === "pending" || S.editing) {
+    const n = stepName();
+    const body = n === "angka" ? stepAngka() : n === "gantung" ? stepGantung() : stepKirim();
+    if (n !== "angka") return body;
+    const gaps = missedDays(S.me, 5);
+    if (!gaps.length) return body;
+    return `<div class="miss">Kamu belum lapor ${esc(gaps.map(fmt).join(" dan "))}.
+      Yang lewat tidak bisa diisi lagi — mulai dari hari ini.</div>` + body;
+  }
+  return screenDone(doc);
+}
+
+function screenLeader() {
+  const day = today(), people = [...S.roster.keys()];
+  const rows = people.map(uid => {
+    const doc = S.cycles.get(key(uid, day));
+    return { uid, doc, st: statusOf(day, doc), missed: missedDays(uid, 5).length };
+  });
+  const done = rows.filter(r => r.st === "submitted" || r.st === "late");
+  const late = [...S.commitments.values()].filter(c => c.status === "open" && c.due < day);
+  const waiting = rows.filter(r => r.st === "pending" || r.st === "missed");
+
+  const cards = [];
+  rows.filter(r => r.doc && (r.doc.escalation||"").trim()).forEach(r => cards.push(
+    `<div class="card due"><div class="row"><span class="strong">${esc(nameOf(r.uid))}</span>
+      <span class="grow"></span><span class="meta">minta bantuan</span></div>
+      <div style="margin-top:6px">${esc(r.doc.escalation)}</div></div>`));
+  late.forEach(c => cards.push(
+    `<div class="card bad"><div class="row"><span class="strong">${esc(nameOf(c.owner))}</span>
+      <span class="grow"></span><span class="meta">janji ${esc(fmt(c.due))} lewat</span></div>
+      <div style="margin-top:6px">${esc(c.action)}</div></div>`));
+  rows.filter(r => r.missed >= 2).forEach(r => cards.push(
+    `<div class="card bad"><div class="row"><span class="strong">${esc(nameOf(r.uid))}</span>
+      <span class="grow"></span><span class="meta">${r.missed} hari</span></div>
+      <div style="margin-top:6px">Belum lapor beberapa hari.</div></div>`));
+
+  let html = `<h1>Yang perlu kamu lihat</h1>
+    <p class="sub">${esc(fmtLong(day))} · squad ${people.length} orang</p>
+    <div class="stats">
+      <div class="g"><b>${done.length}/${people.length}</b><span>sudah lapor</span></div>
+      <div class="${late.length ? "r" : ""}"><b>${late.length}</b><span>janji lewat</span></div>
+      <div class="${waiting.length ? "r" : ""}"><b>${waiting.length}</b><span>belum lapor</span></div>
+    </div>`;
+  html += cards.length ? `<h2>Perlu perhatian</h2>` + cards.join("")
+    : `<div class="blank" style="margin-top:18px"><b>Tidak ada yang perlu dibaca.</b>
+       Semua lapor, tidak ada yang minta bantuan, tidak ada janji lewat.</div>`;
+  if (waiting.length) html += `<h2>Belum lapor</h2>` + waiting.map(r =>
+    `<div class="card"><div class="row"><span class="strong">${esc(nameOf(r.uid))}</span>
+      <span class="grow"></span><span class="meta">${r.st === "missed" ? "lewat jam 18:00" : "masih ada waktu"}</span>
+    </div></div>`).join("");
+  return html;
+}
+
+function renderBar() {
+  const day = today(), doc = mine(day), st = statusOf(day, doc);
+  if (S.tab === "chief") { bar.hidden = true; return; }
+  if (!isWorkday(day) || (nowHour() < OPEN_AT && !doc)) { bar.hidden = true; return; }
+
+  bar.hidden = false;
+  const err = S.error ? `<div class="err">${esc(S.error)}</div>` : "";
+
+  if (st === "pending" || S.editing) {
+    const steps = stepList(), last = S.step >= steps.length;
+    barIn.innerHTML = err + `<div class="btns">
+      ${S.step > 1 ? `<button class="btn sec" type="button" id="back">Kembali</button>` : ""}
+      <button class="btn" type="button" id="next">${last ? "Kirim laporan" : "Lanjut"}</button>
+      </div>${S.savedAt ? `<div class="saved">Tersimpan otomatis ${esc(S.savedAt)}</div>` : ""}`;
+    if (el("back")) el("back").addEventListener("click", () => { S.step--; S.error = null; render(); toTop(); });
+    el("next").addEventListener("click", onNext);
+  } else {
+    barIn.innerHTML = `<div class="btns">
+      <button class="btn" type="button" id="copy">${S.copied ? "Tersalin ✓" : "Salin laporan"}</button>
+      <button class="btn sec" type="button" id="toggle">${S.showReport ? "Tutup" : "Lihat"}</button>
+      </div>`;
+    el("copy").addEventListener("click", onCopy);
+    el("toggle").addEventListener("click", () => { S.showReport = !S.showReport; render(); });
+  }
+}
+
+function render() {
+  el("whenLbl").textContent = S.ready ? `${fmt(today())} · ${nowHM()}` : "…";
+  const av = el("avatar");
+  av.textContent = (S.name || "?").trim().charAt(0).toUpperCase() || "?";
+  av.title = S.name || "";
+  if (!S.ready) { view.innerHTML = `<div class="blank">Sebentar…</div>`; return; }
+
+  const tabs = el("tabs");
+  if (S.isLeader) {
+    tabs.hidden = false;
+    const late = [...S.commitments.values()].filter(c => c.status === "open" && c.due < today()).length;
+    tabs.innerHTML =
+      `<button role="tab" data-tab="hari-ini" aria-selected="${S.tab === "hari-ini"}">Punya saya</button>
+       <button role="tab" data-tab="chief" aria-selected="${S.tab === "chief"}">Squad${
+         late ? `<span class="n">${late}</span>` : ""}</button>`;
+  } else tabs.hidden = true;
+
+  let body = (S.tab === "chief" && S.isLeader) ? screenLeader() : screenPlayer();
+  if (S.offline) body += `<p class="note">Tersimpan di HP ini saja untuk sekarang.
+    Isian kamu aman dan tidak hilang.</p>`;
+  view.innerHTML = body;
+  renderBar();
+}
+
+const toTop = () => window.scrollTo({ top:0, behavior:"smooth" });
+
+/* ---- events -------------------------------------------------------------- */
+function collect() {
+  const g = {};
+  view.querySelectorAll("[data-row]").forEach(i => {
+    if (i.value === "") return;
+    (g[i.dataset.row] || (g[i.dataset.row] = {}))[i.dataset.col] = num(i.value);
+  });
+  const val = n => { const e = view.querySelector(`[name=${n}]`); return e ? e.value : undefined; };
+  const a = { ...S.a };
+  if (view.querySelector("[data-row]")) a.grid = g;
+  ["detail","plan","due","escalation","prista"].forEach(n => {
+    const v = val(n); if (v !== undefined) a[n] = v;
+  });
+  const dc = view.querySelector("[name=declared]");
+  if (dc) a.declared = dc.checked;
+  return a;
+}
+
+function onNext() {
+  S.a = collect();
+  saveDraft(today(), S.a);
+  const err = checkStep();
+  S.error = err;
+  if (err) { render(); toTop(); return; }
+
+  const steps = stepList();
+  if (S.step >= steps.length) {
+    const resolved = [...view.querySelectorAll("[data-resolve]")].filter(i => i.checked)
+      .map(i => i.dataset.resolve);
+    submitNow(resolved);
+  } else S.step++;
+  render(); toTop();
+}
+
+function onCopy() {
+  const doc = mine(today());
+  if (!doc) return;
+  const text = buildReport(doc);
+  const ok = () => { S.copied = true; render(); setTimeout(() => { S.copied = false; render(); }, 2200); };
+  const fall = () => { S.showReport = true; render();
+    const n = el("reportText"); if (!n) return;
+    const r = document.createRange(); r.selectNodeContents(n);
+    const s = window.getSelection(); s.removeAllRanges(); s.addRange(r); };
+  try { navigator.clipboard.writeText(text).then(ok, fall); } catch { fall(); }
+}
+
+el("tabs").addEventListener("click", ev => {
+  const b = ev.target.closest("[data-tab]");
+  if (!b) return;
+  S.tab = b.dataset.tab; S.error = null; render(); toTop();
+});
+
+view.addEventListener("click", ev => {
+  const g = ev.target.closest("[data-goto]");
+  if (!g) return;
+  S.a = collect(); saveDraft(today(), S.a);
+  S.step = parseInt(g.dataset.goto, 10); S.error = null; render(); toTop();
+});
+
+// Selecting on focus means tapping a cell and typing replaces the number, instead of
+// dropping the caret mid-digit and turning 13 into 173.
+view.addEventListener("focusin", ev => {
+  if (ev.target.dataset && ev.target.dataset.row) ev.target.select();
+});
+
+/** Grid keys: Enter and the arrows move between cells instead of changing numbers. */
+view.addEventListener("keydown", ev => {
+  const t = ev.target;
+  if (!t.dataset || !t.dataset.row) return;
+  const cells = [...view.querySelectorAll("[data-row]")];
+  const i = cells.indexOf(t), wide = COLS.length;
+  let to = null;
+  if (ev.key === "ArrowUp")         to = i - wide;
+  else if (ev.key === "ArrowDown")  to = i + wide;
+  else if (ev.key === "Enter")      to = i + 1;
+  else if (ev.key === "ArrowLeft"  && t.selectionStart === 0) to = i - 1;
+  else if (ev.key === "ArrowRight" && t.selectionStart === t.value.length) to = i + 1;
+  else return;
+  ev.preventDefault();
+  if (to >= 0 && to < cells.length) { cells[to].focus(); cells[to].select(); }
+  else if (ev.key === "Enter" && el("next")) el("next").focus();
+});
+
+// Scrolling the page must never change a number the person already typed.
+view.addEventListener("wheel", ev => {
+  const a = document.activeElement;
+  if (a && a.dataset && a.dataset.row && a.contains(ev.target)) a.blur();
+}, { passive:true });
+
+view.addEventListener("input", ev => {
+  if (ev.target.dataset && ev.target.dataset.row) {
+    const clean = ev.target.value.replace(/[^0-9]/g, "");
+    if (clean !== ev.target.value) {
+      const at = ev.target.selectionStart - (ev.target.value.length - clean.length);
+      ev.target.value = clean;
+      try { ev.target.setSelectionRange(at, at); } catch { /* ignore */ }
+    }
+  }
+  if (!ev.target.matches("[data-row],[name],textarea,input")) return;
+  S.a = collect();
+  saveDraft(today(), S.a);
+  if (!ev.target.dataset.row) return;
+  // Update only the three tiles and the lamp — rebuilding would steal the keyboard.
+  const t = totals(S.a.grid), l = lampFor(S.a.grid);
+  const sl = view.querySelector(".sumline");
+  if (sl) sl.innerHTML = `<div><b>${t.open}</b><span>masih aktif</span></div>
+    <div class="${t.hanging ? "w" : ""}"><b>${t.hanging}</b><span>gantung</span></div>
+    <div><b>${t.reply}</b><span>dibalas</span></div>`;
+  const lp = view.querySelector(".lamp");
+  if (lp) { lp.className = "lamp " + l.level; lp.innerHTML = "<i></i>" + esc(l.label); }
+});
+
+render();
+boot();
+</script>
