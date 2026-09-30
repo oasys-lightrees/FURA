@@ -14,6 +14,9 @@ require __DIR__ . '/lib/require-php8.php';
 require_once __DIR__ . '/lib/auth.php';
 require_once __DIR__ . '/lib/repo.php';
 
+// Says what is missing on the first screen, not on the first click.
+messi_require_ready();
+
 $me = auth_user();
 if (!$me) { header('Location: login.php'); exit; }
 if ($me['role'] !== 'admin') { http_response_code(403); exit('Halaman ini untuk admin.'); }

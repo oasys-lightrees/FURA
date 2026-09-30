@@ -13,6 +13,9 @@ require __DIR__ . '/lib/require-php8.php';
 
 require_once __DIR__ . '/lib/auth.php';
 
+// Says what is missing on the first screen, not on the first click.
+messi_require_ready();
+
 $count = (int) (q1('SELECT COUNT(*) AS n FROM users')['n'] ?? 0);
 if ($count > 0) {
     http_response_code(403);

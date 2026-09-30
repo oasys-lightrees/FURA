@@ -16,6 +16,9 @@ require __DIR__ . '/lib/require-php8.php';
 require_once __DIR__ . '/lib/auth.php';
 require_once __DIR__ . '/lib/repo.php';
 
+// Says what is missing on the first screen, not on the first click.
+messi_require_ready();
+
 $user = auth_user();
 if (!$user) {
     header('Location: login.php');

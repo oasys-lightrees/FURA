@@ -201,6 +201,40 @@ ok('a player is not', !is_leader($nicho));
 
 /* -------------------------------------------------------------------- done */
 
+/* ------------------------------------------- pemasangan yang belum selesai */
+
+// The three ways a first install goes wrong must each name themselves. A blank 500 is
+// the one failure the person on the other end cannot act on.
+$out = shell_exec('cd ' . escapeshellarg(dirname(__DIR__))
+    . ' && MESSI_CONFIG_FILE=/tidak/ada/config.php php login.php 2>&1');
+ok('config.php yang belum dibuat mengatakannya sendiri',
+   str_contains((string) $out, 'config.php belum dibuat'));
+
+$bad = sys_get_temp_dir() . '/messi-bad-config.php';
+file_put_contents($bad, '<?php return ' . var_export([
+    'db' => ['host' => '127.0.0.1', 'socket' => '', 'name' => 'tidak_ada_database_ini',
+             'user' => 'bukan_user', 'pass' => 'bukan_password'],
+    'base_url' => 'https://example.test', 'telegram_token' => '', 'cron_key' => 'x',
+    'first_day' => '2026-09-28', 'session_days' => 30,
+], true) . ';');
+$out = shell_exec('cd ' . escapeshellarg(dirname(__DIR__))
+    . ' && MESSI_CONFIG_FILE=' . escapeshellarg($bad) . ' php login.php 2>&1');
+ok('database yang tidak bisa dihubungi mengatakannya sendiri',
+   str_contains((string) $out, 'Database tidak bisa dihubungi'));
+ok('dan menyebutkan kata MySQL-nya, supaya bisa dibedakan penyebabnya',
+   str_contains((string) $out, 'SQLSTATE'));
+ok('tapi tidak pernah membocorkan passwordnya',
+   !str_contains((string) $out, 'bukan_password'));
+unlink($bad);
+
+// Tables missing: the database is reachable but install.sql was never imported.
+$root->exec('DROP TABLE IF EXISTS commitments, cycles, login_tokens, sessions, job_log, users');
+$out = shell_exec('cd ' . escapeshellarg(dirname(__DIR__)) . ' && MESSI_TEST_DB='
+    . escapeshellarg($GLOBALS['MESSI_TEST_DBNAME'])
+    . ' php tests/probe_unready.php 2>&1');
+ok('install.sql yang belum di-import mengatakannya sendiri',
+   str_contains((string) $out, 'Tabelnya belum dibuat'));
+
 Clock::unfreeze();
 $root->exec('DROP DATABASE `' . $GLOBALS['MESSI_TEST_DBNAME'] . '`');
 done();

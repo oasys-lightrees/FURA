@@ -10,6 +10,9 @@ require __DIR__ . '/lib/require-php8.php';
 
 require_once __DIR__ . '/lib/auth.php';
 
+// Says what is missing on the first screen, not on the first click.
+messi_require_ready();
+
 $error = null;
 
 // Arriving from Telegram: spend the token and go straight in.

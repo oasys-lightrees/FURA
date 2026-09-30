@@ -10,6 +10,44 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/engine.php';
 
+/**
+ * Stops with something readable instead of a blank page.
+ *
+ * The three ways a first install goes wrong — no config.php, wrong database password,
+ * install.sql never imported — all end as an uncaught error, and cPanel has
+ * display_errors off by default, so what the person actually sees is a white screen.
+ * A white screen is the one failure nobody can act on.
+ */
+function messi_stop(string $title, string $detail, string $whatToDo): void
+{
+    $isApi = str_contains((string) ($_SERVER['SCRIPT_NAME'] ?? ''), '/api/');
+
+    if (PHP_SAPI === 'cli') {
+        fwrite(STDERR, $title . ': ' . $detail . "\n" . $whatToDo . "\n");
+        exit(1);
+    }
+    http_response_code(500);
+    if ($isApi) {
+        header('Content-Type: application/json; charset=utf-8');
+        echo json_encode(['ok' => false, 'error' => $title . ' ' . $whatToDo],
+                         JSON_UNESCAPED_UNICODE);
+        exit;
+    }
+    header('Content-Type: text/html; charset=utf-8');
+    $e = fn($t) => htmlspecialchars($t, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
+    echo '<!doctype html><meta charset="utf-8"><title>MESSI belum siap</title>'
+       . '<div style="max-width:34rem;margin:4rem auto;padding:0 1.5rem;'
+       . 'font:400 16px/1.6 system-ui,-apple-system,sans-serif;color:#1a1c1f">'
+       . '<p style="color:#6b6d73;font-size:14px;margin:0">MESSI belum siap dipakai</p>'
+       . '<h1 style="font-size:1.25rem;margin:.25rem 0 1rem">' . $e($title) . '</h1>'
+       . ($detail === '' ? '' : '<p style="background:#f7e7e4;color:#97322a;padding:.75rem 1rem;'
+         . 'border-radius:.5rem;font-size:14px;margin:0 0 1rem">' . $e($detail) . '</p>')
+       . '<p>' . $whatToDo . '</p>'
+       . '<p style="color:#6b6d73;font-size:14px">Langkah lengkapnya ada di '
+       . '<strong>PASANG.txt</strong>, satu folder dengan berkas ini.</p></div>';
+    exit;
+}
+
 function cfg(?string $key = null)
 {
     static $config = null;
@@ -23,8 +61,13 @@ function cfg(?string $key = null)
         // safer place for a database password on shared hosting.
         $path = getenv('MESSI_CONFIG_FILE') ?: dirname(__DIR__) . '/config.php';
         if (!is_file($path)) {
-            http_response_code(500);
-            exit('config.php belum ada. Salin config.example.php jadi config.php.');
+            messi_stop(
+                'config.php belum dibuat',
+                '',
+                'Di File Manager, ganti nama <code>config.example.php</code> menjadi '
+                . '<code>config.php</code>, lalu isi nama database, user, password, dan '
+                . '<code>base_url</code>.'
+            );
         }
         $config = require $path;
     }
@@ -42,15 +85,53 @@ function db(): PDO
     if (!empty($c['socket'])) {                  // handy locally; cPanel uses the host
         $dsn = 'mysql:unix_socket=' . $c['socket'] . ';dbname=' . $c['name'] . ';charset=utf8mb4';
     }
-    $pdo = new PDO($dsn, $c['user'], $c['pass'], [
-        PDO::ATTR_ERRMODE            => PDO::ERRMODE_EXCEPTION,
-        PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
-        PDO::ATTR_EMULATE_PREPARES   => false,
-    ]);
+    try {
+        $pdo = new PDO($dsn, $c['user'], $c['pass'], [
+            PDO::ATTR_ERRMODE            => PDO::ERRMODE_EXCEPTION,
+            PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
+            PDO::ATTR_EMULATE_PREPARES   => false,
+        ]);
+    } catch (PDOException $e) {
+        // MySQL's own words help here — they distinguish a wrong password from a
+        // database that does not exist. They name the user and host, never the password.
+        messi_stop(
+            'Database tidak bisa dihubungi',
+            $e->getMessage(),
+            'Cek <code>name</code>, <code>user</code>, dan <code>pass</code> di '
+            . '<code>config.php</code>. Di cPanel ketiganya berawalan nama akun, '
+            . 'misalnya <code>akunanda_messi</code> — bukan <code>messi</code> saja. '
+            . 'Pastikan juga user-nya sudah dikaitkan ke database lewat '
+            . '<em>MySQL Databases &rarr; Add User To Database</em> dengan '
+            . '<em>All Privileges</em>.'
+        );
+    }
     // Every DATETIME in this schema is UTC. Saying so stops the server's own timezone
     // from quietly shifting NOW() and CURRENT_TIMESTAMP.
     $pdo->exec("SET time_zone = '+00:00'");
     return $pdo;
+}
+
+/**
+ * Checked once on every page a person can open, so a half-finished install says what is
+ * missing on the first screen rather than on the first click.
+ */
+function messi_require_ready(): void
+{
+    try {
+        db()->query('SELECT 1 FROM users LIMIT 1');
+    } catch (PDOException $e) {
+        // 42S02 is "table doesn't exist": the database is fine, install.sql never ran.
+        if (($e->getCode() === '42S02') || str_contains($e->getMessage(), 'users')) {
+            messi_stop(
+                'Tabelnya belum dibuat',
+                $e->getMessage(),
+                'Buka <em>phpMyAdmin</em> di cPanel, pilih databasenya di kiri, lalu tab '
+                . '<em>Import</em> &rarr; pilih <code>install.sql</code> &rarr; <em>Go</em>. '
+                . 'Setelah itu harus ada enam tabel.'
+            );
+        }
+        throw $e;
+    }
 }
 
 function q(string $sql, array $args = []): PDOStatement
