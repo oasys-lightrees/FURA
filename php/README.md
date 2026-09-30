@@ -10,7 +10,27 @@ bagian belakangnya: dulu data disimpan platform artifact, sekarang MySQL.
 Karena cPanel sudah menyediakannya, dan tidak ada yang perlu di-install, di-build, atau
 dijaga tetap hidup. Satu folder di-upload, satu database dibuat, satu cron dipasang.
 
+## Paket siap-upload
+
+```sh
+sh php/make-zip.sh          # -> messi-cpanel.zip
+```
+
+Isinya hanya yang jalan di produksi; `tests/` sengaja tidak ikut, karena salah satunya
+menghapus dan membuat ulang database. Zip-nya tidak punya folder induk, jadi di-extract
+di dalam `public_html/messi` langsung jadi isinya, bukan `messi/messi`.
+
+Langkah lengkap versi non-teknis ada di **`PASANG.txt`** di dalam paket.
+
+## Butuh PHP 8
+
+cPanel sering masih default ke PHP 7, dan kode ini butuh 8.0 ke atas. Kalau versinya
+kurang, tiap halaman menampilkan penjelasan dan cara menggantinya
+(*Software → Select PHP Version*) — bukan layar putih kosong.
+
 ## Pasang, sekali saja
+
+0. **Pastikan PHP 8.** cPanel → *Select PHP Version* → 8.1 atau 8.2.
 
 1. **Buat database.** cPanel → *MySQL® Databases*. Buat database, buat user, kaitkan
    user ke database dengan *All Privileges*. Catat tiga nama yang muncul — semuanya
@@ -96,8 +116,11 @@ lib/bootstrap.php  konfigurasi + koneksi database
 lib/auth.php       siapa yang sedang bertanya
 lib/repo.php       baca/tulis, dengan pemeriksaan yang tidak bisa dilewati browser
 lib/telegram.php   bot
+lib/require-php8.php  penjaga versi PHP, dibaca paling awal
 install.sql        enam tabel
-tests/             229 pemeriksaan
+PASANG.txt         langkah pemasangan, bahasa non-teknis
+make-zip.sh        bikin messi-cpanel.zip
+tests/             229 pemeriksaan (tidak ikut ke server)
 ```
 
 ## Yang diputuskan server, bukan browser

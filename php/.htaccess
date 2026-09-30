@@ -2,14 +2,17 @@
 
 DirectoryIndex index.php
 
-# config.php holds the database password; lib/ and tests/ are not pages. Apache should
-# never hand any of them out, whatever the URL says.
-<FilesMatch "^(config\.php|config\.example\.php)$">
+# config.php holds the database password. The patterns below are anchored so they hold
+# whether the app lives at /messi/ or at the document root — an earlier version only
+# matched a subfolder, which left lib/ readable on a root install.
+<FilesMatch "^(config\.php|config\.example\.php|.*\.sql)$">
   Require all denied
 </FilesMatch>
 
-RedirectMatch 404 ^/.*/(lib|tests)/
-RedirectMatch 404 ^/.*/app\.html$
+# lib/ and tests/ are code, not pages. app.html is served through index.php, which is
+# what puts the database behind it; on its own it is a page with no data and no login.
+RedirectMatch 404 ^/(.*/)?(lib|tests)/
+RedirectMatch 404 ^/(.*/)?app\.html$
 
 <IfModule mod_headers.c>
   Header set X-Content-Type-Options "nosniff"

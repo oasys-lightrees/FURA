@@ -1,0 +1,108 @@
+MESSI — cara pasang di cPanel
+==============================
+
+Butuh PHP 8.0 ke atas. Kalau hostingnya masih PHP 7, halamannya akan bilang sendiri
+dan memberi tahu cara gantinya. Ganti dulu sebelum lanjut:
+cPanel -> Software -> Select PHP Version (atau MultiPHP Manager) -> pilih 8.1 / 8.2.
+
+
+1. BUAT DATABASE
+   cPanel -> MySQL Databases
+   - Create New Database: messi
+   - Add New User: bikin user + password (simpan passwordnya)
+   - Add User To Database: pilih keduanya -> centang ALL PRIVILEGES -> Make Changes
+   Catat tiga nama yang jadi, semuanya berawalan nama akun cPanel, contoh:
+     database : akunanda_messi
+     user     : akunanda_messi
+     password : (yang tadi dibuat)
+
+
+2. BUAT TABELNYA
+   cPanel -> phpMyAdmin -> klik database tadi di kiri -> tab Import
+   -> Choose File: install.sql -> Go
+   Harus muncul enam tabel: users, sessions, login_tokens, cycles, commitments, job_log
+
+
+3. UPLOAD
+   cPanel -> File Manager -> masuk ke public_html
+   - buat folder: messi
+   - masuk ke folder itu -> Upload -> pilih messi-cpanel.zip
+   - setelah selesai, klik kanan zip-nya -> Extract
+   - hapus zip-nya
+
+   Pastikan "Show Hidden Files" aktif (Settings di kanan atas), lalu cek file
+   .htaccess ikut ter-extract. Kalau tidak ada, aplikasinya tetap jalan tapi
+   lapisan pengamannya berkurang.
+
+
+4. ISI KONFIGURASI
+   Di File Manager, klik kanan config.example.php -> Rename -> jadi config.php
+   Lalu klik kanan config.php -> Edit, isi:
+
+     'name'     => nama database dari langkah 1
+     'user'     => user database dari langkah 1
+     'pass'     => passwordnya
+     'base_url' => alamat lengkap ke folder ini, tanpa garis miring di akhir,
+                   contoh: https://namadomain.com/messi
+     'cron_key' => teks acak panjang, ketik asal saja yang panjang dan aneh
+
+   Simpan.
+
+
+5. BUAT AKUN ADMIN PERTAMA
+   Buka di browser:  https://namadomain.com/messi/setup.php
+   Isi nama, email, password (minimal 10 karakter).
+   Setelah jadi, HAPUS file setup.php lewat File Manager.
+   (Dia menolak jalan lagi kalau sudah ada akun, tapi lebih rapi kalau dihapus.)
+
+
+6. PASANG CRON
+   cPanel -> Cron Jobs -> Common Settings: Once Per Hour
+   Command:
+     /usr/local/bin/php /home/AKUNANDA/public_html/messi/cron/tick.php >/dev/null 2>&1
+
+   Ganti AKUNANDA dengan nama akun cPanel. Kalau tidak yakin path-nya, lihat di
+   File Manager bagian atas — di situ tertulis path lengkapnya.
+
+
+7. TAMBAH ORANG
+   Masuk sebagai admin -> di bawah halaman klik "Squad" -> Tambah orang.
+   Tanggal "Mulai lapor" menentukan sejak kapan orang itu dihitung. Orang baru tidak
+   akan pernah ditandai bolos untuk hari sebelum dia bergabung.
+
+
+TELEGRAM (boleh dilewati dulu)
+------------------------------
+Tanpa Telegram aplikasinya tetap jalan penuh; bedanya orang harus ingat sendiri
+membuka halamannya. Dengan Telegram, tiap pagi jam 09:00 bot mengirim link yang
+langsung masuk tanpa password.
+
+ a. Chat @BotFather di Telegram -> /newbot -> salin tokennya ke 'telegram_token'
+    di config.php
+ b. Buka sekali di browser (ganti TOKEN dan alamatnya):
+    https://api.telegram.org/botTOKEN/setWebhook?url=https://namadomain.com/messi/api/telegram.php?key=CRON_KEY
+ c. Di halaman Squad klik "Kode Telegram" untuk orangnya, lalu suruh dia kirim
+    /mulai KODE ke bot. Berlaku 60 menit.
+
+
+KALAU ADA MASALAH
+-----------------
+Layar putih kosong
+  Hampir selalu versi PHP. Cek langkah paling atas. Kalau sudah PHP 8, nyalakan
+  error log: cPanel -> Metrics -> Errors.
+
+"config.php belum ada"
+  Langkah 4 belum dilakukan, atau namanya masih config.example.php.
+
+Bisa masuk tapi halamannya kosong / muter terus
+  Biasanya 'base_url' di config.php salah. Harus persis sama dengan alamat yang
+  ada di address bar, tanpa garis miring di akhir.
+
+Cron tidak jalan
+  Cek path PHP-nya. Sebagian hosting pakai /usr/bin/php atau
+  /opt/cpanel/ea-php81/root/usr/bin/php. Lihat di cPanel -> Cron Jobs, biasanya
+  ada contohnya di bagian atas halaman.
+
+Mau cek cron tanpa menunggu sejam
+  Buka: https://namadomain.com/messi/cron/tick.php?key=CRON_KEY
+  Dia akan menulis satu baris ringkasan apa yang barusan dikerjakan.
