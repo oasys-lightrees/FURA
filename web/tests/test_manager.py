@@ -99,6 +99,32 @@ with sync_playwright() as p:
     pg.click('[data-tab="chief"]'); pg.wait_for_timeout(350)
     check("angka manager ikut terhitung (2/3)", txt(pg,".stats"), lambda s: "2/3" in s)
 
+    print("\n--- yang sudah lapor hari ini bukan 'pembolos' hari ini ---")
+    # Seed sendiri: Dita lapor hari ini tapi dua hari kerja sebelumnya kosong. Dulu dia
+    # muncul sebagai kartu merah "belum lapor beberapa hari" — berbarengan dengan
+    # barisnya sendiri yang hijau, dan menenggelamkan eskalasi yang sungguhan.
+    pgD = new_page(ctx, "u_chief", at=AT, store={
+      "roster": {"u_chief":{"name":"Chief","joined":D2}, "u_dita":{"name":"Dita","joined":D2}},
+      "cycles": {"u_dita__"+TODAY: cyc("u_dita", TODAY),
+                 "u_chief__"+TODAY: cyc("u_chief", TODAY)},
+      "commitments": {}})
+    pgD.click('[data-tab="chief"]'); pgD.wait_for_timeout(400)
+    bodyD = pgD.inner_text("body")
+    check("Dita tidak dituduh membolos padahal dia lapor hari ini",
+          "Belum lapor beberapa hari." not in bodyD)
+    check("riwayatnya tetap kelihatan, sebagai catatan kecil di barisnya",
+          bodyD, lambda s: "hari terlewat" in s)
+    check("dan dia tetap terhitung sudah lapor", txt(pgD,".stats"), lambda s: "2/2" in s)
+
+    print("\n--- yang benar-benar tidak lapor tetap diangkat ---")
+    pgE = new_page(ctx, "u_chief", at=AT, store={
+      "roster": {"u_chief":{"name":"Chief","joined":D2}, "u_bayu":{"name":"Bayu","joined":D2}},
+      "cycles": {"u_chief__"+TODAY: cyc("u_chief", TODAY)},
+      "commitments": {}})
+    pgE.click('[data-tab="chief"]'); pgE.wait_for_timeout(400)
+    check("Bayu yang memang tidak pernah lapor tetap diangkat",
+          pgE.inner_text("body"), lambda s: "Belum lapor beberapa hari." in s)
+
     print("\n--- semua beres: halaman manager harus kosong ---")
     # Realistic: on the roster since day one, and reported every workday since.
     pg2 = new_page(ctx, "u_chief", at=AT, store={

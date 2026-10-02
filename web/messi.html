@@ -607,7 +607,10 @@ function screenLeader() {
     `<div class="card bad"><div class="row"><span class="strong">${esc(nameOf(c.owner))}</span>
       <span class="grow"></span><span class="meta">janji ${esc(fmt(c.due))} lewat</span></div>
       <div style="margin-top:6px">${esc(c.action)}</div></div>`));
-  rows.filter(r => r.missed >= 2).forEach(r => cards.push(
+  // Hanya yang memang belum lapor hari ini. Orang yang sudah mengisi bukan masalah
+  // hari ini — riwayatnya tetap kelihatan, tapi sebagai catatan kecil di barisnya,
+  // bukan kartu merah yang menenggelamkan eskalasi yang sungguhan.
+  rows.filter(r => r.missed >= 2 && !(r.doc && r.doc.submittedAt)).forEach(r => cards.push(
     `<div class="card bad"><div class="row"><span class="strong">${esc(nameOf(r.uid))}</span>
       <span class="grow"></span><span class="meta">${r.missed} hari</span></div>
       <div style="margin-top:6px">Belum lapor beberapa hari.</div></div>`));
@@ -633,7 +636,8 @@ function screenLeader() {
         <span class="grow"></span>
         <span class="meta">${t.open} aktif · ${
           t.hanging === 0 ? "aman" : t.hanging + " gantung"}${
-          r.doc.late ? " · telat" : ""}</span>
+          r.doc.late ? " · telat" : ""}${
+          r.missed >= 2 ? ` · ${r.missed} hari terlewat` : ""}</span>
         <span class="chev">${open ? "▾" : "›"}</span>
       </button>
       ${open ? `<div class="report">${esc(buildReport(r.doc))}</div>` : ""}
