@@ -6,12 +6,16 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from harness import (SHOTS, check, context, launch, new_page, report, results,
                      store_of, txt, sync_playwright)
 
+# Rabu 30 Sep, 11:00 WIB — sebelum tenggat. Dibekukan supaya tanggal-tanggal di bawah
+# tetap berarti hal yang sama berapa pun hari ini dijalankan.
+AT = "2026-09-30T04:00:00Z"
+
 with sync_playwright() as p:
     b = launch(p)
     ctx = context(b)
 
     print("\n=== USER (Nicho, bukan owner) ===")
-    pg = new_page(ctx, "u_nicho")
+    pg = new_page(ctx, "u_nicho", at=AT)
     check("halaman termuat di langkah 1", txt(pg,".stepno"), "LANGKAH 1 DARI 2")
     check("nama dikenali dari akun", pg.get_attribute("#avatar","title"), "Nicho")
     check("player TIDAK melihat tab manager", pg.eval_on_selector("#tabs","e=>e.hidden"))

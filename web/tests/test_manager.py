@@ -7,6 +7,8 @@ from harness import (SHOTS, check, context, launch, new_page, report, results,
                      store_of, txt, sync_playwright)
 
 TODAY, YDAY, D2 = "2026-09-30", "2026-09-29", "2026-09-28"   # Rab, Sel, Sen
+# Tanpa ini suite-nya hanya benar pada 30 Sep 2026 — dan diam-diam pecah keesokan harinya.
+AT = "2026-09-30T04:00:00Z"                                   # Rabu 11:00 WIB
 def cyc(owner, day, gt3=0, lt3=0, esc="", late=False):
     return { "owner":owner, "day":day, "grid":{"WAG":{"open":13,"gt3":gt3,"lt3":lt3,"reply":5},
              "TGG":{"open":4,"reply":2}, "GCG":{"open":4,"reply":1}},
@@ -34,14 +36,14 @@ with sync_playwright() as p:
     ctx = context(b)
 
     print("\n=== MANAGER (Chief, owner) ===")
-    pg = new_page(ctx, "u_chief", SEED)
+    pg = new_page(ctx, "u_chief", SEED, at=AT)
     check("manager melihat dua tab", pg.eval_on_selector("#tabs","e=>!e.hidden"))
     check("tab bernama 'Punya saya' & 'Squad'", txt(pg,"#tabs"), lambda s: "Punya saya" in s and "Squad" in s)
     check("badge janji lewat di tab", txt(pg,"#tabs .n"), "1")
     check("default ke laporan sendiri", txt(pg,"h1"), "Berapa banyak hari ini?")
 
     pg.click('[data-tab="chief"]'); pg.wait_for_timeout(400)
-    check("judul halaman manager", txt(pg,"h1"), "Yang perlu kamu lihat")
+    check("judul halaman manager", txt(pg,"h1"), "Rekap squad")
     body = pg.inner_text("body")
     stats = txt(pg,".stats")
     check("hitung sudah lapor (1 dari 3)", stats, lambda s: "1/3" in s)
@@ -55,10 +57,35 @@ with sync_playwright() as p:
     check("daftar belum lapor hari ini", body, lambda s: "Belum lapor" in s)
     check("nama asli terbaca, bukan id", "u_nicho" not in body and "u_rio" not in body)
 
-    check("TIDAK menampilkan isi laporan penuh tiap orang",
+    # Laporan lengkap tidak terhampar begitu saja, tapi bisa dibuka satu per satu —
+    # dulu laporan itu memang tertempel utuh di grup, jadi ini lebih tertutup, bukan
+    # lebih terbuka.
+    check("laporan penuh tidak terhampar semua sekaligus",
           "MESSI Report" not in body and "Deklarasi:" not in body)
+    pg.click('[data-open="u_nicho"]'); pg.wait_for_timeout(250)
+    opened = txt(pg, ".report")
+    check("tapi laporan satu orang bisa dibuka", opened, lambda s: "MESSI Report" in s)
+    check("isinya laporan orang yang diklik", opened, lambda s: "Report by: Nicho" in s)
+    pg.click('[data-open="u_nicho"]'); pg.wait_for_timeout(250)
+    check("dan bisa ditutup lagi", pg.query_selector(".report") is None)
     check("tidak ada tombol kirim di halaman manager", pg.eval_on_selector("#bar","e=>e.hidden"))
     pg.screenshot(path=str(SHOTS)+"/t-manager.png", full_page=True)
+
+    print("\n--- rekap semua orang, bukan cuma yang bermasalah ---")
+    check("ada daftar semua orang", body, lambda s: "SEMUA (3)" in s)
+    check("yang sudah lapor tampil dengan angkanya", body, lambda s: "21 aktif" in s)  # 13 WAG + 4 TGG + 4 GCG
+    check("dan dengan berapa yang gantung", body, lambda s: "3 gantung" in s)
+    check("yang belum lapor juga tetap tercantum", body, lambda s: "Rio" in s)
+    check("Chief sendiri ikut terdaftar", body, lambda s: "Chief" in s)
+
+    print("\n--- membaca hari kemarin ---")
+    check("ada tombol ke hari sebelumnya", pg.query_selector('[data-day="2026-09-29"]') is not None)
+    pg.click('[data-day="2026-09-29"]'); pg.wait_for_timeout(350)
+    check("judul harinya ikut pindah", pg.inner_text("body"), lambda s: "Selasa, 29 Sep" in s)
+    check("angkanya hari itu, bukan hari ini", txt(pg,".stats"), lambda s: "2/3" in s)
+    pg.click('[data-day="2026-09-30"]'); pg.wait_for_timeout(350)
+    check("bisa kembali ke hari ini", pg.inner_text("body"), lambda s: "Rabu, 30 Sep" in s)
+    check("tidak bisa melihat besok", pg.query_selector('[data-day="2026-10-01"]') is None)
 
     print("\n--- manager mengisi laporannya sendiri ---")
     pg.click('[data-tab="hari-ini"]'); pg.wait_for_timeout(300)
@@ -74,7 +101,7 @@ with sync_playwright() as p:
 
     print("\n--- semua beres: halaman manager harus kosong ---")
     # Realistic: on the roster since day one, and reported every workday since.
-    pg2 = new_page(ctx, "u_chief", {
+    pg2 = new_page(ctx, "u_chief", at=AT, store={
       "roster": {"u_chief":{"name":"Chief","joined":D2}},
       "cycles": {"u_chief__"+TODAY: cyc("u_chief", TODAY),
                  "u_chief__"+YDAY:  cyc("u_chief", YDAY),
@@ -87,7 +114,7 @@ with sync_playwright() as p:
     pg2.screenshot(path=str(SHOTS)+"/t-manager-clear.png", full_page=True)
 
     print("\n--- user biasa tidak boleh melihat halaman manager ---")
-    pg3 = new_page(ctx, "u_rio", SEED)
+    pg3 = new_page(ctx, "u_rio", SEED, at=AT)
     check("Rio tidak punya tab manager", pg3.eval_on_selector("#tabs","e=>e.hidden"))
     check("Rio tidak melihat data orang lain",
           "Butuh Chief approve" not in pg3.inner_text("body"))
@@ -98,3 +125,6 @@ with sync_playwright() as p:
 
 bad = [r for r in results if not r[0]]
 print(f"\n{len(results)-len(bad)}/{len(results)} lolos")
+# Keluar dengan kode gagal, supaya run_all.py bisa melihatnya. Tanpa baris ini suite
+# yang gagal tetap terbaca sukses oleh pemanggilnya.
+sys.exit(1 if bad else 0)

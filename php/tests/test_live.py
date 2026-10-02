@@ -147,10 +147,15 @@ with Host("messi_live_test") as host, sync_playwright() as p:
     lead.click('[data-tab="chief"]')
     lead.wait_for_timeout(500)
     body = lead.inner_text("body")
-    check("leader melihat laporan orang lain", body, lambda s: "Nicho" in s)
+    check("judulnya rekap, bukan daftar masalah", lead.inner_text("h1"), "Rekap squad")
     check("hitungannya 1 dari 3", lead.inner_text(".stats"), lambda s: "1/3" in s)
     check("nama, bukan id database", "u_1" not in body and "u_2" not in body)
-    check("leader tidak melihat isi laporan penuh orang lain", "Deklarasi:" not in body)
+    check("semua orang terdaftar, bukan cuma yang bermasalah",
+          body, lambda s: "SEMUA (3)" in s and "Nicho" in s and "Rio" in s)
+    check("yang sudah lapor tampil dengan angkanya",
+          body, lambda s: "26 aktif" in s)   # 13 WAG + 4 TGG + 9 GCG, setelah dikoreksi
+    check("yang belum lapor ditandai begitu", body, lambda s: "belum lapor" in s)
+    check("laporan penuh tidak terhampar sekaligus", "Deklarasi:" not in body)
 
     print("\n--- leader mengisi laporannya sendiri ---")
     lead.click('[data-tab="hari-ini"]')
@@ -168,6 +173,33 @@ with Host("messi_live_test") as host, sync_playwright() as p:
     lead.click('[data-tab="chief"]')
     lead.wait_for_timeout(500)
     check("hitungannya naik jadi 2 dari 3", lead.inner_text(".stats"), lambda s: "2/3" in s)
+
+    print("\n--- atasan membaca laporan utuh dari website, tanpa Google Chat ---")
+    me = lead.evaluate("""() => document.querySelector("[data-open]").dataset.open""")
+    lead.click(f'[data-open="{me}"]')
+    lead.wait_for_timeout(350)
+    opened = lead.inner_text(".report")
+    check("laporan utuh bisa dibuka dari rekap",
+          opened, lambda s: s.startswith("MESSI Report") and "Deklarasi:" in s)
+    check("dan isinya dari database, bukan diketik ulang",
+          opened, lambda s: "Channel aktif/open" in s)
+    lead.click(f'[data-open="{me}"]')
+    lead.wait_for_timeout(300)
+    check("bisa ditutup lagi", lead.query_selector(".report") is None)
+
+    print("\n--- dan bisa membaca hari lain ---")
+    prev = lead.query_selector("[data-day]")
+    check("ada jalan ke hari kerja sebelumnya", prev is not None)
+    prev.click()
+    lead.wait_for_timeout(400)
+    check("pindah ke hari sebelumnya", lead.inner_text(".stats"), lambda s: "0/" in s)
+    check("hari itu memang belum ada yang lapor",
+          lead.inner_text("body"), lambda s: "belum lapor" in s or "tidak lapor" in s)
+    lead.click('[data-tab="hari-ini"]')
+    lead.click('[data-tab="chief"]')
+    lead.wait_for_timeout(400)
+    check("ganti tab mengembalikan ke hari ini",
+          lead.inner_text(".stats"), lambda s: "2/3" in s)
 
     print("\n=== data yang diberikan ke tiap orang ===")
     def fetched(page):

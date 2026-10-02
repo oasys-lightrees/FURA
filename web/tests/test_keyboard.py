@@ -69,3 +69,6 @@ with sync_playwright() as p:
 
 bad = [r for r in results if not r[0]]
 print(f"\n{len(results)-len(bad)}/{len(results)} lolos")
+# Keluar dengan kode gagal, supaya run_all.py bisa melihatnya. Tanpa baris ini suite
+# yang gagal tetap terbaca sukses oleh pemanggilnya.
+sys.exit(1 if bad else 0)

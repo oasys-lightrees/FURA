@@ -3,6 +3,11 @@
  * What the hourly job actually does, as a function so it can be called twice in a test
  * and prove it means the same thing both times.
  *
+ * It no longer posts a recap. The recap belongs on the Squad screen, where a leader can
+ * read any day, open anybody's full report, and act on it — none of which a chat message
+ * can do. What stays here is only what chat is actually good at: a nudge that gets
+ * people to the site.
+ *
  * Everything here is idempotent. Opening a cycle is guarded by the unique key on
  * (user_id, day); each message is recorded in job_log before it can be sent again. The
  * cron may fire twice in an hour, or miss an hour and catch up, and the day still comes
@@ -60,12 +65,6 @@ function messi_tick(): array
         log_job('notify_due', $today . ' sent=' . $did['nudged']);
     }
 
-    // 18:00 — what the day came to, for whoever has to act on it.
-    if ($hour >= MESSI_DUE_HOUR && !job_done('notify_leader', $today)) {
-        $did['recap'] = (int) tick_notify_leader($today);
-        log_job('notify_leader', $today . ' sent=' . $did['recap']);
-    }
-
     return $did;
 }
 
@@ -89,39 +88,4 @@ function tick_notify_due(string $today): bool
         return false;
     }
     return chat_send(chat_reminder($names));
-}
-
-/** 18:00 — what the day came to. Goes to the leader space when one is configured,
- *  and to the squad space otherwise, which is where these reports always went. */
-function tick_notify_leader(string $today): bool
-{
-    $reported = [];
-    $waiting = [];
-    foreach (q('SELECT u.name, c.status, c.answers FROM users u
-                  LEFT JOIN cycles c ON c.user_id = u.id AND c.day = ?
-                 WHERE u.active = 1 AND u.joined_on <= ? ORDER BY u.name',
-               [$today, $today]) as $r) {
-        if (empty($r['answers'])) {
-            $waiting[] = $r['name'];
-            continue;
-        }
-        $a = json_decode((string) $r['answers'], true) ?: [];
-        $t = messi_totals($a['grid'] ?? [], array_keys(MESSI_CHANNELS));
-        $mark = ['green' => '🟢', 'amber' => '🟡', 'red' => '🔴'][messi_lamp($t)['level']];
-        $reported[] = $mark . ' ' . $r['name'] . ' — ' . $t['open'] . ' aktif, '
-                    . $t['hanging'] . ' gantung' . ($r['status'] === 'late' ? ' (telat)' : '');
-    }
-
-    // Built from the parts that exist, so a day nobody reported does not open with two
-    // blank lines where the names should be.
-    $lines = ['*Rekap MESSI ' . messi_fmt_day($today) . '*'];
-    if ($reported) {
-        $lines[] = '';
-        $lines = array_merge($lines, $reported);
-    }
-    if ($waiting) {
-        $lines[] = '';
-        $lines[] = 'Belum lapor: ' . implode(', ', $waiting) . '.';
-    }
-    return chat_send(implode("\n", $lines), 'chat_webhook_leader');
 }

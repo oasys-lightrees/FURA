@@ -1,5 +1,6 @@
 """Runs every browser suite and reports one total.  python3 web/tests/run_all.py"""
 
+import re
 import subprocess
 import sys
 from pathlib import Path
@@ -15,8 +16,12 @@ for name in SUITES:
     if r.stderr.strip():
         print(r.stderr.rstrip(), file=sys.stderr)
     tail = [l for l in r.stdout.splitlines() if "lolos" in l]
-    lines.append(f"  {name:<20} {tail[-1].strip() if tail else 'tidak selesai'}")
-    if r.returncode != 0:
+    summary = tail[-1].strip() if tail else "tidak selesai"
+    lines.append(f"  {name:<20} {summary}")
+    # Dua-duanya diperiksa. Exit code pernah berbohong karena suite-nya lupa keluar
+    # dengan kode gagal; angka "x/y lolos" yang tidak sama besar juga tidak boleh lolos.
+    counts = re.match(r"^(\d+)/(\d+) lolos", summary)
+    if r.returncode != 0 or not counts or counts.group(1) != counts.group(2):
         failed.append(name)
 
 print(f"\n{'=' * 60}\nRINGKASAN\n{'=' * 60}")

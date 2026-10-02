@@ -1,7 +1,7 @@
 # MESSI di cPanel
 
 Versi PHP + MySQL dari aplikasi di `web/`. Halamannya **sama persis** — `app.html`
-adalah salinan `web/messi.html` tanpa satu baris pun diubah, jadi 89 pemeriksaan browser
+adalah salinan `web/messi.html` tanpa satu baris pun diubah, jadi 102 pemeriksaan browser
 di `web/tests/` tetap menggambarkan apa yang dipakai squad. Yang ditulis ulang cuma
 bagian belakangnya: dulu data disimpan platform artifact, sekarang MySQL.
 
@@ -80,8 +80,9 @@ halamannya. Dengan ini, space squad dapat tiga pesan tiap hari kerja.
    *Add webhooks* → beri nama → salin URL-nya ke `chat_webhook` di `config.php`.
 2. Buka `cek.php` → *Kirim pesan uji* → pesannya harus muncul di space.
 
-`chat_webhook_leader` opsional: rekap 18:00 ke space terpisah. Kosong berarti ikut
-ke space squad, yang memang tempat laporan MESSI selalu diposting.
+Hanya dua pesan, dan keduanya cuma mengantar orang ke website. **Rekap tidak dikirim
+ke chat.** Atasan membacanya di tab *Squad*, yang bisa membuka hari mana saja dan
+membuka laporan utuh siapa pun — dua hal yang tidak bisa dilakukan sebuah pesan chat.
 
 **Sebuah webhook memposting ke satu space, bukan japri.** Itu satu fakta yang
 membentuk semuanya: pesan pagi membawa alamat biasa, bukan link sekali-pakai yang
@@ -102,7 +103,6 @@ Dijalankan tiap jam, dan aman kalau jalan dua kali atau terlewat satu jam:
 | tiap jam | hari yang lewat tanpa laporan ditandai *tidak lapor*; janji yang lewat tanggal ditandai *tidak ditepati*; token kedaluwarsa dibuang |
 | 09:00 | laporan dibuka; satu pesan ke space, menyebut janji yang jatuh tempo hari ini |
 | 17:00 | pengingat, menyebut siapa yang belum lapor — tidak dikirim kalau semua sudah |
-| 18:00 | rekap hari itu |
 
 Setiap pengiriman dicatat di tabel `job_log`, jadi "kenapa tidak ada pesan?" selalu
 ada jawabannya. URL webhook-nya membawa kunci sendiri, jadi tidak pernah ikut tercatat.
@@ -130,7 +130,7 @@ lib/require-php8.php  penjaga versi PHP, dibaca paling awal
 install.sql        enam tabel
 PASANG.txt         langkah pemasangan, bahasa non-teknis
 make-zip.sh        bikin messi-cpanel.zip
-tests/             232 pemeriksaan (tidak ikut ke server)
+tests/             235 pemeriksaan (tidak ikut ke server)
 ```
 
 ## Yang diputuskan server, bukan browser
@@ -168,8 +168,8 @@ menyebutkan mana yang barusan terjadi.
 |--------|--------|
 | `tests/test_engine.php` | 55 — aturan, dicocokkan dengan `tests/test_core.py` |
 | `tests/test_repo.php` | 52 — terhadap MySQL sungguhan, di database yang dia buat sendiri |
-| `tests/test_cron.php` | 44 — seminggu penuh jam demi jam, jam dibekukan, pesan bot ditangkap |
-| `tests/test_live.py` | 45 — browser terhadap aplikasi yang benar-benar jalan |
+| `tests/test_cron.php` | 37 — seminggu penuh jam demi jam, jam dibekukan, pesan bot ditangkap |
+| `tests/test_live.py` | 55 — browser terhadap aplikasi yang benar-benar jalan |
 | `tests/test_admin.py` | 36 — pemasangan pertama, tambah orang, ganti password, link sekali pakai |
 | `tests/check_sync.php` | memastikan `app.html` belum menyimpang dari `web/messi.html` |
 

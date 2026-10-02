@@ -18,8 +18,8 @@ require_once __DIR__ . '/../lib/tick.php';
 
 /* What would be posted to Google Chat, caught in a bucket instead. */
 $sent = [];
-Chat::$send = function (string $text, string $which) use (&$sent): bool {
-    $sent[] = ['text' => $text, 'space' => $which];
+Chat::$send = function (string $text) use (&$sent): bool {
+    $sent[] = ['text' => $text];
     return true;
 };
 
@@ -108,13 +108,10 @@ Clock::freeze('2026-09-28T10:30:00Z');
 repo_save_cycle($chief, uid((int) $chief['id']) . '__2026-09-28', $clean);
 
 $m = tick_at('2026-09-28T11:00:00Z');                       // 18:00
-eq('rekapnya satu pesan', count($m), 1);
-eq('dan diarahkan ke space rekap', $m[0]['space'], 'chat_webhook_leader');
-ok('rekap menyebut yang sudah lapor', said($m, 'Nicho'));
-ok('rekap menandai yang gantung dengan merah', said($m, '🔴 Nicho'));
-ok('rekap menandai yang bersih dengan hijau', said($m, '🟢 Chief'));
-ok('rekap menyebut siapa yang belum lapor', said($m, 'Belum lapor: Dita'));
-ok('Rio belum bergabung, jadi tidak disebut belum lapor', !said($m, 'Rio'));
+// Rekapnya tidak lagi dikirim ke mana-mana: atasan membacanya di layar Squad, yang bisa
+// membuka hari lain dan laporan utuh tiap orang — dua hal yang tidak bisa dilakukan
+// sebuah pesan chat.
+eq('jam 18:00 tidak ada rekap yang dikirim ke chat', count($m), 0);
 
 /* ================================================== Selasa 29 Sep — konsekuensi */
 
@@ -141,8 +138,7 @@ repo_save_cycle($nicho, uid((int) $nicho['id']) . '__2026-09-29', $clean);
 repo_save_cycle($chief, uid((int) $chief['id']) . '__2026-09-29', hanging('2026-09-30'));
 
 $m = tick_at('2026-09-29T11:00:00Z');                       // 18:00
-ok('Nicho sekarang hijau', said($m, '🟢 Nicho'));
-ok('dan Dita masih belum lapor dua hari berturut-turut', said($m, 'Belum lapor: Dita'));
+eq('tetap tidak ada rekap yang diposting', count($m), 0);
 
 /* ================================================ Rabu 30 Sep — orang baru */
 
@@ -190,8 +186,8 @@ Clock::freeze('2026-10-06T02:00:00Z');
 $did = messi_tick();
 ok('tanpa webhook, hari tetap dibuka — pesannya saja yang tidak ada',
    ($did['opened'] ?? 0) > 0 && ($did['asked'] ?? 0) === 0);
-Chat::$send = function (string $text, string $which) use (&$sent): bool {
-    $sent[] = ['text' => $text, 'space' => $which];
+Chat::$send = function (string $text) use (&$sent): bool {
+    $sent[] = ['text' => $text];
     return true;
 };
 
@@ -199,7 +195,7 @@ Chat::$send = function (string $text, string $which) use (&$sent): bool {
 
 $kinds = q('SELECT DISTINCT kind FROM job_log ORDER BY kind')->fetchAll(PDO::FETCH_COLUMN);
 eq('setiap pekerjaan meninggalkan catatan',
-   $kinds, ['break_overdue', 'generate', 'notify_due', 'notify_leader', 'notify_open', 'reap']);
+   $kinds, ['break_overdue', 'generate', 'notify_due', 'notify_open', 'reap']);
 
 Clock::unfreeze();
 Chat::$send = null;

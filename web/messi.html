@@ -169,6 +169,18 @@ h2 { font-size:11.5px; font-weight:700; letter-spacing:.09em; text-transform:upp
 .btn.sec { background:var(--surface); color:var(--ink); border-color:var(--line); flex:0 0 auto;
            min-width:96px; }
 .saved { font-size:12.5px; color:var(--muted); text-align:center; margin-top:9px; }
+.daynav { display:flex; align-items:center; justify-content:space-between; gap:10px;
+          margin:0 0 14px; font-size:14px; }
+.daynav b { font-weight:600; }
+.daynav button { font:inherit; font-size:13.5px; color:var(--ink); background:var(--surface);
+                 border:1px solid var(--line); border-radius:9px; padding:7px 11px; cursor:pointer; }
+.daynav span { min-width:1px; }
+.prow { display:flex; align-items:center; gap:9px; width:100%; padding:0; margin:0;
+        font:inherit; text-align:left; color:inherit; background:none; border:0; cursor:pointer; }
+.pip { flex:0 0 auto; width:9px; height:9px; border-radius:50%; background:var(--muted); }
+.pip.green { background:var(--kept); } .pip.amber { background:var(--due); }
+.pip.red { background:var(--broken); } .pip.off { background:var(--line); }
+.chev { color:var(--muted); font-size:15px; }
 .fix { display:block; width:100%; margin:14px 0 0; padding:11px; font:inherit; font-size:14px;
        color:var(--muted); background:none; border:1px dashed var(--line); border-radius:11px;
        cursor:pointer; }
@@ -237,6 +249,15 @@ const addDays = (s,n) => { const t = d(s); t.setUTCDate(t.getUTCDate()+n); retur
 const isWorkday = s => WORKDAYS.includes(d(s).getUTCDay());
 const fmt = s => { const t = d(s); return `${ID_SHORT[t.getUTCDay()]} ${t.getUTCDate()} ${MON[t.getUTCMonth()]}`; };
 const fmtLong = s => { const t = d(s); return `${ID_DAY[t.getUTCDay()]}, ${t.getUTCDate()} ${MON[t.getUTCMonth()]}`; };
+/** Hari kerja berikutnya ke arah `dir`, atau null kalau sudah mentok. */
+function stepWorkday(from, dir) {
+  for (let d = addDays(from, dir), i = 0; i < 10; i++, d = addDays(d, dir)) {
+    if (d > today() || d < FIRST_DAY) return null;
+    if (isWorkday(d)) return d;
+  }
+  return null;
+}
+
 function pastWorkdays(end, n) {
   const out = []; for (let s = end; s >= FIRST_DAY && out.length < n; s = addDays(s,-1))
     if (isWorkday(s)) out.push(s);
@@ -263,7 +284,9 @@ const statusOf = (day, doc) =>
 /* ---- state --------------------------------------------------------------- */
 const S = { me:null, name:"", isLeader:false, cycles:new Map(), commitments:new Map(),
             roster:new Map(), tab:"hari-ini", step:1, editing:false, error:null,
-            copied:false, showReport:false, ready:false, offline:false, a:null, savedAt:null };
+            copied:false, showReport:false, ready:false, offline:false, a:null, savedAt:null,
+            // Layar leader: hari yang sedang dibaca, dan laporan siapa yang dibuka.
+            day:null, openRow:null };
 
 let db = null, users = null;
 const key = (uid,day) => uid + "__" + day;
@@ -533,18 +556,50 @@ function screenPlayer() {
   return screenDone(doc);
 }
 
+/**
+ * Rekap squad — ini yang dibaca atasan.
+ *
+ * Dulu rekap ini dikirim sebagai pesan jam 18:00, dan sebelum itu lagi orang menempel
+ * laporan lengkapnya ke grup. Begitu keduanya hilang, layar ini yang menggantikan: bukan
+ * daftar masalah saja, tapi semua orang beserta angkanya — dan laporan utuh siapa pun
+ * bisa dibuka dengan satu ketukan, seperti dulu terbaca di grup.
+ */
 function screenLeader() {
-  const day = today(), people = [...S.roster.keys()];
+  const day = S.day || today();
+  const people = [...S.roster.keys()].filter(uid => day >= joinedOn(uid));
   const rows = people.map(uid => {
     const doc = S.cycles.get(key(uid, day));
     return { uid, doc, st: statusOf(day, doc), missed: missedDays(uid, 5).length };
   });
-  const done = rows.filter(r => r.st === "submitted" || r.st === "late");
-  const late = [...S.commitments.values()].filter(c => c.status === "open" && c.due < day);
-  const waiting = rows.filter(r => r.st === "pending" || r.st === "missed");
+  rows.sort((a, b) => nameOf(a.uid).localeCompare(nameOf(b.uid)));
 
+  const done = rows.filter(r => r.doc && r.doc.submittedAt);
+  const waiting = rows.filter(r => !(r.doc && r.doc.submittedAt));
+  const late = [...S.commitments.values()]
+    .filter(c => c.status === "open" && c.due < today());
+
+  /* ---- kepala: hari apa yang sedang dibaca ---- */
+  const prev = stepWorkday(day, -1), next = stepWorkday(day, 1);
+  const nav = `<div class="daynav">
+    ${prev ? `<button type="button" data-day="${prev}">‹ ${esc(fmt(prev))}</button>`
+           : `<span></span>`}
+    <b>${esc(fmtLong(day))}${day === today() ? "" : ""}</b>
+    ${next ? `<button type="button" data-day="${next}">${esc(fmt(next))} ›</button>`
+           : `<span></span>`}
+  </div>`;
+
+  let html = `<h1>Rekap squad</h1>
+    <p class="sub">${people.length} orang${day === today() ? " · hari ini" : ""}</p>
+    ${nav}
+    <div class="stats">
+      <div class="g"><b>${done.length}/${people.length}</b><span>sudah lapor</span></div>
+      <div class="${late.length ? "r" : ""}"><b>${late.length}</b><span>janji lewat</span></div>
+      <div class="${waiting.length ? "r" : ""}"><b>${waiting.length}</b><span>belum lapor</span></div>
+    </div>`;
+
+  /* ---- yang butuh tindakan, tetap di atas ---- */
   const cards = [];
-  rows.filter(r => r.doc && (r.doc.escalation||"").trim()).forEach(r => cards.push(
+  rows.filter(r => r.doc && (r.doc.escalation || "").trim()).forEach(r => cards.push(
     `<div class="card due"><div class="row"><span class="strong">${esc(nameOf(r.uid))}</span>
       <span class="grow"></span><span class="meta">minta bantuan</span></div>
       <div style="margin-top:6px">${esc(r.doc.escalation)}</div></div>`));
@@ -556,21 +611,35 @@ function screenLeader() {
     `<div class="card bad"><div class="row"><span class="strong">${esc(nameOf(r.uid))}</span>
       <span class="grow"></span><span class="meta">${r.missed} hari</span></div>
       <div style="margin-top:6px">Belum lapor beberapa hari.</div></div>`));
-
-  let html = `<h1>Yang perlu kamu lihat</h1>
-    <p class="sub">${esc(fmtLong(day))} · squad ${people.length} orang</p>
-    <div class="stats">
-      <div class="g"><b>${done.length}/${people.length}</b><span>sudah lapor</span></div>
-      <div class="${late.length ? "r" : ""}"><b>${late.length}</b><span>janji lewat</span></div>
-      <div class="${waiting.length ? "r" : ""}"><b>${waiting.length}</b><span>belum lapor</span></div>
-    </div>`;
+  // Kalau tidak ada yang perlu ditindak, itu kabar — bukan alasan untuk diam.
   html += cards.length ? `<h2>Perlu perhatian</h2>` + cards.join("")
-    : `<div class="blank" style="margin-top:18px"><b>Tidak ada yang perlu dibaca.</b>
-       Semua lapor, tidak ada yang minta bantuan, tidak ada janji lewat.</div>`;
-  if (waiting.length) html += `<h2>Belum lapor</h2>` + waiting.map(r =>
-    `<div class="card"><div class="row"><span class="strong">${esc(nameOf(r.uid))}</span>
-      <span class="grow"></span><span class="meta">${r.st === "missed" ? "lewat jam 18:00" : "masih ada waktu"}</span>
-    </div></div>`).join("");
+    : `<div class="blank" style="margin-top:4px"><b>Tidak ada yang perlu dibaca.</b>
+       Tidak ada yang minta bantuan, tidak ada janji lewat.</div>`;
+
+  /* ---- semua orang, dengan angkanya ---- */
+  html += `<h2>Semua (${people.length})</h2>` + rows.map(r => {
+    const open = S.openRow === r.uid;
+    if (!r.doc || !r.doc.submittedAt) {
+      return `<div class="card"><div class="row">
+        <span class="pip off"></span><span class="strong">${esc(nameOf(r.uid))}</span>
+        <span class="grow"></span><span class="meta">${
+          r.st === "missed" ? "tidak lapor" : "belum lapor"}</span></div></div>`;
+    }
+    const t = totals(r.doc.grid), lamp = lampFor(r.doc.grid);
+    return `<div class="card">
+      <button class="prow" type="button" data-open="${esc(r.uid)}">
+        <span class="pip ${lamp.level}"></span>
+        <span class="strong">${esc(nameOf(r.uid))}</span>
+        <span class="grow"></span>
+        <span class="meta">${t.open} aktif · ${
+          t.hanging === 0 ? "aman" : t.hanging + " gantung"}${
+          r.doc.late ? " · telat" : ""}</span>
+        <span class="chev">${open ? "▾" : "›"}</span>
+      </button>
+      ${open ? `<div class="report">${esc(buildReport(r.doc))}</div>` : ""}
+    </div>`;
+  }).join("");
+
   return html;
 }
 
@@ -592,8 +661,8 @@ function renderBar() {
     el("next").addEventListener("click", onNext);
   } else {
     barIn.innerHTML = `<div class="btns">
-      <button class="btn" type="button" id="copy">${S.copied ? "Tersalin ✓" : "Salin laporan"}</button>
-      <button class="btn sec" type="button" id="toggle">${S.showReport ? "Tutup" : "Lihat"}</button>
+      <button class="btn" type="button" id="toggle">${S.showReport ? "Tutup laporan" : "Lihat laporan"}</button>
+      <button class="btn sec" type="button" id="copy">${S.copied ? "Tersalin ✓" : "Salin"}</button>
       </div>`;
     el("copy").addEventListener("click", onCopy);
     el("toggle").addEventListener("click", () => { S.showReport = !S.showReport; render(); });
@@ -687,7 +756,9 @@ function onCopy() {
 el("tabs").addEventListener("click", ev => {
   const b = ev.target.closest("[data-tab]");
   if (!b) return;
-  S.tab = b.dataset.tab; S.error = null; render(); toTop();
+  S.tab = b.dataset.tab; S.error = null;
+  S.day = null; S.openRow = null;          // tiap masuk tab Squad, mulai dari hari ini
+  render(); toTop();
 });
 
 view.addEventListener("click", ev => {
@@ -700,7 +771,11 @@ view.addEventListener("click", ev => {
 // Selecting on focus means tapping a cell and typing replaces the number, instead of
 // dropping the caret mid-digit and turning 13 into 173.
 view.addEventListener("click", ev => {
-  if (ev.target && ev.target.id === "edit") reopen();
+  if (ev.target && ev.target.id === "edit") { reopen(); return; }
+  const day = ev.target.closest && ev.target.closest("[data-day]");
+  if (day) { S.day = day.dataset.day; S.openRow = null; render(); toTop(); return; }
+  const row = ev.target.closest && ev.target.closest("[data-open]");
+  if (row) { const u = row.dataset.open; S.openRow = S.openRow === u ? null : u; render(); }
 });
 view.addEventListener("focusin", ev => {
   if (ev.target.dataset && ev.target.dataset.row) ev.target.select();

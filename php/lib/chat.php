@@ -9,8 +9,10 @@
  *     space is a login link for everyone in that space, so the message carries the
  *     plain address and people sign in normally. Sessions last 30 days, so that is
  *     roughly a monthly login, not a daily one.
- *   - The three daily messages are one message each to the space, not one per person.
- *     That suits how the squad already works — reports were always posted in the group.
+ *   - There is no recap here. A recap belongs on the Squad screen, which can show any
+ *     day, open anybody's full report and be acted on; a chat message can do none of
+ *     that. What chat is good at is the nudge that gets people to the site, so that is
+ *     all this sends: the day is open, and later, who has still not reported.
  *
  * Google Chat markup, not HTML: *bold*, _italic_, and <url|text> for links. Passing
  * HTML-escaped text here would print the escapes.
@@ -24,18 +26,13 @@ require_once __DIR__ . '/bootstrap.php';
 /** A seam, so the tests can read what would be posted without a webhook or a network. */
 final class Chat
 {
-    /** @var null|callable(string,string):bool */
+    /** @var null|callable(string):bool */
     public static $send = null;
 }
 
-function chat_webhook(string $which = 'chat_webhook'): string
+function chat_webhook(): string
 {
-    $url = trim((string) cfg($which));
-    // The leader recap falls back to the squad space rather than going nowhere.
-    if ($url === '' && $which !== 'chat_webhook') {
-        $url = trim((string) cfg('chat_webhook'));
-    }
-    return $url;
+    return trim((string) cfg('chat_webhook'));
 }
 
 function chat_enabled(): bool
@@ -47,16 +44,16 @@ function chat_enabled(): bool
  * Posts one message. A failure is logged, never fatal — the report is still reachable
  * in a browser on a day Google is having trouble.
  */
-function chat_send(string $text, string $which = 'chat_webhook'): bool
+function chat_send(string $text): bool
 {
     if (!chat_enabled() || trim($text) === '') {
         return false;
     }
     if (Chat::$send !== null) {
-        return (Chat::$send)($text, $which);
+        return (Chat::$send)($text);
     }
 
-    $url = chat_webhook($which);
+    $url = chat_webhook();
     if ($url === '') {
         return false;
     }
@@ -76,7 +73,7 @@ function chat_send(string $text, string $which = 'chat_webhook'): bool
 
     if ($code !== 200) {
         // The webhook URL carries its own key and token, so it never goes in the log.
-        log_job('chat_error', substr($which . ' ' . $code . ' ' . ($err ?: (string) $body), 0, 500));
+        log_job('chat_error', substr($code . ' ' . ($err ?: (string) $body), 0, 500));
         return false;
     }
     return true;

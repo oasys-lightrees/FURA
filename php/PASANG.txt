@@ -90,7 +90,11 @@ Dengan ini, tiap hari kerja space squad dapat tiga pesan:
 
   09:00  laporan hari ini dibuka + janji siapa saja yang jatuh tempo hari ini
   17:00  pengingat, menyebut siapa yang belum lapor
-  18:00  rekap: siapa hijau/kuning/merah, dan siapa yang belum lapor
+
+Cuma dua, dan dua-duanya sekadar mengingatkan orang untuk membuka websitenya.
+Rekapnya TIDAK dikirim ke chat: atasan membacanya di tab "Squad" di website,
+yang bisa dibuka hari mana saja dan bisa membuka laporan utuh tiap orang —
+dua hal yang tidak bisa dilakukan sebuah pesan chat.
 
 Cara pasang, sekitar 2 menit:
 
@@ -99,10 +103,6 @@ Cara pasang, sekitar 2 menit:
  c. Beri nama "MESSI" -> Save -> salin URL-nya
  d. Tempel ke 'chat_webhook' di config.php
  e. Buka cek.php -> klik "Kirim pesan uji" -> pesan harus muncul di space
-
-Kalau mau rekap jam 18:00 masuk ke space terpisah (misal space leader), bikin
-webhook kedua di space itu dan tempel ke 'chat_webhook_leader'. Dikosongkan
-berarti rekapnya ikut ke space squad.
 
 CATATAN PENTING: webhook Google Chat itu memposting ke SATU SPACE, bukan japri
 ke tiap orang. Karena itu pesan paginya berisi link biasa, bukan link yang
