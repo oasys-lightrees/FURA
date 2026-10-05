@@ -191,6 +191,16 @@ Chat::$send = function (string $text) use (&$sent): bool {
     return true;
 };
 
+/* ------------------------------------------------ bentuk pesan minta bantuan */
+
+$pesan = chat_escalation("Rio D'Souza", 'Butuh Chief approve harga Klien A');
+ok('menyebut siapa yang minta', str_contains($pesan, "Rio D'Souza"));
+ok('apostrof tetap utuh, bukan entitas HTML', !str_contains($pesan, '&#039;'));
+ok('membawa isi permintaannya', str_contains($pesan, 'Butuh Chief approve harga Klien A'));
+ok('memakai markup Google Chat, bukan HTML',
+   str_contains($pesan, '*') && !str_contains($pesan, '<b>'));
+ok('dan membawa link ke aplikasinya', str_contains($pesan, 'https://example.test/messi|'));
+
 /* ------------------------------------------------------- catatan yang tertinggal */
 
 $kinds = q('SELECT DISTINCT kind FROM job_log ORDER BY kind')->fetchAll(PDO::FETCH_COLUMN);

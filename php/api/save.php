@@ -33,6 +33,13 @@ try {
     switch ($collection) {
         case 'cycles':
             $result = repo_save_cycle($user, $id, $doc);
+            // Laporannya sudah tersimpan sebelum baris ini. Kalau Google sedang bermasalah,
+            // yang hilang cuma pemberitahuannya — bukan laporan orangnya.
+            if (!empty($result['announce'])) {
+                require_once __DIR__ . '/../lib/chat.php';
+                chat_send(chat_escalation($user['name'], (string) $result['announce']), 6);
+            }
+            unset($result['announce']);
             break;
         case 'commitments':
             $result = repo_resolve_commitment($user, $id, $doc);

@@ -44,7 +44,7 @@ function chat_enabled(): bool
  * Posts one message. A failure is logged, never fatal — the report is still reachable
  * in a browser on a day Google is having trouble.
  */
-function chat_send(string $text): bool
+function chat_send(string $text, int $timeout = 15): bool
 {
     if (!chat_enabled() || trim($text) === '') {
         return false;
@@ -59,12 +59,16 @@ function chat_send(string $text): bool
     }
 
     $ch = curl_init($url);
+    if ($ch === false) {                 // URL yang bentuknya rusak
+        log_job('chat_error', 'webhook tidak bisa dibuka');
+        return false;
+    }
     curl_setopt_array($ch, [
         CURLOPT_POST => true,
         CURLOPT_HTTPHEADER => ['Content-Type: application/json; charset=UTF-8'],
         CURLOPT_POSTFIELDS => json_encode(['text' => $text], JSON_UNESCAPED_UNICODE),
         CURLOPT_RETURNTRANSFER => true,
-        CURLOPT_TIMEOUT => 15,
+        CURLOPT_TIMEOUT => $timeout,
     ]);
     $body = curl_exec($ch);
     $code = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE);
@@ -102,6 +106,25 @@ function chat_morning(string $today, array $duePromises): string
     $lines[] = '';
     $lines[] = chat_link('Isi laporan');
     return implode("\n", $lines);
+}
+
+/**
+ * Somebody asked for help.
+ *
+ * This one is not on a schedule. A person who reported and is blocked is the one case
+ * where waiting until the next hour is worse than the noise of posting at once — and
+ * the system already chases people who stay silent, so staying silent about somebody
+ * who spoke up had the asymmetry exactly backwards.
+ */
+function chat_escalation(string $name, string $text): string
+{
+    return implode("\n", [
+        '🙋 *' . $name . '* minta bantuan',
+        '',
+        $text,
+        '',
+        chat_link('Buka MESSI'),
+    ]);
 }
 
 /** 17:00 — named, because a reminder addressed to nobody is read by nobody. */

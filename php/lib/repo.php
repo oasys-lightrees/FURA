@@ -155,6 +155,17 @@ function repo_save_cycle(array $user, string $docId, array $doc): array
     $now = Clock::nowUtcSql();
     $cycleId = repo_ensure_cycle($userId, $today);
 
+    // Apakah permintaan bantuan ini perlu diumumkan? Hanya kalau ada isinya dan berbeda
+    // dari yang sudah pernah diumumkan untuk hari yang sama — memperbaiki angka tidak
+    // boleh mengirim ulang, tapi mengganti isi permintaannya harus.
+    $before = q1('SELECT answers FROM cycles WHERE id = ?', [$cycleId]);
+    $beforeA = json_decode((string) ($before['answers'] ?? ''), true);
+    $announced = is_array($beforeA) ? (string) ($beforeA['escalation_announced'] ?? '') : '';
+    $toAnnounce = ($answers['escalation'] !== '' && $answers['escalation'] !== $announced)
+        ? $answers['escalation'] : null;
+    // Penanda ikut disimpan di dalam answers, jadi tidak perlu kolom baru.
+    $answers['escalation_announced'] = $toAnnounce ?? $announced;
+
     q('UPDATE cycles SET answers = ?, status = ?, submitted_at = ? WHERE id = ?',
       [json_encode($answers, JSON_UNESCAPED_UNICODE), $status, $now, $cycleId]);
 
@@ -173,7 +184,10 @@ function repo_save_cycle(array $user, string $docId, array $doc): array
         }
     }
 
-    return ['status' => $status, 'day' => $today, 'cycle_id' => $cycleId];
+    // Dikembalikan, tidak dikirim dari sini: repository tidak bicara ke pihak ketiga,
+    // supaya laporan yang sudah tersimpan tidak pernah bisa digagalkan oleh Google.
+    return ['status' => $status, 'day' => $today, 'cycle_id' => $cycleId,
+            'announce' => $toAnnounce];
 }
 
 /**

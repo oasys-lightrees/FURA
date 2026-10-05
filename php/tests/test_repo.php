@@ -163,6 +163,39 @@ eq('the day after, only their own first day counts against them',
 eq('but someone who was here is',
    messi_missed_days([], '2026-09-28', '2026-09-30'), ['2026-09-29', '2026-09-28']);
 
+/* ------------------------------------------------- permintaan bantuan */
+
+// Yang diam dikejar; yang bicara harus didengar. Permintaan bantuan diumumkan saat
+// ditulis, bukan ditunggu sampai ada yang kebetulan membuka layar Squad.
+$minta = ['grid' => ['WAG' => ['open' => 5, 'reply' => 5]], 'declared' => true,
+          'escalation' => 'Butuh Chief approve harga Klien A'];
+
+eq('permintaan bantuan baru diumumkan',
+   repo_save_cycle($rio, uid((int) $rio['id']) . '__2026-09-30', $minta)['announce'],
+   'Butuh Chief approve harga Klien A');
+
+eq('memperbaiki angka tidak mengumumkannya lagi',
+   repo_save_cycle($rio, uid((int) $rio['id']) . '__2026-09-30',
+                   ['grid' => ['WAG' => ['open' => 9, 'reply' => 9]], 'declared' => true,
+                    'escalation' => 'Butuh Chief approve harga Klien A'])['announce'],
+   null);
+
+eq('tapi mengganti isinya diumumkan lagi',
+   repo_save_cycle($rio, uid((int) $rio['id']) . '__2026-09-30',
+                   ['grid' => ['WAG' => ['open' => 9, 'reply' => 9]], 'declared' => true,
+                    'escalation' => 'Klien A sudah oke, sekarang Vendor B yang stuck'])['announce'],
+   'Klien A sudah oke, sekarang Vendor B yang stuck');
+
+eq('laporan tanpa permintaan bantuan tidak mengumumkan apa pun',
+   repo_save_cycle($nicho, uid((int) $nicho['id']) . '__2026-09-30',
+                   ['grid' => $goodGrid, 'detail' => 'OA003', 'plan' => 'Telepon langsung',
+                    'due' => '2026-10-01', 'declared' => true])['announce'],
+   null);
+
+ok('penandanya ikut tersimpan, tanpa perlu kolom baru',
+   str_contains((string) q1('SELECT answers FROM cycles WHERE user_id = ? AND day = ?',
+                            [$rio['id'], '2026-09-30'])['answers'], 'escalation_announced'));
+
 /* -------------------------------------------------------------------- auth */
 
 $_COOKIE = [];

@@ -103,6 +103,7 @@ Dijalankan tiap jam, dan aman kalau jalan dua kali atau terlewat satu jam:
 | tiap jam | hari yang lewat tanpa laporan ditandai *tidak lapor*; janji yang lewat tanggal ditandai *tidak ditepati*; token kedaluwarsa dibuang |
 | 09:00 | laporan dibuka; satu pesan ke space, menyebut janji yang jatuh tempo hari ini |
 | 17:00 | pengingat, menyebut siapa yang belum lapor — tidak dikirim kalau semua sudah |
+| *seketika* | ada yang menulis permintaan bantuan — tidak menunggu cron |
 
 Setiap pengiriman dicatat di tabel `job_log`, jadi "kenapa tidak ada pesan?" selalu
 ada jawabannya. URL webhook-nya membawa kunci sendiri, jadi tidak pernah ikut tercatat.
@@ -130,7 +131,7 @@ lib/require-php8.php  penjaga versi PHP, dibaca paling awal
 install.sql        enam tabel
 PASANG.txt         langkah pemasangan, bahasa non-teknis
 make-zip.sh        bikin messi-cpanel.zip
-tests/             235 pemeriksaan (tidak ikut ke server)
+tests/             245 pemeriksaan (tidak ikut ke server)
 ```
 
 ## Yang diputuskan server, bukan browser
@@ -167,8 +168,8 @@ menyebutkan mana yang barusan terjadi.
 | Berkas | Isinya |
 |--------|--------|
 | `tests/test_engine.php` | 55 — aturan, dicocokkan dengan `tests/test_core.py` |
-| `tests/test_repo.php` | 52 — terhadap MySQL sungguhan, di database yang dia buat sendiri |
-| `tests/test_cron.php` | 37 — seminggu penuh jam demi jam, jam dibekukan, pesan bot ditangkap |
+| `tests/test_repo.php` | 57 — terhadap MySQL sungguhan, di database yang dia buat sendiri |
+| `tests/test_cron.php` | 42 — seminggu penuh jam demi jam, jam dibekukan, pesan bot ditangkap |
 | `tests/test_live.py` | 55 — browser terhadap aplikasi yang benar-benar jalan |
 | `tests/test_admin.py` | 36 — pemasangan pertama, tambah orang, ganti password, link sekali pakai |
 | `tests/check_sync.php` | memastikan `app.html` belum menyimpang dari `web/messi.html` |
