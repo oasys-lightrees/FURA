@@ -20,14 +20,14 @@ pip install playwright && playwright install chromium
 python3 web/tests/run_all.py
 ```
 
-111 checks across four suites. They drive a real browser against `messi.html` with
+122 checks across four suites. They drive a real browser against `messi.html` with
 `window.claude` faked (`tests/stub.js`): an in-memory store held in localStorage plus a
 switchable identity, so a submission made as one person can be read as another.
 
 | Suite | Covers |
 |---|---|
-| `test_player.py` (43) | Login, the 2-vs-3 step flow, every rejection, live totals, draft survival across a reload, promise capture, the generated report, and correcting a report already sent |
-| `test_manager.py` (41) | The recap screen: every person with their figures, any past workday, a drill-down into one person's full report; escalations by name, overdue promises, repeat absentees; and that a player sees nobody else's data |
+| `test_player.py` (48) | Login, the 2-vs-3 step flow, every rejection, live totals, draft survival across a reload, promise capture, the generated report, and correcting a report already sent |
+| `test_manager.py` (47) | The recap screen: every person with their figures, any past workday, a drill-down into one person's full report; escalations by name, overdue promises, repeat absentees; and that a player sees nobody else's data |
 | `test_edge.py` (11) | Weekend, before opening, after the deadline, and one person's submission reaching another's screen |
 | `test_keyboard.py` (16) | Grid navigation: Enter and arrows move between cells and never change a number; the wheel cannot either |
 

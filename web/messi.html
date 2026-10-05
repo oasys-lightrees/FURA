@@ -6,6 +6,7 @@
 <style>
 :root {
   color-scheme: light;
+  --shell:500px;
   --paper:#f5f3ef; --surface:#ffffff; --raise:#faf9f6;
   --ink:#1a1c1f; --muted:#6b6d73; --line:#e4e1db;
   --kept:#2f6248; --due:#9a6410; --broken:#97322a;
@@ -31,17 +32,21 @@ html, body { height:100%; }
 body { margin:0; background:var(--paper); color:var(--ink); font-family:var(--ui);
        font-size:16px; line-height:1.5; -webkit-font-smoothing:antialiased;
        -webkit-text-size-adjust:100%; }
-.app { max-width:500px; margin:0 auto; }
+.app { max-width:var(--shell); margin:0 auto; }
 main { padding:22px 16px 132px; }
 
 /* header */
 .top { position:sticky; top:env(safe-area-inset-top,0px); z-index:30;
        background:color-mix(in srgb,var(--paper) 94%,transparent); backdrop-filter:blur(10px);
        border-bottom:1px solid var(--line); }
-.top-in { max-width:500px; margin:0 auto; padding:11px 16px; display:flex;
+.top-in { max-width:var(--shell); margin:0 auto; padding:11px 16px; display:flex;
           align-items:center; gap:10px; }
 .logo { font-weight:700; letter-spacing:.14em; font-size:13px; }
 .when { margin-left:auto; font-family:var(--mono); font-size:12px; color:var(--muted); }
+.theme { width:30px; height:30px; border-radius:50%; flex:none; cursor:pointer;
+          font-size:14px; line-height:1; background:var(--surface); color:var(--muted);
+          border:1px solid var(--line); display:grid; place-items:center; padding:0; }
+.theme:hover { color:var(--ink); border-color:var(--ink); }
 .avatar { width:30px; height:30px; border-radius:50%; background:var(--ink); color:var(--paper);
           display:grid; place-items:center; font-size:12px; font-weight:700; flex:none; }
 
@@ -147,7 +152,7 @@ h2 { font-size:11.5px; font-weight:700; letter-spacing:.09em; text-transform:upp
 .stats .g b { color:var(--kept); } .stats .r b { color:var(--broken); }
 
 .tabs { display:flex; gap:24px; border-bottom:1px solid var(--line); padding-inline:16px;
-        max-width:500px; margin:0 auto; }
+        max-width:var(--shell); margin:0 auto; }
 .tabs button { font:inherit; font-size:15px; font-weight:600; background:none; border:0;
                color:var(--muted); cursor:pointer; padding:13px 0 10px; margin-bottom:-1px;
                border-bottom:2px solid transparent; min-height:46px; }
@@ -160,7 +165,7 @@ h2 { font-size:11.5px; font-weight:700; letter-spacing:.09em; text-transform:upp
        background:color-mix(in srgb,var(--paper) 96%,transparent); backdrop-filter:blur(10px);
        border-top:1px solid var(--line);
        padding:12px 16px calc(12px + env(safe-area-inset-bottom,0px)); }
-.bar-in { max-width:500px; margin:0 auto; }
+.bar-in { max-width:var(--shell); margin:0 auto; }
 .bar .err { color:var(--broken); font-size:14px; font-weight:600; margin-bottom:9px; }
 .btns { display:flex; gap:9px; }
 .btn { font:inherit; font-size:16px; font-weight:600; padding:14px 18px; border-radius:12px;
@@ -191,11 +196,34 @@ h2 { font-size:11.5px; font-weight:700; letter-spacing:.09em; text-transform:upp
 .note { font-size:12.5px; color:var(--muted); margin-top:28px; padding-top:14px;
         border-top:1px solid var(--line); }
 @media (prefers-reduced-motion: reduce) { * { transition:none !important; } }
+/* Laptop. Telepon tetap satu kolom dengan tombol di bawah jempol; di layar lebar
+   kolomnya melebar, kotak angkanya membesar, dan batang tombol ikut mengalir di akhir
+   halaman — batang yang menempel di dasar layar lebar terasa terlepas dari isinya. */
+@media (min-width:860px) {
+  :root { --shell:720px; }
+  main { padding:34px 24px 40px; }
+  .top-in, .tabs { padding-inline:24px; }
+  h1 { font-size:27px; }
+  .tbl { padding:20px; }
+  .tbl input { min-height:52px; font-size:17px; }
+  .bar { position:static; background:none; backdrop-filter:none; border-top:0;
+         padding:18px 24px 48px; }
+  .bar-in { padding:0; }
+  .btns { justify-content:flex-end; }
+  .btn { flex:0 0 auto; min-width:190px; }
+  .btn.sec { min-width:120px; }
+  /* Rekap: yang perlu ditindak di kiri, seluruh squad di kanan — terbaca sekaligus
+     tanpa menggulir, yang memang gunanya layar lebar buat seorang leader. */
+  .cols { display:grid; grid-template-columns:1fr 1fr; gap:0 28px; align-items:start; }
+  .cols h2:first-child { margin-top:0; }
+}
+
 </style>
 
 <div class="top"><div class="top-in">
   <span class="logo">MESSI</span>
   <span class="when" id="whenLbl">—</span>
+  <button class="theme" id="theme" type="button" aria-label="Ganti terang/gelap"></button>
   <span class="avatar" id="avatar">·</span>
 </div></div>
 <nav class="tabs" id="tabs" role="tablist" hidden></nav>
@@ -233,6 +261,31 @@ const COLS = [
 const DECLARATION =
   "Saya sudah memastikan Messenger Squad saya semua terkelola dengan baik tanpa gantung, " +
   "dan saya melaporkan laporan di atas dengan jujur sesuai kondisi sebenarnya.";
+
+/* ---- tema ---------------------------------------------------------------- */
+/* Bawaannya mengikuti perangkat. Begitu orang menekan tombolnya, pilihannya dikunci
+   di perangkat itu saja — tidak ikut ke HP rekannya, dan tidak disimpan di server. */
+const THEME = "messi.theme";
+const prefersDark = () => window.matchMedia
+  && window.matchMedia("(prefers-color-scheme: dark)").matches;
+function readTheme() {
+  try { return localStorage.getItem(THEME); } catch { return null; }   // mode privat
+}
+function applyTheme() {
+  const t = readTheme();
+  const root = document.documentElement;
+  if (t) root.setAttribute("data-theme", t); else root.removeAttribute("data-theme");
+  const dark = t ? t === "dark" : prefersDark();
+  const btn = el("theme");
+  if (btn) { btn.textContent = dark ? "☀" : "☾";
+             btn.title = dark ? "Pakai tampilan terang" : "Pakai tampilan gelap"; }
+}
+function toggleTheme() {
+  const t = readTheme();
+  const next = (t ? t === "dark" : prefersDark()) ? "light" : "dark";
+  try { localStorage.setItem(THEME, next); } catch { /* mode privat: sekali pakai saja */ }
+  applyTheme();
+}
 
 /* ---- Jakarta clock ------------------------------------------------------- */
 const parts = () => Object.fromEntries(new Intl.DateTimeFormat("en-GB",
@@ -617,12 +670,14 @@ function screenLeader() {
     `<div class="card bad"><div class="row"><span class="strong">${esc(nameOf(r.uid))}</span>
       <span class="grow"></span><span class="meta">${r.missed} hari</span></div>
       <div style="margin-top:6px">Belum lapor beberapa hari.</div></div>`));
-  // Kalau tidak ada yang perlu ditindak, itu kabar — bukan alasan untuk diam.
+  // Dua kolom di laptop, bertumpuk di telepon — pembungkusnya sama, CSS yang memutuskan.
+  html += `<div class="cols"><div class="col">`;
   html += cards.length ? `<h2>Perlu perhatian</h2>` + cards.join("")
     : `<div class="blank" style="margin-top:4px"><b>Tidak ada yang perlu dibaca.</b>
        Tidak ada yang minta bantuan, tidak ada janji lewat.</div>`;
 
   /* ---- semua orang, dengan angkanya ---- */
+  html += `</div><div class="col">`;
   html += `<h2>Semua (${people.length})</h2>` + rows.map(r => {
     const open = S.openRow === r.uid;
     if (!r.doc || !r.doc.submittedAt) {
@@ -647,7 +702,7 @@ function screenLeader() {
     </div>`;
   }).join("");
 
-  return html;
+  return html + `</div></div>`;
 }
 
 function renderBar() {
@@ -836,5 +891,7 @@ view.addEventListener("input", ev => {
 });
 
 render();
+applyTheme();
+el("theme").addEventListener("click", toggleTheme);
 boot();
 </script>

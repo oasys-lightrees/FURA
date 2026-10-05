@@ -139,6 +139,29 @@ with sync_playwright() as p:
           and pg2.query_selector(".card.due") is None)
     pg2.screenshot(path=str(SHOTS)+"/t-manager-clear.png", full_page=True)
 
+    print("\n--- di laptop, rekapnya dua kolom ---")
+    wide = b.new_context(viewport={"width": 1280, "height": 900})
+    pgW = new_page(wide, "u_chief", SEED, at=AT)
+    pgW.click('[data-tab="chief"]'); pgW.wait_for_timeout(400)
+    check("kolomnya jadi dua", pgW.evaluate(
+        "getComputedStyle(document.querySelector('.cols')).gridTemplateColumns"),
+        lambda v: len(v.split()) == 2)
+    check("lebarnya melebar dari 500px", pgW.evaluate(
+        "document.querySelector('.app').getBoundingClientRect().width"), 720)
+    # Batang tombol yang menempel di dasar layar lebar terasa terlepas dari isinya.
+    check("batang tombol ikut mengalir, tidak menempel di dasar layar", pgW.evaluate(
+        "getComputedStyle(document.querySelector('#bar')).position"), "static")
+    check("isinya sama saja, cuma tata letaknya yang beda",
+          pgW.inner_text("body"), lambda s: "SEMUA (3)" in s and "Rekap squad" in s)
+    wide.close()
+
+    print("\n--- di telepon tetap satu kolom ---")
+    check("tidak dua kolom di layar sempit", pg.evaluate(
+        "getComputedStyle(document.querySelector('.cols')).gridTemplateColumns"),
+        lambda v: len(v.split()) == 1)
+    check("batang tombol tetap menempel di bawah jempol", pg.evaluate(
+        "getComputedStyle(document.querySelector('#bar')).position"), "fixed")
+
     print("\n--- user biasa tidak boleh melihat halaman manager ---")
     pg3 = new_page(ctx, "u_rio", SEED, at=AT)
     check("Rio tidak punya tab manager", pg3.eval_on_selector("#tabs","e=>e.hidden"))

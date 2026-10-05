@@ -141,6 +141,18 @@ with sync_playwright() as p:
     check("angka barunya yang tersimpan",
           list(st2["cycles"].values())[0]["grid"]["GCG"]["open"], 9)
 
+    print("\n--- terang / gelap ---")
+    check("ada tombol temanya", pg.query_selector("#theme") is not None)
+    get = lambda: pg.evaluate("document.documentElement.getAttribute('data-theme')")
+    check("bawaannya mengikuti perangkat, belum dikunci", get() is None)
+    pg.click("#theme"); pg.wait_for_timeout(250)
+    first = get()
+    check("sekali ditekan, temanya terkunci", first in ("light", "dark"))
+    pg.reload(); pg.wait_for_timeout(900)
+    check("pilihannya bertahan setelah halaman ditutup", get(), first)
+    pg.click("#theme"); pg.wait_for_timeout(250)
+    check("bisa dibalik lagi", get(), lambda t: t in ("light", "dark") and t != first)
+
     open(str(SHOTS)+"/store.json","w").write(json.dumps(store_of(pg)))
     pg.screenshot(path=str(SHOTS)+"/t-user-done.png", full_page=True)
     b.close()
