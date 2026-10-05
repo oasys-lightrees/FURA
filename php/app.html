@@ -438,16 +438,11 @@ function stepAngka() {
 }
 
 function stepGantung() {
-  const t = totals(S.a.grid), due = duePromises(), day = today();
+  const t = totals(S.a.grid), day = today();
   return `${progress()}
     <h1>${t.hanging} yang masih gantung</h1>
     <p class="sub">Supaya tidak keskip, tiga hal ini perlu diisi.</p>
-    ${due.length ? `<h2>Janji kamu kemarin</h2>` + due.map(c => `
-      <label class="check"><input type="checkbox" data-resolve="${esc(c.id)}">
-        <span class="t"><span class="strong">${esc(c.action)}</span><br>
-        <span class="meta">janji ${esc(fmt(c.due))}${c.due < day ? " · sudah lewat" : ""} — sudah beres?</span>
-        </span></label>`).join("") : ""}
-    <div class="fld" style="margin-top:${due.length ? 22 : 0}px">
+    <div class="fld">
       <label for="detail">Yang mana saja?</label>
       <textarea id="detail" name="detail" placeholder="WAG Klien A — belum dibalas 4 hari">${esc(S.a.detail)}</textarea>
     </div>
@@ -474,6 +469,14 @@ function stepKirim() {
       ${t.hanging > 0 ? row("Rencana", S.a.plan + (S.a.due ? ` — ${fmt(S.a.due)}` : "")) : ""}
       <div><dt></dt><dd><button class="edit" type="button" data-goto="1">Ubah angka</button></dd></div>
     </div>
+    ${(() => { const due = duePromises(), day = today(); return due.length
+      ? `<h2>Janji kamu</h2>` + due.map(c => `
+        <label class="check"><input type="checkbox" data-resolve="${esc(c.id)}">
+          <span class="t"><span class="strong">${esc(c.action)}</span><br>
+          <span class="meta">janji ${esc(fmt(c.due))}${
+            c.due < day ? " · sudah lewat" : ""} — sudah beres?</span>
+          </span></label>`).join("")
+      : ""; })()}
     <div class="fld"><label for="escalation">Ada yang perlu Chief tahu?
       <span class="opt">— boleh dikosongkan</span>
       <span class="hint">Ini yang dia baca. Angkanya sudah otomatis.</span></label>

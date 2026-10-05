@@ -92,6 +92,35 @@ with sync_playwright() as p:
     check("setelah refresh tetap 'sudah terkirim'", txt(pg,"h1"), "Sudah terkirim")
     check("janji tampil di layar selesai", "Balas setelah harga" in pg.inner_text("body"))
 
+    print("\n--- janji ditutup pada hari yang justru bersih ---")
+    # Jalur yang paling mungkin terjadi: kamu janji mengejar Klien A, besoknya kamu
+    # benar-benar mengejarnya, jadi tidak ada lagi yang gantung. Kalau kotak centang
+    # janji hanya ada di langkah "gantung", langkah itu dilewati — dan orang yang
+    # MENEPATI janjinya justru tidak bisa menutupnya. Janjinya lalu patah sendiri.
+    from harness import store_of as _store
+    DUE = "2026-09-30"
+    pgC = new_page(ctx, "u_nicho", at=AT, store={
+      "roster": {"u_nicho": {"name": "Nicho", "joined": "2026-09-28"}},
+      "cycles": {},
+      "commitments": {"c-1": {"id": "c-1", "owner": "u_nicho", "action": "Telepon Klien A",
+                              "due": DUE, "status": "open", "from": "2026-09-29"}}})
+    for row, v in [("WAG", 6), ("TGG", 2), ("GCG", 1)]:
+        pgC.fill(f"[data-row={row}][data-col=open]", str(v))
+    pgC.fill("[data-row=WAG][data-col=reply]", "6")
+    pgC.wait_for_timeout(200)
+    check("hari bersih memang melewati langkah gantung",
+          txt(pgC, ".stepno"), "LANGKAH 1 DARI 2")
+    pgC.click("#next"); pgC.wait_for_timeout(300)
+    check("janji yang jatuh tempo tetap muncul di langkah kirim",
+          pgC.query_selector('[data-resolve="c-1"]') is not None)
+    check("lengkap dengan aksinya", txt(pgC, "body"), lambda s: "Telepon Klien A" in s)
+    pgC.check('[data-resolve="c-1"]')
+    pgC.check("[name=declared]")
+    pgC.click("#next"); pgC.wait_for_timeout(500)
+    check("laporannya terkirim", txt(pgC, "h1"), "Sudah terkirim")
+    check("dan janjinya tercatat DITEPATI, bukan patah",
+          _store(pgC)["commitments"]["c-1"]["status"], "kept")
+
     print("\n--- salah ketik, dibetulkan ---")
     pg.click("#edit"); pg.wait_for_timeout(350)
     check("laporan bisa dibuka lagi", txt(pg,"h1"), "Berapa banyak hari ini?")
