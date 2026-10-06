@@ -191,6 +191,21 @@ Chat::$send = function (string $text) use (&$sent): bool {
     return true;
 };
 
+/* ------------------------------------- janji yang ditulis beberapa baris */
+
+// Kolom rencananya textarea. Orang menekan Enter, dan baris keduanya dulu lepas dari
+// bullet dan dari namanya — terbaca seperti janji milik entah siapa.
+$panjang = chat_morning('2026-10-06', [
+    ['name' => 'Nicho', 'action_text' => "Balas setelah Onboarding selesai\nBalas setelah project selesai"],
+    ['name' => 'Rio',   'action_text' => 'Telepon Klien A'],
+]);
+$baris = array_values(array_filter(explode("\n", $panjang), fn($l) => str_starts_with($l, '- ')));
+eq('dua janji tetap dua baris, berapa pun Enter-nya', count($baris), 2);
+ok('baris kedua janji pertama ikut ke barisnya sendiri',
+   str_contains($baris[0], 'Onboarding') && str_contains($baris[0], 'project selesai'));
+ok('dan tetap membawa nama pemiliknya', str_starts_with($baris[0], '- Nicho — '));
+ok('janji orang kedua tidak tercampur', $baris[1] === '- Rio — Telepon Klien A');
+
 /* ------------------------------------------------ bentuk pesan minta bantuan */
 
 $pesan = chat_escalation("Rio D'Souza", 'Butuh Chief approve harga Klien A');

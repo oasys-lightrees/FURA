@@ -100,7 +100,11 @@ function chat_morning(string $today, array $duePromises): string
         $lines[] = '';
         $lines[] = 'Yang dijanjikan jatuh tempo hari ini:';
         foreach ($duePromises as $p) {
-            $lines[] = '- ' . $p['name'] . ' — ' . $p['action_text'];
+            // Kolom rencananya textarea, jadi orang boleh menekan Enter — dan memang
+            // begitu kejadiannya. Satu janji harus tetap satu baris di sini, kalau tidak
+            // baris keduanya lepas dari bullet dan dari nama pemiliknya.
+            $act = trim((string) preg_replace('/\s*\R\s*/u', ' · ', (string) $p['action_text']));
+            $lines[] = '- ' . $p['name'] . ' — ' . $act;
         }
     }
     $lines[] = '';

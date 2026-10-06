@@ -131,7 +131,7 @@ lib/require-php8.php  penjaga versi PHP, dibaca paling awal
 install.sql        enam tabel
 PASANG.txt         langkah pemasangan, bahasa non-teknis
 make-zip.sh        bikin messi-cpanel.zip
-tests/             245 pemeriksaan (tidak ikut ke server)
+tests/             249 pemeriksaan (tidak ikut ke server)
 ```
 
 ## Yang diputuskan server, bukan browser
@@ -169,7 +169,7 @@ menyebutkan mana yang barusan terjadi.
 |--------|--------|
 | `tests/test_engine.php` | 55 — aturan, dicocokkan dengan `tests/test_core.py` |
 | `tests/test_repo.php` | 57 — terhadap MySQL sungguhan, di database yang dia buat sendiri |
-| `tests/test_cron.php` | 42 — seminggu penuh jam demi jam, jam dibekukan, pesan bot ditangkap |
+| `tests/test_cron.php` | 46 — seminggu penuh jam demi jam, jam dibekukan, pesan bot ditangkap |
 | `tests/test_live.py` | 55 — browser terhadap aplikasi yang benar-benar jalan |
 | `tests/test_admin.py` | 36 — pemasangan pertama, tambah orang, ganti password, link sekali pakai |
 | `tests/check_sync.php` | memastikan `app.html` belum menyimpang dari `web/messi.html` |
