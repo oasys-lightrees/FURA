@@ -27,8 +27,13 @@ if (!$me) { header('Location: login.php'); exit; }
 if ($me['role'] !== 'admin') { http_response_code(403); exit('Halaman ini untuk admin.'); }
 
 $notice = null;
+// Setelan disimpan di tabel `settings`. Kalau pemasangannya belum meng-import versi
+// install.sql yang membuatnya, aplikasinya tetap jalan dengan pertanyaan bawaan — tapi
+// halaman ini tidak bisa menyimpan apa pun, dan harus mengatakannya di depan.
+$missing = messi_missing_tables();
+$noTable = in_array('settings', $missing, true);
 
-if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST') {
+if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST' && !$noTable) {
     csrf_check();
 
     if (($_POST['do'] ?? '') === 'reset') {
@@ -111,6 +116,8 @@ select { width:auto; }
 button { padding:0.5rem 0.875rem; font:inherit; font-size:0.875rem; font-weight:500;
          cursor:pointer; background:#1a1c1f; color:#fff; border:0; border-radius:0.375rem; }
 button.quiet { background:#faf9f6; color:#1a1c1f; border:1px solid #d9d5ce; }
+button[disabled] { opacity:0.45; cursor:not-allowed; }
+.note code { background:#f0ede8; padding:0.0625rem 0.3125rem; border-radius:0.25rem; }
 .note { padding:0.625rem 0.75rem; border-radius:0.5rem; margin:0 0 1rem; font-size:0.875rem; }
 .ok { background:#e8f0eb; color:#2f6248; }
 .warn { background:#f7eedd; color:#9a6410; }
@@ -133,6 +140,12 @@ a { color:#1a1c1f; }
   <p class="sub"><a href="index.php">← kembali ke laporan</a> · <a href="admin.php">Tim</a></p>
 
   <?php if ($notice): ?><p class="note ok"><?= h($notice) ?></p><?php endif; ?>
+  <?php if ($noTable): ?>
+    <p class="note warn"><strong>Belum bisa disimpan.</strong> Tabel <code>settings</code>
+       belum ada di database ini, jadi yang di bawah adalah pertanyaan bawaan dan
+       perubahannya tidak akan tersimpan. Laporan harian tetap jalan seperti biasa.<br>
+       <?= messi_import_again() ?></p>
+  <?php endif; ?>
 
   <form method="post">
   <input type="hidden" name="csrf" value="<?= h($csrf) ?>">
@@ -238,7 +251,7 @@ a { color:#1a1c1f; }
   </div>
 
   <div class="bar">
-    <button type="submit">Simpan</button>
+    <button type="submit"<?= $noTable ? ' disabled' : '' ?>>Simpan</button>
     <span>Berlaku untuk laporan berikutnya. Laporan yang sudah terkirim tidak berubah.</span>
   </div>
   </form>

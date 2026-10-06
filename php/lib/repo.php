@@ -26,11 +26,30 @@ final class Cfg
     public static function get(): array
     {
         if (self::$held === null) {
-            $row = q1('SELECT value FROM settings WHERE name = ?', ['messi']);
-            $raw = $row ? json_decode((string) $row['value'], true) : null;
-            self::$held = messi_config_normalize($raw);
+            self::$held = messi_config_normalize(self::stored());
         }
         return self::$held;
+    }
+
+    /**
+     * Setelan tersimpan, atau null kalau belum ada.
+     *
+     * Tabel yang belum dibuat bukan alasan untuk mematikan aplikasinya: setelan punya
+     * bawaan, dan bawaan itu persis yang dipakai sebelum halaman setelan ada. Yang
+     * memberitahu bahwa tabelnya kurang adalah messi_require_ready(), satu halaman yang
+     * menyebutkan nama tabelnya dan cara membuatnya — bukan 500 kosong dari sini.
+     */
+    private static function stored(): ?array
+    {
+        try {
+            $row = q1('SELECT value FROM settings WHERE name = ?', ['messi']);
+        } catch (PDOException $e) {
+            if ($e->getCode() === '42S02') {
+                return null;
+            }
+            throw $e;
+        }
+        return $row ? json_decode((string) $row['value'], true) : null;
     }
 
     /** Dipakai setelah admin menyimpan, dan oleh tes yang berganti setelan. */

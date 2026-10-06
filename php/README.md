@@ -132,7 +132,7 @@ soal.php           halaman admin: pertanyaan, ambang, jam, channel
 install.sql        tujuh tabel
 PASANG.txt         langkah pemasangan, bahasa non-teknis
 make-zip.sh        bikin messi-cpanel.zip
-tests/             340 pemeriksaan (tidak ikut ke server)
+tests/             352 pemeriksaan (tidak ikut ke server)
 ```
 
 ## Yang diputuskan server, bukan browser
@@ -181,10 +181,10 @@ menyebutkan mana yang barusan terjadi.
 | Berkas | Isinya |
 |--------|--------|
 | `tests/test_engine.php` | 99 — aturan, dicocokkan dengan `tests/test_core.py` |
-| `tests/test_repo.php` | 81 — terhadap MySQL sungguhan, di database yang dia buat sendiri |
+| `tests/test_repo.php` | 85 — terhadap MySQL sungguhan, di database yang dia buat sendiri |
 | `tests/test_cron.php` | 46 — seminggu penuh jam demi jam, jam dibekukan, pesan bot ditangkap |
 | `tests/test_live.py` | 57 — browser terhadap aplikasi yang benar-benar jalan |
-| `tests/test_admin.py` | 57 — pemasangan pertama, tambah orang, ganti password, link sekali pakai, mengubah pertanyaan |
+| `tests/test_admin.py` | 65 — pemasangan pertama, tambah orang, ganti password, link sekali pakai, mengubah pertanyaan |
 | `tests/check_sync.php` | memastikan `app.html` belum menyimpang dari `web/messi.html` |
 
 Yang dicoba juga: laporan atas nama orang lain, permintaan tanpa token, cron tanpa kunci,

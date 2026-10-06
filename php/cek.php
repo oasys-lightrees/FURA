@@ -61,7 +61,7 @@ if ($hasConfig) {
     try {
         $db = db();
         row('ok', 'Koneksi database', 'berhasil');
-        $want = ['users', 'sessions', 'login_tokens', 'cycles', 'commitments', 'job_log', 'settings'];
+        $want = MESSI_TABLES;
         $tables = $db->query('SHOW TABLES')->fetchAll(PDO::FETCH_COLUMN);
         $missing = array_diff($want, $tables);
         row($missing ? 'bad' : 'ok', 'Tabel', $missing

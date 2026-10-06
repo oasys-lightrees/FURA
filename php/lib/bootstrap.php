@@ -35,10 +35,10 @@ function messi_stop(string $title, string $detail, string $whatToDo): void
     }
     header('Content-Type: text/html; charset=utf-8');
     $e = fn($t) => htmlspecialchars($t, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
-    echo '<!doctype html><meta charset="utf-8"><title>MESSI belum siap</title>'
+    echo '<!doctype html><meta charset="utf-8"><title>FURA belum siap</title>'
        . '<div style="max-width:34rem;margin:4rem auto;padding:0 1.5rem;'
        . 'font:400 16px/1.6 system-ui,-apple-system,sans-serif;color:#1a1c1f">'
-       . '<p style="color:#6b6d73;font-size:14px;margin:0">MESSI belum siap dipakai</p>'
+       . '<p style="color:#6b6d73;font-size:14px;margin:0">FURA belum siap dipakai</p>'
        . '<h1 style="font-size:1.25rem;margin:.25rem 0 1rem">' . $e($title) . '</h1>'
        . ($detail === '' ? '' : '<p style="background:#f7e7e4;color:#97322a;padding:.75rem 1rem;'
          . 'border-radius:.5rem;font-size:14px;margin:0 0 1rem">' . $e($detail) . '</p>')
@@ -115,23 +115,51 @@ function db(): PDO
  * Checked once on every page a person can open, so a half-finished install says what is
  * missing on the first screen rather than on the first click.
  */
+/**
+ * Tabel yang dibutuhkan, dipisah menurut akibat kalau hilang.
+ *
+ * Tanpa salah satu tabel inti tidak ada yang bisa dikerjakan sama sekali. `settings` lain
+ * urusannya: setelan punya bawaan, jadi pelaporan harian tetap jalan tanpa tabel itu —
+ * yang hilang cuma kemampuan admin menyimpan perubahan. Mematikan seluruh aplikasi untuk
+ * itu akan menghukum delapan orang karena satu langkah pemasangan yang terlewat.
+ */
+const MESSI_TABLES_CORE = ['users', 'sessions', 'login_tokens', 'cycles', 'commitments',
+                           'job_log'];
+const MESSI_TABLES = ['users', 'sessions', 'login_tokens', 'cycles', 'commitments',
+                      'job_log', 'settings'];
+
+/** Tabel mana saja yang belum ada. Dipakai halaman cek dan halaman setelan. */
+function messi_missing_tables(): array
+{
+    $have = db()->query('SHOW TABLES')->fetchAll(PDO::FETCH_COLUMN);
+    return array_values(array_diff(MESSI_TABLES, $have));
+}
+
+function messi_import_again(): string
+{
+    return 'Buka <em>phpMyAdmin</em> di cPanel, pilih databasenya di kiri, lalu tab '
+        . '<em>Import</em> &rarr; pilih <code>install.sql</code> &rarr; <em>Go</em>. '
+        . 'Aman diulang walaupun tabel lain sudah ada: data yang sudah tersimpan tidak '
+        . 'tersentuh, yang terjadi cuma tabel yang kurang ikut dibuat. '
+        . 'Setelah itu harus ada ' . count(MESSI_TABLES) . ' tabel.';
+}
+
+/**
+ * Seluruh tabel inti diperiksa, bukan satu.
+ *
+ * Dulu yang diperiksa cuma `users`, jadi pemasangan lama yang kehilangan satu tabel baru
+ * lolos di sini lalu mati dengan halaman 500 kosong beberapa baris kemudian — persis
+ * kegagalan yang halaman ini ada untuk mencegahnya. Yang kurang disebutkan namanya.
+ */
 function messi_require_ready(): void
 {
-    try {
-        db()->query('SELECT 1 FROM users LIMIT 1');
-    } catch (PDOException $e) {
-        // 42S02 is "table doesn't exist": the database is fine, install.sql never ran.
-        if (($e->getCode() === '42S02') || str_contains($e->getMessage(), 'users')) {
-            messi_stop(
-                'Tabelnya belum dibuat',
-                $e->getMessage(),
-                'Buka <em>phpMyAdmin</em> di cPanel, pilih databasenya di kiri, lalu tab '
-                . '<em>Import</em> &rarr; pilih <code>install.sql</code> &rarr; <em>Go</em>. '
-                . 'Setelah itu harus ada enam tabel.'
-            );
-        }
-        throw $e;
+    $have = db()->query('SHOW TABLES')->fetchAll(PDO::FETCH_COLUMN);
+    $missing = array_values(array_diff(MESSI_TABLES_CORE, $have));
+    if (!$missing) {
+        return;
     }
+    messi_stop('Tabelnya belum dibuat', 'Yang kurang: ' . implode(', ', $missing),
+               messi_import_again());
 }
 
 function q(string $sql, array $args = []): PDOStatement

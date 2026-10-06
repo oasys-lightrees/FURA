@@ -389,6 +389,29 @@ ok('tapi tidak pernah membocorkan passwordnya',
    !str_contains((string) $out, 'bukan_password'));
 unlink($bad);
 
+// Satu tabel yang kurang. Ini pemasangan lama yang belum meng-import versi barunya —
+// dan dulu ia lolos pemeriksaan kesiapan lalu mati dengan 500 kosong beberapa baris
+// setelahnya, yang justru kegagalan yang halaman ini ada untuk mencegahnya.
+Cfg::forget();
+$root->exec('DROP TABLE settings');
+try {
+    $tanpaTabel = repo_config();
+} catch (Throwable $e) {
+    $tanpaTabel = 'MELEDAK: ' . $e->getMessage();
+}
+eq('tabel setelan yang hilang tidak mematikan aplikasinya, cuma kembali ke bawaannya',
+   $tanpaTabel, messi_config_default());
+$out = shell_exec('cd ' . escapeshellarg(dirname(__DIR__)) . ' && MESSI_TEST_DB='
+    . escapeshellarg($GLOBALS['MESSI_TEST_DBNAME'])
+    . ' php tests/probe_unready.php 2>&1');
+ok('dan tidak menghentikan siapa pun dari melapor',
+   !str_contains((string) $out, 'Tabelnya belum dibuat'));
+eq('yang kurang tetap bisa disebutkan namanya, untuk halaman yang memang perlu',
+   messi_missing_tables(), ['settings']);
+ok('jalan keluarnya satu kalimat yang sama di mana pun',
+   str_contains(messi_import_again(), 'install.sql')
+     && str_contains(messi_import_again(), 'Aman diulang'));
+
 // Tables missing: the database is reachable but install.sql was never imported.
 $root->exec('DROP TABLE IF EXISTS commitments, cycles, login_tokens, sessions, job_log, settings, users');
 $out = shell_exec('cd ' . escapeshellarg(dirname(__DIR__)) . ' && MESSI_TEST_DB='

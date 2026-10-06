@@ -27,6 +27,14 @@ from livehost import PASSWORD, Host, sign_in
 
 NEW_PASSWORD = "password-baru-yang-panjang"
 
+# install.sql dijalankan ulang persis seperti phpMyAdmin menjalankannya: baris komentar
+# dibuang dulu, baru dipecah per titik koma.
+REIMPORT = """require 'lib/bootstrap.php';
+$sql = preg_replace('/^--.*$/m', '', file_get_contents('install.sql'));
+foreach (explode(';', $sql) as $one) {
+    if (trim($one) !== '') { db()->exec($one); }
+}"""
+
 
 def status(pg, path, base):
     return pg.evaluate("async p => (await fetch(p)).status", base + path)
@@ -352,6 +360,53 @@ with Host("messi_admin_test", seed="empty") as host, sync_playwright() as p:
     admin.wait_for_load_state("networkidle")
     check("dan penyusupnya tidak masuk daftar",
           admin.inner_text("body"), lambda s: "Penyusup" not in s)
+
+    print("\n=== pemasangan lama yang kurang satu tabel ===")
+    # Gejala yang benar-benar dilihat orangnya: halaman 500 kosong. Diuji dari sisi
+    # browser, bukan cuma dari fungsinya, karena yang kosong itulah yang tidak bisa
+    # ditindaklanjuti siapa pun.
+    host.php("-r", 'require "lib/bootstrap.php"; db()->exec("DROP TABLE settings");')
+    admin.goto(host.base + "/index.php")
+    admin.wait_for_load_state("networkidle")
+    admin.wait_for_timeout(700)
+    # Pelaporan harian tidak boleh ikut mati karena satu tabel setelan: setelan punya
+    # bawaan, dan delapan orang tidak boleh berhenti bekerja karena satu langkah
+    # pemasangan yang terlewat.
+    check("aplikasinya tetap jalan dengan pertanyaan bawaan",
+          admin.inner_text("body"), lambda s: "Modul" in s or "Berapa banyak" in s)
+
+    admin.goto(host.base + "/soal.php")
+    admin.wait_for_load_state("networkidle")
+    soal = admin.inner_text("body")
+    check("halaman pertanyaan mengatakan kenapa belum bisa menyimpan",
+          soal, lambda s: "Belum bisa disimpan" in s and "settings" in s)
+    check("beserta jalan keluarnya", soal,
+          lambda s: "install.sql" in s and "Aman diulang" in s)
+    check("dan tombol simpannya dimatikan, bukan dibiarkan menipu",
+          admin.is_disabled("button:has-text('Simpan')"))
+    # Tombol yang dimatikan cuma menghalangi klik. Yang mengirim lewat jalan lain harus
+    # tetap mendapat halaman, bukan 500 — itu justru yang sedang dibetulkan di sini.
+    paksa = admin.evaluate(
+        """async ([url, csrf]) => {
+             const body = new URLSearchParams({ csrf, threshold_days: "7" });
+             const r = await fetch(url, { method: "POST", body });
+             return r.status;
+           }""", [host.base + "/soal.php",
+                  admin.get_attribute("input[name=csrf]", "value")])
+    check("mengirim paksa pun tidak meledakkan halamannya", paksa, 200)
+
+    admin.goto(host.base + "/cek.php")
+    admin.wait_for_load_state("networkidle")
+    check("halaman cek hosting ikut menyebutkannya",
+          admin.inner_text("body"), lambda s: "kurang: settings" in s)
+
+    # Dan import ulang memang memulihkannya, tanpa menyentuh data yang sudah ada.
+    host.php("-r", REIMPORT)
+    admin.goto(host.base + "/admin.php")
+    admin.wait_for_load_state("networkidle")
+    check("import ulang memulihkannya", admin.inner_text("h1"), "Tim")
+    check("dan orang-orangnya masih ada", admin.inner_text("body"),
+          lambda s: "oki@example.test" in s)
 
     other.close()
     pctx.close()

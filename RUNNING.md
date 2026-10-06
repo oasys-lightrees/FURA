@@ -58,7 +58,7 @@ PY
 web/               THE PAGE PEOPLE USE — messi.html, plus the flow spec and the demo
 web/tests/         223 browser checks (player, manager, edge cases, keyboard, catalogue)
 php/               the same page, deployable: PHP + MySQL, cPanel, Google Chat, hourly cron
-php/tests/         340 checks — rules, a real MySQL, a simulated week, the running app
+php/tests/         352 checks — rules, a real MySQL, a simulated week, the running app
 core/messi_core/   pure rules: cadence, period keys, state machines. No web, no ORM.
 app/               FastAPI app, schema.sql, templates, seed, CLI
 tests/             pytest over core/ — runs without a database
