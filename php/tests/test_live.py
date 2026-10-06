@@ -75,11 +75,19 @@ with Host("messi_live_test") as host, sync_playwright() as p:
     check("yang gantung memunculkan langkah keduanya",
           pg.inner_text("body"), lambda s: "gantung" in s.lower())
 
-    pg.fill("[name=detail]", "WAG Klien A belum dibalas")
-    pg.fill("[name=plan]", "Telepon pagi")
+    pg.fill("[name=detail]", "WAG Klien A belum dibalas, TGG Vendor B belum diputus")
+    pg.fill("[data-pa='0']", "Telepon pagi")
     due = pg.evaluate(
         "() => { const t = new Date(Date.now() + 2*864e5); return t.toISOString().slice(0,10); }")
-    pg.fill("[name=due]", due)
+    due2 = pg.evaluate(
+        "() => { const t = new Date(Date.now() + 4*864e5); return t.toISOString().slice(0,10); }")
+    pg.fill("[data-pd='0']", due)
+    # Dua rencana dengan tanggal berbeda, lewat jalur sungguhan: halaman -> save.php ->
+    # MySQL. Bentuk daftarnya hanya benar kalau sampai ke tabel commitments utuh.
+    pg.click("#addPlan")
+    pg.wait_for_timeout(200)
+    pg.fill("[data-pa='1']", "Putuskan vendor B")
+    pg.fill("[data-pd='1']", due2)
     pg.click("#next")
     pg.wait_for_timeout(300)
     pg.check("[name=declared]")
@@ -99,6 +107,13 @@ with Host("messi_live_test") as host, sync_playwright() as p:
           pg2.inner_text("h1"), "Sudah terkirim")
     check("janji yang tadi dibuat ikut tersimpan", pg2.inner_text("body"),
           lambda s: "Telepon pagi" in s)
+    rows = host.php("-r", """
+        require "lib/bootstrap.php";
+        foreach (q("SELECT action_text, due_date, status FROM commitments ORDER BY due_date")
+                 as $r) { echo $r["action_text"], "|", $r["due_date"], "|", $r["status"], "\n"; }
+    """).stdout.strip().splitlines()
+    check("dua rencana jadi dua janji di database", rows,
+          [f"Telepon pagi|{due}|open", f"Putuskan vendor B|{due2}|open"])
     check("hari yang terlewat dikenali dari tanggal masuk di database",
           pg2.inner_text("body"), lambda s: "tidak lapor" in s)
     pg2.click("text=Lihat")
@@ -122,6 +137,11 @@ with Host("messi_live_test") as host, sync_playwright() as p:
     pg.wait_for_timeout(200)
     pg.click("#next")
     pg.wait_for_timeout(300)
+    check("rencana yang dulu diisi juga kembali, bukan kosong",
+          pg.eval_on_selector_all("[data-pa]", "e=>e.map(x=>x.value)"),
+          ["Telepon pagi", "Putuskan vendor B"])
+    pg.click("[data-drop='1']")       # vendor B ternyata tidak perlu diputus
+    pg.wait_for_timeout(250)
     pg.click("#next")
     pg.wait_for_timeout(300)
     if pg.query_selector("[name=declared]"):
@@ -131,9 +151,11 @@ with Host("messi_live_test") as host, sync_playwright() as p:
     check("perbaikan ikut terkirim", pg.inner_text("h1"), "Sudah terkirim")
     promises = host.php("-r", """
         require "lib/bootstrap.php";
-        echo (string) q1("SELECT COUNT(*) n FROM commitments WHERE status = 'open'")["n"];
-    """).stdout.strip()
-    check("memperbaiki laporan tidak meninggalkan janji kedua", promises, "1")
+        foreach (q("SELECT action_text, status FROM commitments ORDER BY due_date") as $r) {
+            echo $r["action_text"], "|", $r["status"], "\n"; }
+    """).stdout.strip().splitlines()
+    check("memperbaiki laporan tidak meninggalkan janji kedua",
+          promises, [f"Telepon pagi|open", "Putuskan vendor B|cancelled"])
     days = host.php("-r", """
         require "lib/bootstrap.php";
         echo (string) q1("SELECT COUNT(*) n FROM cycles WHERE submitted_at IS NOT NULL")["n"];

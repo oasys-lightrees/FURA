@@ -163,6 +163,66 @@ eq('the day after, only their own first day counts against them',
 eq('but someone who was here is',
    messi_missed_days([], '2026-09-28', '2026-09-30'), ['2026-09-29', '2026-09-28']);
 
+/* --------------------------------------------------- beberapa janji sekaligus */
+
+// Hari pertama pemakaian nyata: tiga hal gantung, tiga rencana, tanggal berbeda-beda.
+$tiga = ['grid' => $goodGrid, 'detail' => 'WAG Klien A, TGG Vendor B, GCG PT Sinar',
+         'declared' => true, 'plans' => [
+             ['action' => 'Balas setelah Onboarding selesai', 'due' => '2026-10-01'],
+             ['action' => 'Balas setelah project selesai',    'due' => '2026-10-02'],
+             ['action' => 'Balas setelah pemasangan selesai', 'due' => '2026-10-05'],
+         ]];
+$dita = make_user('dita@example.test', 'Dita', 'player', '2026-09-28');
+repo_save_cycle($dita, uid((int) $dita['id']) . '__2026-09-30', $tiga);
+
+$janji = fn() => q('SELECT action_text, due_date, status FROM commitments
+                     WHERE user_id = ? ORDER BY due_date', [$dita['id']])->fetchAll();
+
+eq('tiga rencana jadi tiga janji', count($janji()), 3);
+eq('masing-masing membawa tanggalnya sendiri',
+   array_column($janji(), 'due_date'), ['2026-10-01', '2026-10-02', '2026-10-05']);
+
+// Memperbaiki laporan: satu tanggal digeser, satu baris dibuang, satu baris ditambah.
+repo_save_cycle($dita, uid((int) $dita['id']) . '__2026-09-30',
+    ['grid' => $goodGrid, 'detail' => 'dua saja', 'declared' => true, 'plans' => [
+        ['action' => 'Balas setelah Onboarding selesai', 'due' => '2026-10-06'],  // digeser
+        ['action' => 'Balas setelah pemasangan selesai', 'due' => '2026-10-05'],  // tetap
+        ['action' => 'Susul Vendor C',                   'due' => '2026-10-07'],  // baru
+    ]]);
+$now = $janji();
+eq('tanggal yang digeser ikut berubah, bukan bikin janji baru',
+   count(array_filter($now, fn($c) => $c['action_text'] === 'Balas setelah Onboarding selesai')), 1);
+eq('dan tanggalnya yang baru',
+   array_values(array_filter($now, fn($c) => $c['action_text'] === 'Balas setelah Onboarding selesai'))[0]['due_date'],
+   '2026-10-06');
+eq('baris yang dibuang dibatalkan, bukan dihapus diam-diam',
+   array_values(array_filter($now, fn($c) => $c['action_text'] === 'Balas setelah project selesai'))[0]['status'],
+   'cancelled');
+eq('baris baru jadi janji baru',
+   count(array_filter($now, fn($c) => $c['action_text'] === 'Susul Vendor C')), 1);
+eq('yang tidak disentuh tetap terbuka',
+   array_values(array_filter($now, fn($c) => $c['action_text'] === 'Balas setelah pemasangan selesai'))[0]['status'],
+   'open');
+
+// Janji yang sudah ditutup bukan milik laporan untuk diubah lagi.
+$sudah = array_values(array_filter($janji(), fn($c) => $c['action_text'] === 'Susul Vendor C'));
+$sudahId = (int) q1('SELECT id FROM commitments WHERE action_text = ?', ['Susul Vendor C'])['id'];
+repo_resolve_commitment($dita, cid($sudahId), ['status' => 'kept']);
+repo_save_cycle($dita, uid((int) $dita['id']) . '__2026-09-30',
+    ['grid' => $goodGrid, 'detail' => 'tinggal satu', 'declared' => true, 'plans' => [
+        ['action' => 'Balas setelah pemasangan selesai', 'due' => '2026-10-05'],
+    ]]);
+eq('janji yang sudah ditepati tidak ikut dibatalkan walau barisnya dibuang',
+   q1('SELECT status FROM commitments WHERE id = ?', [$sudahId])['status'], 'kept');
+
+// Bentuk lama tetap jalan — laporan dua minggu pertama memakainya.
+$lama = make_user('lama@example.test', 'Lama', 'player', '2026-09-28');
+repo_save_cycle($lama, uid((int) $lama['id']) . '__2026-09-30',
+    ['grid' => $goodGrid, 'detail' => 'satu', 'plan' => 'Telepon Klien A',
+     'due' => '2026-10-02', 'declared' => true]);
+eq('laporan bentuk lama tetap menghasilkan satu janji',
+   (int) q1('SELECT COUNT(*) n FROM commitments WHERE user_id = ?', [$lama['id']])['n'], 1);
+
 /* ------------------------------------------------- permintaan bantuan */
 
 // Yang diam dikejar; yang bicara harus didengar. Permintaan bantuan diumumkan saat

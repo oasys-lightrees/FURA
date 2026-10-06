@@ -173,6 +173,42 @@ function messi_missed_days(array $cyclesByDay, string $joinedOn, string $today, 
     return $out;
 }
 
+/* ------------------------------------------------------------------- rencana */
+
+const MESSI_MAX_PLANS = 5;   // lebih dari ini bukan sapuan harian lagi, tapi daftar tugas
+
+/**
+ * Rencana sebuah laporan, selalu sebagai daftar.
+ *
+ * Laporan lama menyimpan satu `plan` + `due`; yang baru menyimpan `plans`. Dibaca di satu
+ * tempat saja supaya laporan dua minggu pertama tetap terbaca utuh tanpa diubah apa pun
+ * di database.
+ */
+function messi_plans(array $a): array
+{
+    $rows = [];
+    if (isset($a['plans']) && is_array($a['plans'])) {
+        $rows = $a['plans'];
+    } elseif (($a['plan'] ?? '') !== '' || ($a['due'] ?? '') !== '') {
+        $rows = [['action' => $a['plan'] ?? '', 'due' => $a['due'] ?? '']];
+    }
+    $out = [];
+    foreach ($rows as $r) {
+        if (!is_array($r)) {
+            continue;
+        }
+        $action = trim((string) ($r['action'] ?? ''));
+        $due = trim((string) ($r['due'] ?? ''));
+        if ($action !== '' || $due !== '') {
+            $out[] = ['action' => $action, 'due' => $due];
+        }
+        if (count($out) >= MESSI_MAX_PLANS) {
+            break;
+        }
+    }
+    return $out;
+}
+
 /* ----------------------------------------------------------------- validation */
 
 /** Consistency first: the declaration attests that the figures above are true, so asking
@@ -199,11 +235,17 @@ function messi_validate(array $a, array $channels): ?string
         if (trim((string) ($a['detail'] ?? '')) === '') {
             return 'Tulis dulu yang mana saja yang gantung.';
         }
-        if (trim((string) ($a['plan'] ?? '')) === '') {
+        $plans = messi_plans($a);
+        if (!$plans) {
             return 'Tulis rencananya.';
         }
-        if (trim((string) ($a['due'] ?? '')) === '') {
-            return 'Pilih tanggalnya. Tanpa tanggal, tidak ada yang bisa mengingatkan.';
+        foreach ($plans as $p) {
+            if ($p['action'] === '') {
+                return 'Ada tanggal tanpa rencana. Tulis rencananya, atau hapus barisnya.';
+            }
+            if ($p['due'] === '') {
+                return 'Pilih tanggalnya. Tanpa tanggal, tidak ada yang bisa mengingatkan.';
+            }
         }
     }
     if (empty($a['declared'])) {
@@ -236,10 +278,18 @@ function messi_build_report(array $doc, string $reporter, array $channelDefs): s
         $v = trim((string) $v);
         return $k . ': ' . ($v === '' ? 'Belum ada' : $v);
     };
-    $plan = trim((string) ($doc['plan'] ?? ''));
-    if ($plan !== '' && trim((string) ($doc['due'] ?? '')) !== '') {
-        $plan .= ' (target ' . messi_fmt_day($doc['due']) . ')';
+    // Satu rencana tetap berbentuk satu baris, persis seperti laporan yang sudah dikenal
+    // squad. Baru menjadi daftar begitu rencananya lebih dari satu.
+    $rows = [];
+    foreach (messi_plans($doc) as $p) {
+        $rows[] = $p['action'] . ($p['due'] !== '' ? ' (target ' . messi_fmt_day($p['due']) . ')' : '');
     }
+    // $line() memangkas spasi di ujung, jadi daftar berbutir disusun di luar helper itu —
+    // kalau tidak, butir pertamanya naik ke baris judulnya.
+    $planLine = count($rows) > 1
+        ? 'g. Rencana:' . "\n- " . implode("\n- ", $rows)
+        : null;
+    $plan = $rows[0] ?? '';
 
     return implode("\n", [
         'MESSI Report',
@@ -254,7 +304,7 @@ function messi_build_report(array $doc, string $reporter, array $channelDefs): s
         'd. Tidak gantung: ' . $t['clear'],
         'e. Sudah dibalas hari ini: ' . $t['reply'],
         $line('f. Yang masih gantung', $doc['detail'] ?? ''),
-        $line('g. Rencana', $plan),
+        $planLine ?? $line('g. Rencana', $plan),
         $line('h. Eskalasi', $doc['escalation'] ?? ''),
         $line('i. Calon PRISTA baru', $doc['prista'] ?? ''),
         '',

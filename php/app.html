@@ -174,6 +174,18 @@ h2 { font-size:11.5px; font-weight:700; letter-spacing:.09em; text-transform:upp
 .btn.sec { background:var(--surface); color:var(--ink); border-color:var(--line); flex:0 0 auto;
            min-width:96px; }
 .saved { font-size:12.5px; color:var(--muted); text-align:center; margin-top:9px; }
+.prow2 { position:relative; border:1px solid var(--line); border-radius:12px;
+         padding:13px 13px 1px; margin-bottom:10px; background:var(--raise); }
+.prow2 .fld { margin-bottom:12px; }
+.prow2 textarea { min-height:60px; }
+.drop { position:absolute; top:9px; right:9px; width:30px; height:30px; border-radius:50%;
+        font:inherit; font-size:13px; line-height:1; cursor:pointer; color:var(--muted);
+        background:var(--surface); border:1px solid var(--line); }
+.drop:hover { color:var(--broken); border-color:var(--broken); }
+.addplan { width:100%; padding:12px; font:inherit; font-size:14.5px; font-weight:600;
+           color:var(--muted); background:none; border:1px dashed var(--line);
+           border-radius:12px; cursor:pointer; }
+.addplan:hover { color:var(--ink); border-color:var(--ink); }
 .daynav { display:flex; align-items:center; justify-content:space-between; gap:10px;
           margin:0 0 14px; font-size:14px; }
 .daynav b { font-weight:600; }
@@ -347,7 +359,29 @@ const mine = day => S.cycles.get(key(S.me, day));
 const myPromises = () => [...S.commitments.values()]
   .filter(c => c.owner === S.me && c.status === "open").sort((a,b) => a.due.localeCompare(b.due));
 const duePromises = () => myPromises().filter(c => c.due <= today());
-const blank = () => ({ grid:{}, detail:"", plan:"", due:"", escalation:"", prista:"", declared:false });
+const MAX_PLANS = 5;      // lebih dari ini bukan sapuan harian lagi, tapi daftar tugas
+const blank = () => ({ grid:{}, detail:"", plans:[{action:"",due:""}],
+                       escalation:"", prista:"", declared:false });
+
+/** Rencana sebagai daftar, apa pun bentuk simpanannya. Laporan dua minggu pertama
+ *  memakai satu `plan` + `due`; dibaca di satu tempat supaya tetap terbuka utuh. */
+function rawPlans(a) {
+  a = a || {};
+  const rows = Array.isArray(a.plans) ? a.plans
+    : (a.plan || a.due) ? [{ action:a.plan || "", due:a.due || "" }] : [];
+  return rows.filter(r => r && typeof r === "object")
+             .map(r => ({ action:(r.action || "").trim(), due:(r.due || "").trim() }));
+}
+
+/** Yang disimpan dan divalidasi: baris kosong bukan rencana, jadi tidak dihitung. */
+function plansOf(a) { return rawPlans(a).filter(r => r.action || r.due).slice(0, MAX_PLANS); }
+
+/** Yang sedang diisi di layar. Beda dari plansOf: baris kosong dipertahankan — orang yang
+ *  baru menekan "+ tambah rencana" harus melihat barisnya, bukan melihatnya hilang lagi. */
+function planRows(a) {
+  const rows = rawPlans(a).slice(0, MAX_PLANS);
+  return rows.length ? rows : [{ action:"", due:"" }];
+}
 
 /* ---- drafts -------------------------------------------------------------- */
 function saveDraft(day, a) {
@@ -423,8 +457,12 @@ function checkStep() {
   }
   if (stepName() === "gantung") {
     if (!S.a.detail.trim()) return "Tulis dulu yang mana saja yang gantung.";
-    if (!S.a.plan.trim())   return "Tulis rencananya.";
-    if (!S.a.due)           return "Pilih tanggalnya. Tanpa tanggal, tidak ada yang bisa mengingatkan.";
+    const rows = plansOf(S.a);
+    if (!rows.length) return "Tulis rencananya.";
+    for (const r of rows) {
+      if (!r.action) return "Ada tanggal tanpa rencana. Tulis rencananya, atau hapus barisnya.";
+      if (!r.due)    return "Pilih tanggalnya. Tanpa tanggal, tidak ada yang bisa mengingatkan.";
+    }
   }
   if (stepName() === "kirim" && !S.a.declared) return "Centang pernyataannya dulu.";
   return null;
@@ -441,10 +479,22 @@ function submitNow(resolved) {
     c.status = day <= c.due ? "kept" : "broken"; c.resolvedAt = day;
     put("commitments", id, c);
   }
-  if (S.a.plan && S.a.due) {
-    const id = "c-" + S.me + "-" + Date.now().toString(36);
-    const c = { id, owner:S.me, action:S.a.plan, due:S.a.due, status:"open", from:day };
+  // Satu janji per baris rencana. Dicocokkan lewat teksnya, bukan urutannya — menghapus
+  // baris pertama akan menggeser semua, dan janji orang jadi tertukar.
+  const mineToday = [...S.commitments.values()]
+    .filter(c => c.owner === S.me && c.from === day && c.status === "open");
+  const wanted = plansOf(S.a).filter(r => r.action && r.due);
+  for (const r of wanted) {
+    const found = mineToday.find(c => c.action === r.action);
+    if (found) { found.due = r.due; put("commitments", found.id, found); continue; }
+    const id = "c-" + S.me + "-" + Date.now().toString(36) + "-" + Math.random().toString(36).slice(2, 6);
+    const c = { id, owner:S.me, action:r.action, due:r.due, status:"open", from:day };
     S.commitments.set(id, c); put("commitments", id, c);
+  }
+  for (const c of mineToday) {
+    if (!wanted.some(r => r.action === c.action)) {
+      c.status = "cancelled"; c.resolvedAt = day; put("commitments", c.id, c);
+    }
   }
   clearDraft(day); S.editing = false; S.step = 1;
 }
@@ -491,7 +541,22 @@ function stepAngka() {
 }
 
 function stepGantung() {
-  const t = totals(S.a.grid), day = today();
+  const t = totals(S.a.grid), day = today(), rows = planRows(S.a);
+  // Mulai dari satu baris. Orang dengan satu rencana harus melihat layar yang sama
+  // persis seperti sebelumnya — baris kedua hanya ada kalau dia memintanya.
+  const plan = (r, i) => `<div class="prow2" data-plan="${i}">
+      <div class="fld">
+        <label for="plan${i}">Mau diapakan?</label>
+        <textarea id="plan${i}" data-pa="${i}" rows="2"
+          placeholder="Balas setelah harga di-approve">${esc(r.action)}</textarea>
+      </div>
+      <div class="fld">
+        <label for="due${i}">Kapan beres?</label>
+        <input id="due${i}" data-pd="${i}" type="date" min="${esc(day)}" value="${esc(r.due)}">
+      </div>
+      ${rows.length > 1 ? `<button class="drop" type="button" data-drop="${i}"
+        aria-label="Hapus rencana ini">✕</button>` : ""}
+    </div>`;
   return `${progress()}
     <h1>${t.hanging} yang masih gantung</h1>
     <p class="sub">Supaya tidak keskip, tiga hal ini perlu diisi.</p>
@@ -499,11 +564,11 @@ function stepGantung() {
       <label for="detail">Yang mana saja?</label>
       <textarea id="detail" name="detail" placeholder="WAG Klien A — belum dibalas 4 hari">${esc(S.a.detail)}</textarea>
     </div>
-    <div class="fld"><label for="plan">Mau diapakan?</label>
-      <textarea id="plan" name="plan" placeholder="Balas setelah harga di-approve">${esc(S.a.plan)}</textarea></div>
-    <div class="fld"><label for="due">Kapan beres?
-      <span class="hint">Nanti kamu diingatkan tepat di tanggal ini — bukan tiap hari.</span></label>
-      <input id="due" name="due" type="date" min="${esc(day)}" value="${esc(S.a.due)}"></div>`;
+    <p class="hint" style="margin:0 0 10px">Tiap rencana punya tanggalnya sendiri. Nanti kamu
+      diingatkan tepat di tanggal itu — bukan tiap hari.</p>
+    ${rows.map(plan).join("")}
+    ${rows.length < MAX_PLANS
+      ? `<button class="addplan" type="button" id="addPlan">+ tambah rencana</button>` : ""}`;
 }
 
 function stepKirim() {
@@ -519,7 +584,8 @@ function stepKirim() {
       ${row("Gantung", t.hanging === 0 ? "tidak ada" : `${t.hanging}  (${t.gt3} lebih dari 3 hari)`, true)}
       ${row("Dibalas", String(t.reply), true)}
       ${t.hanging > 0 ? row("Yang gantung", S.a.detail) : ""}
-      ${t.hanging > 0 ? row("Rencana", S.a.plan + (S.a.due ? ` — ${fmt(S.a.due)}` : "")) : ""}
+      ${t.hanging > 0 ? plansOf(S.a).filter(r => r.action).map((r, i) =>
+          row(i === 0 ? "Rencana" : "", r.action + (r.due ? ` — ${fmt(r.due)}` : ""))).join("") : ""}
       <div><dt></dt><dd><button class="edit" type="button" data-goto="1">Ubah angka</button></dd></div>
     </div>
     ${(() => { const due = duePromises(), day = today(); return due.length
@@ -551,7 +617,13 @@ function buildReport(doc) {
     "b. Gantung >3 hari: " + t.gt3, "c. Gantung <3 hari: " + t.lt3,
     "d. Tidak gantung: " + t.clear, "e. Sudah dibalas hari ini: " + t.reply,
     ln("f. Yang masih gantung", doc.detail),
-    ln("g. Rencana", doc.plan && doc.plan + (doc.due ? ` (target ${fmt(doc.due)})` : "")),
+    (() => {
+      const rows = plansOf(doc).filter(r => r.action)
+        .map(r => r.action + (r.due ? ` (target ${fmt(r.due)})` : ""));
+      // Satu rencana tetap satu baris, persis laporan yang sudah dikenal squad.
+      return rows.length > 1 ? "g. Rencana:\n- " + rows.join("\n- ")
+                             : ln("g. Rencana", rows[0] || "");
+    })(),
     ln("h. Eskalasi", doc.escalation), ln("i. Calon PRISTA baru", doc.prista), "",
     "Deklarasi: " + DECLARATION].join("\n");
 }
@@ -763,7 +835,7 @@ function reopen() {
   const doc = mine(today());
   if (!doc) return;
   S.a = { grid:JSON.parse(JSON.stringify(doc.grid || {})), detail:doc.detail || "",
-          plan:doc.plan || "", due:doc.due || "", escalation:doc.escalation || "",
+          plans:planRows(doc), escalation:doc.escalation || "",
           prista:doc.prista || "", declared:false };
   S.editing = true; S.step = 1; S.error = null; S.showReport = false;
   saveDraft(today(), S.a); render(); toTop();
@@ -779,9 +851,15 @@ function collect() {
   const val = n => { const e = view.querySelector(`[name=${n}]`); return e ? e.value : undefined; };
   const a = { ...S.a };
   if (view.querySelector("[data-row]")) a.grid = g;
-  ["detail","plan","due","escalation","prista"].forEach(n => {
+  ["detail","escalation","prista"].forEach(n => {
     const v = val(n); if (v !== undefined) a[n] = v;
   });
+  if (view.querySelector("[data-plan]")) {
+    a.plans = [...view.querySelectorAll("[data-plan]")].map(el => ({
+      action: (el.querySelector("[data-pa]") || {}).value || "",
+      due:    (el.querySelector("[data-pd]") || {}).value || "",
+    }));
+  }
   const dc = view.querySelector("[name=declared]");
   if (dc) a.declared = dc.checked;
   return a;
@@ -834,6 +912,22 @@ view.addEventListener("click", ev => {
 // dropping the caret mid-digit and turning 13 into 173.
 view.addEventListener("click", ev => {
   if (ev.target && ev.target.id === "edit") { reopen(); return; }
+  if (ev.target && ev.target.id === "addPlan") {
+    S.a = collect();
+    S.a.plans = planRows(S.a).concat([{ action:"", due:"" }]).slice(0, MAX_PLANS);
+    saveDraft(today(), S.a); render();
+    const last = [...view.querySelectorAll("[data-pa]")].pop();
+    if (last) last.focus();
+    return;
+  }
+  const drop = ev.target.closest && ev.target.closest("[data-drop]");
+  if (drop) {
+    S.a = collect();
+    const i = +drop.dataset.drop, rows = planRows(S.a).filter((_, n) => n !== i);
+    S.a.plans = rows.length ? rows : [{ action:"", due:"" }];
+    saveDraft(today(), S.a); render();
+    return;
+  }
   const day = ev.target.closest && ev.target.closest("[data-day]");
   if (day) { S.day = day.dataset.day; S.openRow = null; render(); toTop(); return; }
   const row = ev.target.closest && ev.target.closest("[data-open]");

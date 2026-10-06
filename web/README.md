@@ -1,7 +1,7 @@
 # MESSI — web
 
 The MESSI module as a page people actually use. Mobile-first, no build step, no install:
-the Telegram bot sends a link and this is what opens.
+a link is posted to the squad space each morning and this is what opens.
 
 | File | What it is | Live |
 |---|---|---|
@@ -20,7 +20,7 @@ pip install playwright && playwright install chromium
 python3 web/tests/run_all.py
 ```
 
-122 checks across four suites. They drive a real browser against `messi.html` with
+157 checks across four suites. They drive a real browser against `messi.html` with
 `window.claude` faked (`tests/stub.js`): an in-memory store held in localStorage plus a
 switchable identity, so a submission made as one person can be read as another.
 
@@ -28,7 +28,7 @@ switchable identity, so a submission made as one person can be read as another.
 |---|---|
 | `test_player.py` (48) | Login, the 2-vs-3 step flow, every rejection, live totals, draft survival across a reload, promise capture, the generated report, and correcting a report already sent |
 | `test_manager.py` (47) | The recap screen: every person with their figures, any past workday, a drill-down into one person's full report; escalations by name, overdue promises, repeat absentees; and that a player sees nobody else's data |
-| `test_edge.py` (11) | Weekend, before opening, after the deadline, and one person's submission reaching another's screen |
+| `test_edge.py` (46) | Weekend, before opening, after the deadline, one person's submission reaching another's screen, and the plan list: adding and dropping rows, the five-row cap, one promise per row, and corrections that keep each promise on its own date |
 | `test_keyboard.py` (16) | Grid navigation: Enter and arrows move between cells and never change a number; the wheel cannot either |
 
 Set `MESSI_CHROMIUM=/path/to/chromium` if Playwright's own browser is not installed.
@@ -37,11 +37,12 @@ Set `MESSI_CHROMIUM=/path/to/chromium` if Playwright's own browser is not instal
 
 Both belong to a server, not a browser:
 
-1. **The 09:00 Telegram trigger and the afternoon reminder.** Without a cron, a day that
-   was never reported is *derived* on read instead of written. The result is the same;
+1. **The 09:00 post to the squad space and the afternoon reminder.** Without a cron, a day
+   that was never reported is *derived* on read instead of written. The result is the same;
    the reminder is what is missing.
-2. **Posting the report back to the Telegram group.** There is a Copy button and no Send
-   button, because a button that does nothing is worse than no button.
+2. **Sending anything to Google Chat.** There is a Copy button and no Send button, because
+   a button that does nothing is worse than no button. In the deployed build the leader
+   reads the recap on the site itself, so nothing is pasted into a chat any more.
 
 The first is built in [`php/`](../php/README.md), which serves this exact page with a
 PHP + MySQL back end and an hourly job. This page still runs on its own without it.

@@ -135,8 +135,7 @@ function repo_save_cycle(array $user, string $docId, array $doc): array
     $answers = [
         'grid'       => is_array($doc['grid'] ?? null) ? $doc['grid'] : [],
         'detail'     => trim((string) ($doc['detail'] ?? '')),
-        'plan'       => trim((string) ($doc['plan'] ?? '')),
-        'due'        => trim((string) ($doc['due'] ?? '')),
+        'plans'      => messi_plans($doc),      // membaca bentuk lama maupun baru
         'escalation' => trim((string) ($doc['escalation'] ?? '')),
         'prista'     => trim((string) ($doc['prista'] ?? '')),
         'declared'   => !empty($doc['declared']),
@@ -147,8 +146,10 @@ function repo_save_cycle(array $user, string $docId, array $doc): array
     if ($problem !== null) {
         throw new RepoError($problem);
     }
-    if ($answers['due'] !== '' && $answers['due'] < $today) {
-        throw new RepoError('Tanggalnya sudah lewat. Pilih hari ini atau sesudahnya.');
+    foreach ($answers['plans'] as $p) {
+        if ($p['due'] !== '' && $p['due'] < $today) {
+            throw new RepoError('Tanggalnya sudah lewat. Pilih hari ini atau sesudahnya.');
+        }
     }
 
     $status = messi_submit_status(Clock::hour());
@@ -169,25 +170,52 @@ function repo_save_cycle(array $user, string $docId, array $doc): array
     q('UPDATE cycles SET answers = ?, status = ?, submitted_at = ? WHERE id = ?',
       [json_encode($answers, JSON_UNESCAPED_UNICODE), $status, $now, $cycleId]);
 
-    // A promise, if one was made. Keyed to the cycle, so editing today's report moves
-    // the promise instead of leaving a second one behind.
-    if ($answers['plan'] !== '' && $answers['due'] !== '') {
-        $open = q1('SELECT id FROM commitments WHERE cycle_id = ? AND status = ?',
-                   [$cycleId, 'open']);
-        if ($open) {
-            q('UPDATE commitments SET action_text = ?, due_date = ? WHERE id = ?',
-              [$answers['plan'], $answers['due'], $open['id']]);
-        } else {
-            q('INSERT INTO commitments (user_id, cycle_id, action_text, due_date, status, created_at)
-               VALUES (?,?,?,?,?,?)',
-              [$userId, $cycleId, $answers['plan'], $answers['due'], 'open', $now]);
-        }
-    }
+    repo_sync_commitments($userId, $cycleId, $answers['plans'], $now);
 
     // Dikembalikan, tidak dikirim dari sini: repository tidak bicara ke pihak ketiga,
     // supaya laporan yang sudah tersimpan tidak pernah bisa digagalkan oleh Google.
     return ['status' => $status, 'day' => $today, 'cycle_id' => $cycleId,
             'announce' => $toAnnounce];
+}
+
+/**
+ * Brings this cycle's promises in line with what the report now says.
+ *
+ * Matched by the text of the action, never by position in the list: deleting the first
+ * row would shift every other one, and somebody's promise would silently become somebody
+ * else's. A promise that is no longer in the report is cancelled rather than deleted, and
+ * one that has already been settled is never touched — history is not the report's to
+ * rewrite.
+ */
+function repo_sync_commitments(int $userId, int $cycleId, array $plans, string $now): void
+{
+    $open = [];
+    foreach (q('SELECT id, action_text FROM commitments WHERE cycle_id = ? AND status = ?',
+               [$cycleId, 'open']) as $r) {
+        $open[$r['action_text']] = (int) $r['id'];
+    }
+
+    $keep = [];
+    foreach ($plans as $p) {
+        if ($p['action'] === '' || $p['due'] === '') {
+            continue;
+        }
+        if (isset($open[$p['action']])) {
+            q('UPDATE commitments SET due_date = ? WHERE id = ?', [$p['due'], $open[$p['action']]]);
+            $keep[$open[$p['action']]] = true;
+        } else {
+            q('INSERT INTO commitments (user_id, cycle_id, action_text, due_date, status, created_at)
+               VALUES (?,?,?,?,?,?)',
+              [$userId, $cycleId, $p['action'], $p['due'], 'open', $now]);
+        }
+    }
+
+    foreach ($open as $id) {
+        if (!isset($keep[$id])) {
+            q('UPDATE commitments SET status = ?, resolved_at = ? WHERE id = ?',
+              ['cancelled', $now, $id]);
+        }
+    }
 }
 
 /**

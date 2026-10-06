@@ -145,6 +145,34 @@ eq('Monday does not count Saturday and Sunday as missed',
    messi_missed_days([], '2026-09-01', '2026-10-05'),
    ['2026-10-02', '2026-10-01', '2026-09-30', '2026-09-29', '2026-09-28']);
 
+/* ----------------------------------------------------------------- rencana */
+
+// Laporan dua minggu pertama tersimpan dengan bentuk lama. Dia harus tetap terbaca utuh
+// tanpa satu baris pun diubah di database.
+eq('bentuk lama (satu plan + due) terbaca sebagai satu baris',
+   messi_plans(['plan' => 'Telepon Klien A', 'due' => '2026-10-07']),
+   [['action' => 'Telepon Klien A', 'due' => '2026-10-07']]);
+
+eq('bentuk baru terbaca apa adanya',
+   messi_plans(['plans' => [['action' => 'A', 'due' => '2026-10-07'],
+                            ['action' => 'B', 'due' => '2026-10-09']]]),
+   [['action' => 'A', 'due' => '2026-10-07'], ['action' => 'B', 'due' => '2026-10-09']]);
+
+eq('bentuk baru menang kalau dua-duanya ada',
+   messi_plans(['plan' => 'lama', 'due' => '2026-10-01',
+                'plans' => [['action' => 'baru', 'due' => '2026-10-07']]]),
+   [['action' => 'baru', 'due' => '2026-10-07']]);
+
+eq('laporan tanpa rencana sama sekali', messi_plans(['grid' => []]), []);
+eq('baris kosong tidak ikut terhitung',
+   count(messi_plans(['plans' => [['action' => 'A', 'due' => '2026-10-07'],
+                                  ['action' => '', 'due' => '']]])), 1);
+eq('lebih dari lima baris dipotong', count(messi_plans(['plans' => array_fill(0, 9,
+   ['action' => 'A', 'due' => '2026-10-07'])])), 5);
+eq('spasi di ujung dibuang',
+   messi_plans(['plans' => [['action' => '  Telepon  ', 'due' => ' 2026-10-07 ']]]),
+   [['action' => 'Telepon', 'due' => '2026-10-07']]);
+
 /* -------------------------------------------------------------- validation */
 
 $full = ['grid' => $grid, 'detail' => 'OA003 belum dibalas', 'plan' => 'Follow up pagi',
@@ -173,6 +201,25 @@ eq('hanging with no plan is refused',
    'Tulis rencananya.');
 eq('a plan with no date is refused, because nothing can chase it',
    messi_validate(['grid' => $grid, 'detail' => 'OA003', 'plan' => 'besok', 'declared' => true], $CH),
+   'Pilih tanggalnya. Tanpa tanggal, tidak ada yang bisa mengingatkan.');
+
+eq('satu baris lengkap sudah cukup',
+   messi_validate(['grid' => $grid, 'detail' => 'OA003', 'declared' => true,
+                   'plans' => [['action' => 'Telepon', 'due' => '2026-10-07']]], $CH), null);
+eq('beberapa baris lengkap juga boleh',
+   messi_validate(['grid' => $grid, 'detail' => 'OA003', 'declared' => true,
+                   'plans' => [['action' => 'A', 'due' => '2026-10-07'],
+                               ['action' => 'B', 'due' => '2026-10-09']]], $CH), null);
+// Satu baris setengah terisi adalah janji yang tidak bisa ditagih — ditolak, bukan dibuang
+// diam-diam, karena membuangnya berarti menghapus sesuatu yang orang sengaja ketik.
+eq('baris dengan tanggal tapi tanpa rencana ditolak',
+   messi_validate(['grid' => $grid, 'detail' => 'OA003', 'declared' => true,
+                   'plans' => [['action' => 'A', 'due' => '2026-10-07'],
+                               ['action' => '', 'due' => '2026-10-09']]], $CH),
+   'Ada tanggal tanpa rencana. Tulis rencananya, atau hapus barisnya.');
+eq('baris dengan rencana tapi tanpa tanggal ditolak',
+   messi_validate(['grid' => $grid, 'detail' => 'OA003', 'declared' => true,
+                   'plans' => [['action' => 'A', 'due' => '']]], $CH),
    'Pilih tanggalnya. Tanpa tanggal, tidak ada yang bisa mengingatkan.');
 eq('whitespace is not an answer',
    messi_validate(['grid' => $grid, 'detail' => '   ', 'declared' => true], $CH),
@@ -211,6 +258,16 @@ $want = implode("\n", [
 ]);
 eq('the report reads exactly as the squad already writes it',
    messi_build_report($doc, 'Nicho', $defs), $want);
+
+// Lebih dari satu rencana jadi daftar; satu rencana tetap satu baris seperti di atas.
+$banyak = messi_build_report(
+    ['day' => '2026-09-30', 'grid' => ['WAG' => ['open' => 9, 'gt3' => 1]],
+     'detail' => 'tiga channel', 'declared' => true,
+     'plans' => [['action' => 'Telepon Klien A', 'due' => '2026-10-02'],
+                 ['action' => 'Kirim revisi Vendor B', 'due' => '2026-10-05']]],
+    'Nicho', $defs);
+ok('dua rencana jadi dua baris berbutir',
+   str_contains($banyak, "g. Rencana:\n- Telepon Klien A (target Jum 2 Okt)\n- Kirim revisi Vendor B (target Sen 5 Okt)"));
 
 $clean = messi_build_report(
     ['day' => '2026-09-30', 'grid' => ['WAG' => ['open' => 9, 'reply' => 9]]], 'Rio', $defs);

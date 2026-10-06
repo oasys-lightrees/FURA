@@ -1,7 +1,7 @@
 # MESSI di cPanel
 
 Versi PHP + MySQL dari aplikasi di `web/`. Halamannya **sama persis** — `app.html`
-adalah salinan `web/messi.html` tanpa satu baris pun diubah, jadi 122 pemeriksaan browser
+adalah salinan `web/messi.html` tanpa satu baris pun diubah, jadi 157 pemeriksaan browser
 di `web/tests/` tetap menggambarkan apa yang dipakai squad. Yang ditulis ulang cuma
 bagian belakangnya: dulu data disimpan platform artifact, sekarang MySQL.
 
@@ -131,7 +131,7 @@ lib/require-php8.php  penjaga versi PHP, dibaca paling awal
 install.sql        enam tabel
 PASANG.txt         langkah pemasangan, bahasa non-teknis
 make-zip.sh        bikin messi-cpanel.zip
-tests/             249 pemeriksaan (tidak ikut ke server)
+tests/             272 pemeriksaan (tidak ikut ke server)
 ```
 
 ## Yang diputuskan server, bukan browser
@@ -147,6 +147,12 @@ seseorang dihitung ulang di sini, dari jam servernya sendiri:
   diperiksa lagi di server, sebelum deklarasi ditanyakan.
 - **Hari bolos.** Dihitung dari `joined_on` di database, bukan dari apa pun yang
   dikirim browser.
+- **Satu janji per rencana.** Laporan boleh berisi sampai lima rencana, masing-masing
+  dengan tanggalnya sendiri, dan server membuat satu janji untuk tiap baris. Saat laporan
+  diperbaiki, barisnya dicocokkan **lewat teks aksinya**, bukan lewat urutan — kalau lewat
+  urutan, menghapus baris pertama akan menggeser semuanya dan tanggal janji orang
+  tertukar. Baris yang dibuang dibatalkan (`cancelled`), tidak dihapus; janji yang sudah
+  ditutup tidak pernah disentuh lagi.
 
 Semua tanggal disimpan UTC; hari kalender Jakarta disimpan terpisah di `cycles.day`,
 karena hari itulah — bukan detiknya — yang membuat sebuah laporan unik.
@@ -167,10 +173,10 @@ menyebutkan mana yang barusan terjadi.
 
 | Berkas | Isinya |
 |--------|--------|
-| `tests/test_engine.php` | 55 — aturan, dicocokkan dengan `tests/test_core.py` |
-| `tests/test_repo.php` | 57 — terhadap MySQL sungguhan, di database yang dia buat sendiri |
+| `tests/test_engine.php` | 67 — aturan, dicocokkan dengan `tests/test_core.py` |
+| `tests/test_repo.php` | 66 — terhadap MySQL sungguhan, di database yang dia buat sendiri |
 | `tests/test_cron.php` | 46 — seminggu penuh jam demi jam, jam dibekukan, pesan bot ditangkap |
-| `tests/test_live.py` | 55 — browser terhadap aplikasi yang benar-benar jalan |
+| `tests/test_live.py` | 57 — browser terhadap aplikasi yang benar-benar jalan |
 | `tests/test_admin.py` | 36 — pemasangan pertama, tambah orang, ganti password, link sekali pakai |
 | `tests/check_sync.php` | memastikan `app.html` belum menyimpang dari `web/messi.html` |
 

@@ -19,6 +19,7 @@ Sign in as `nicho@lightrees.com` (player) or `chief@lightrees.com` (leader), pas
 | Enrolments, subjects | 7 projects, 3 leads, one squad |
 | Cycle generation | Hourly tick, idempotent per period |
 | **Commitment-driven cadence** | The next ask lands on the date the player promised |
+| Several promises per report | Up to five plans, each with its own date; each one is asked on its own day |
 | Answering, "no change", validation | Working |
 | Reaper | Records missed cycles and broken promises |
 | Leader dashboard | Exceptions only: what was missed, what was promised and not done |
@@ -53,9 +54,9 @@ PY
 
 ```
 web/               THE PAGE PEOPLE USE — messi.html, plus the flow spec and the demo
-web/tests/         122 browser checks (player, manager, edge cases, keyboard)
-php/               the same page, deployable: PHP + MySQL, cPanel, Telegram, hourly cron
-php/tests/         249 checks — rules, a real MySQL, a simulated week, the running app
+web/tests/         157 browser checks (player, manager, edge cases, keyboard)
+php/               the same page, deployable: PHP + MySQL, cPanel, Google Chat, hourly cron
+php/tests/         272 checks — rules, a real MySQL, a simulated week, the running app
 core/messi_core/   pure rules: cadence, period keys, state machines. No web, no ORM.
 app/               FastAPI app, schema.sql, templates, seed, CLI
 tests/             pytest over core/ — runs without a database
@@ -67,7 +68,7 @@ docs/              the design this implements
 stepped flow, `app/` carries the server pieces. See [web/README.md](web/README.md).
 
 [`php/`](php/README.md) is the one meant to go live. It serves `web/messi.html` unchanged
-— a byte-for-byte copy, checked by `php/tests/check_sync.php` — so the 122 browser checks
+— a byte-for-byte copy, checked by `php/tests/check_sync.php` — so the 157 browser checks
 keep describing what ships, and replaces only what was underneath it. Unlike `app/`, it is
 built to face a network: every write is re-checked server-side, the day and the deadline
 come from the server's clock, and the pages that are not pages are blocked by `.htaccess`.
