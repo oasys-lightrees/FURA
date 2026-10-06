@@ -66,7 +66,7 @@ with sync_playwright() as p:
     check("sampai layar cek", txt(pg,".stepno"), "LANGKAH 3 DARI 3")
     check("ringkasan menampilkan angka", txt(pg,".rev"), lambda s: "21" in s and "3" in s)
 
-    pg.fill("[name=escalation]","Butuh Chief approve harga Klien A")
+    pg.fill("[name=escalation]","Butuh approve harga Klien A")
     pg.click("#next"); pg.wait_for_timeout(200)
     check("deklarasi wajib", txt(pg,".bar .err"), "Centang pernyataannya dulu.")
     pg.check("[name=declared]"); pg.click("#next"); pg.wait_for_timeout(400)

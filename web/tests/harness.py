@@ -67,25 +67,55 @@ def check(label, got, want=True):
     return ok
 
 
-def new_page(ctx, who, store=None, reset=True, at=None):
+def new_page(ctx, who, store=None, reset=True, at=None, enter="messi", config=None,
+             seen="messi"):
     """A page acting as `who`. `store` seeds the shared database; `at` freezes the clock.
 
     Pages created from the SAME context share localStorage, which is how the
     cross-person tests prove one person's submission reaches another's screen.
+
+    The page opens on the module catalogue, so by default this walks straight into
+    MESSI with its explainer already read — which is what a returning user sees.
+    Pass `enter=None` to stay on the catalogue, `seen=None` to arrive as somebody who
+    has never opened the module (so its explainer shows), and `config` to serve the
+    page a settings document the way the server does.
     """
     pg = ctx.new_page()
     pg.on("pageerror", lambda e: results.append((False, "JS error: " + str(e), "")))
     if at:
         pg.add_init_script(_CLOCK % json.dumps(at))
+    if config is not None:
+        pg.add_init_script(f"window.FURA_CONFIG={json.dumps(config)};")
     pg.add_init_script(
         f"window.__WHO__={json.dumps(who)};"
         f"window.__SEED__={json.dumps(store or {})};"
         f"window.__RESET__={json.dumps(reset)};"
     )
+    if seen:
+        pg.add_init_script(
+            f'try {{ localStorage.setItem("fura.seen.{seen}", "1"); }} catch (e) {{}}')
     pg.add_init_script(STUB)
     pg.goto(preview_url())
     pg.wait_for_timeout(900)
+    if enter:
+        pg.click(f"[data-mod={enter}]")
+        pg.wait_for_timeout(250)
     return pg
+
+
+def stored(pg, collection="cycles", n=1, timeout=10_000):
+    """Waits until the fake database on disk really holds `n` docs in `collection`.
+
+    The page writes without awaiting the store, so opening a second identity right
+    after a submission can outrun the write — which on screen looks exactly like data
+    not being shared between people. Waiting on the stored copy removes the race
+    instead of papering over it with a longer sleep.
+    """
+    pg.wait_for_function(
+        """([c, want]) => { try { return Object.keys(JSON.parse(
+             localStorage.getItem("__fake_db__") || "{}")[c] || {}).length >= want; }
+           catch (e) { return false; } }""",
+        arg=[collection, n], timeout=timeout)
 
 
 def context(browser):

@@ -28,7 +28,9 @@ if (!$user) {
 // The first screen needs no round trip: everything it reads is already here — and
 // nothing it does not. A player gets their own reports; the squad view is a leader's.
 $mine = is_leader($user) ? null : (int) $user['id'];
+$cfg = repo_config();
 $boot = [
+    'config' => $cfg,
     'me' => [
         'id'       => uid((int) $user['id']),
         'name'     => $user['name'],
@@ -42,7 +44,7 @@ $boot = [
 $app = (string) file_get_contents(__DIR__ . '/app.html');
 // The title belongs in the head; the rest of the file is the page.
 $app = preg_replace('~^\s*<title>(.*?)</title>~s', '', $app, 1, $found);
-$title = $found ? 'MESSI Squad OASYS' : 'MESSI';
+$title = 'FURA' . ($cfg['team_name'] === '' ? '' : ' · ' . $cfg['team_name']);
 
 header('Content-Type: text/html; charset=utf-8');
 header('Cache-Control: no-store');
@@ -61,6 +63,10 @@ header('Referrer-Policy: same-origin');
    read three collections, write one document, and say who is asking. */
 window.claude = (function () {
   const BOOT = <?= json_encode($boot, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_HEX_TAG | JSON_HEX_AMP) ?>;
+
+  // Pertanyaan, ambang dan jam datang dari server. Halaman punya bawaannya sendiri dan
+  // tetap jalan tanpa ini, supaya versi artifact-nya tidak ikut butuh database.
+  window.FURA_CONFIG = BOOT.config;
 
   const snapshot = obj => ({
     docs: Object.entries(obj || {}).map(([id, d]) => ({ id, data: () => d })),
@@ -105,7 +111,8 @@ window.claude = (function () {
 <?= $app ?>
 <footer class="signout">
   Masuk sebagai <strong><?= h($user['name']) ?></strong> ·
-  <?php if ($user['role'] === 'admin'): ?><a href="admin.php">Squad</a> · <?php endif; ?>
+  <?php if ($user['role'] === 'admin'): ?><a href="admin.php">Tim</a> ·
+    <a href="soal.php">Pertanyaan</a> · <?php endif; ?>
   <a href="api/logout.php">Keluar</a>
 </footer>
 <style>

@@ -70,6 +70,7 @@ eq('month names are Indonesian', messi_fmt_day('2026-08-03'), 'Sen 3 Agu');
 /* ------------------------------------------------------------- the figures */
 
 $CH = ['WAG', 'TGG', 'GCG'];
+$CFG = messi_config_default();   // pertanyaan bawaan, yang dipakai kalau admin belum mengubah apa pun
 
 $grid = [
     'WAG' => ['open' => 8, 'gt3' => 1, 'lt3' => 2, 'reply' => 6],
@@ -178,69 +179,69 @@ eq('spasi di ujung dibuang',
 $full = ['grid' => $grid, 'detail' => 'OA003 belum dibalas', 'plan' => 'Follow up pagi',
          'due' => '2026-10-02', 'declared' => true];
 
-eq('a complete report passes', messi_validate($full, $CH), null);
+eq('a complete report passes', messi_validate($full, $CFG), null);
 
 eq('an untouched grid is refused',
-   messi_validate(['declared' => true], $CH),
+   messi_validate(['declared' => true], $CFG),
    'Isi dulu angkanya. Kalau kosong semua, tulis 0.');
 
 eq('all zeroes is a valid answer, not an empty one',
-   messi_validate(['grid' => ['WAG' => ['open' => '0']], 'declared' => true], $CH), null);
+   messi_validate(['grid' => ['WAG' => ['open' => '0']], 'declared' => true], $CFG), null);
 
 // The order that matters: arithmetic before paperwork. Ticking the declaration must never
 // be what stands between someone and being told their numbers do not add up.
 eq('impossible arithmetic is caught before the declaration is asked for',
-   messi_validate(['grid' => ['WAG' => ['open' => 2, 'gt3' => 5]], 'declared' => false], $CH),
+   messi_validate(['grid' => ['WAG' => ['open' => 2, 'gt3' => 5]], 'declared' => false], $CFG),
    'Yang gantung lebih banyak daripada yang masih aktif. Cek lagi angkanya.');
 
 eq('hanging with no detail is refused',
-   messi_validate(['grid' => $grid, 'declared' => true], $CH),
+   messi_validate(['grid' => $grid, 'declared' => true], $CFG),
    'Tulis dulu yang mana saja yang gantung.');
 eq('hanging with no plan is refused',
-   messi_validate(['grid' => $grid, 'detail' => 'OA003', 'declared' => true], $CH),
+   messi_validate(['grid' => $grid, 'detail' => 'OA003', 'declared' => true], $CFG),
    'Tulis rencananya.');
 eq('a plan with no date is refused, because nothing can chase it',
-   messi_validate(['grid' => $grid, 'detail' => 'OA003', 'plan' => 'besok', 'declared' => true], $CH),
+   messi_validate(['grid' => $grid, 'detail' => 'OA003', 'plan' => 'besok', 'declared' => true], $CFG),
    'Pilih tanggalnya. Tanpa tanggal, tidak ada yang bisa mengingatkan.');
 
 eq('satu baris lengkap sudah cukup',
    messi_validate(['grid' => $grid, 'detail' => 'OA003', 'declared' => true,
-                   'plans' => [['action' => 'Telepon', 'due' => '2026-10-07']]], $CH), null);
+                   'plans' => [['action' => 'Telepon', 'due' => '2026-10-07']]], $CFG), null);
 eq('beberapa baris lengkap juga boleh',
    messi_validate(['grid' => $grid, 'detail' => 'OA003', 'declared' => true,
                    'plans' => [['action' => 'A', 'due' => '2026-10-07'],
-                               ['action' => 'B', 'due' => '2026-10-09']]], $CH), null);
+                               ['action' => 'B', 'due' => '2026-10-09']]], $CFG), null);
 // Satu baris setengah terisi adalah janji yang tidak bisa ditagih — ditolak, bukan dibuang
 // diam-diam, karena membuangnya berarti menghapus sesuatu yang orang sengaja ketik.
 eq('baris dengan tanggal tapi tanpa rencana ditolak',
    messi_validate(['grid' => $grid, 'detail' => 'OA003', 'declared' => true,
                    'plans' => [['action' => 'A', 'due' => '2026-10-07'],
-                               ['action' => '', 'due' => '2026-10-09']]], $CH),
+                               ['action' => '', 'due' => '2026-10-09']]], $CFG),
    'Ada tanggal tanpa rencana. Tulis rencananya, atau hapus barisnya.');
 eq('baris dengan rencana tapi tanpa tanggal ditolak',
    messi_validate(['grid' => $grid, 'detail' => 'OA003', 'declared' => true,
-                   'plans' => [['action' => 'A', 'due' => '']]], $CH),
+                   'plans' => [['action' => 'A', 'due' => '']]], $CFG),
    'Pilih tanggalnya. Tanpa tanggal, tidak ada yang bisa mengingatkan.');
 eq('whitespace is not an answer',
-   messi_validate(['grid' => $grid, 'detail' => '   ', 'declared' => true], $CH),
+   messi_validate(['grid' => $grid, 'detail' => '   ', 'declared' => true], $CFG),
    'Tulis dulu yang mana saja yang gantung.');
 
 eq('a clean day needs no detail, plan or date',
-   messi_validate(['grid' => ['WAG' => ['open' => 9, 'reply' => 9]], 'declared' => true], $CH), null);
+   messi_validate(['grid' => ['WAG' => ['open' => 9, 'reply' => 9]], 'declared' => true], $CFG), null);
 
 eq('the declaration is still required',
-   messi_validate(['grid' => ['WAG' => ['open' => 9]], 'declared' => false], $CH),
+   messi_validate(['grid' => ['WAG' => ['open' => 9]], 'declared' => false], $CFG),
    'Centang pernyataannya dulu.');
 
 /* ------------------------------------------------------------- the report */
 
-$defs = ['WAG' => 'WAG', 'TGG' => 'TGG', 'GCG' => 'GCG'];
+
 $doc = ['day' => '2026-09-30'] + $full + ['escalation' => '', 'prista' => 'PT Sinar Jaya'];
 
 $want = implode("\n", [
     'MESSI Report',
     'Date: Rab 30 Sep (2026-09-30)',
-    'Squad: OASYS   Report by: Nicho',
+    'Report by: Nicho',
     '',
     '[MERAH] Ada yang gantung lebih dari 3 hari',
     '',
@@ -252,12 +253,12 @@ $want = implode("\n", [
     'f. Yang masih gantung: OA003 belum dibalas',
     'g. Rencana: Follow up pagi (target Jum 2 Okt)',
     'h. Eskalasi: Belum ada',
-    'i. Calon PRISTA baru: PT Sinar Jaya',
+    'i. Calon project baru: PT Sinar Jaya',
     '',
     'Deklarasi: ' . MESSI_DECLARATION,
 ]);
 eq('the report reads exactly as the squad already writes it',
-   messi_build_report($doc, 'Nicho', $defs), $want);
+   messi_build_report($doc, 'Nicho', $CFG), $want);
 
 // Lebih dari satu rencana jadi daftar; satu rencana tetap satu baris seperti di atas.
 $banyak = messi_build_report(
@@ -265,19 +266,130 @@ $banyak = messi_build_report(
      'detail' => 'tiga channel', 'declared' => true,
      'plans' => [['action' => 'Telepon Klien A', 'due' => '2026-10-02'],
                  ['action' => 'Kirim revisi Vendor B', 'due' => '2026-10-05']]],
-    'Nicho', $defs);
+    'Nicho', $CFG);
 ok('dua rencana jadi dua baris berbutir',
    str_contains($banyak, "g. Rencana:\n- Telepon Klien A (target Jum 2 Okt)\n- Kirim revisi Vendor B (target Sen 5 Okt)"));
 
 $clean = messi_build_report(
-    ['day' => '2026-09-30', 'grid' => ['WAG' => ['open' => 9, 'reply' => 9]]], 'Rio', $defs);
+    ['day' => '2026-09-30', 'grid' => ['WAG' => ['open' => 9, 'reply' => 9]]], 'Rio', $CFG);
 ok('a clean day is green', str_contains($clean, '[HIJAU] Tidak ada yang gantung'));
 ok('empty fields read as Belum ada, not as blanks',
    str_contains($clean, 'f. Yang masih gantung: Belum ada'));
 ok('a plan with no date carries no target',
    !str_contains(messi_build_report(
-       ['day' => '2026-09-30', 'grid' => ['WAG' => ['open' => 1]], 'plan' => 'besok'], 'Rio', $defs),
+       ['day' => '2026-09-30', 'grid' => ['WAG' => ['open' => 1]], 'plan' => 'besok'], 'Rio', $CFG),
      'target'));
+
+/* ------------------------------------------------- setelan yang bisa diubah */
+
+// Dokumen kosong, dokumen sampah, dan dokumen setengah jadi harus semuanya menghasilkan
+// setelan yang bisa dipakai. Halaman setelan yang salah tidak boleh mematikan aplikasinya.
+eq('tanpa setelan tersimpan, yang berlaku adalah bawaannya',
+   messi_config_normalize(null), messi_config_default());
+eq('dokumen sampah pun tetap menghasilkan setelan utuh',
+   messi_config_normalize('bukan array'), messi_config_default());
+eq('kunci yang hilang diisi dari bawaannya',
+   messi_config_normalize(['threshold_days' => 1])['questions']['detail']['label'],
+   'Yang mana saja?');
+
+eq('ambang yang diubah memang berlaku',
+   messi_config_normalize(['threshold_days' => 1])['threshold_days'], 1);
+eq('ambang di luar akal kembali ke bawaannya',
+   messi_config_normalize(['threshold_days' => 0])['threshold_days'], MESSI_THRESHOLD);
+eq('begitu juga ambang yang bukan angka',
+   messi_config_normalize(['threshold_days' => 'tiga'])['threshold_days'], MESSI_THRESHOLD);
+// Jam tutup sebelum jam buka berarti setiap laporan telat sejak detik pertama.
+eq('jam tutup tidak boleh mendahului jam buka',
+   messi_config_normalize(['open_hour' => 20, 'due_hour' => 8])['due_hour'], 24);
+eq('jam yang masuk akal diterima apa adanya',
+   messi_config_normalize(['open_hour' => 7, 'due_hour' => 16])['due_hour'], 16);
+
+$ch = messi_config_normalize(['channels' => [
+    ['key' => 'ig', 'label' => 'Instagram DM', 'full' => 'Instagram Direct'],
+    ['key' => 'ig', 'label' => 'Kembar'],                       // kunci ganda
+    ['key' => 'spasi kosong', 'label' => 'Tidak sah'],           // kunci tidak sah
+    ['key' => 'EMAIL'],                                          // tanpa nama
+]])['channels'];
+eq('channel bisa diganti seluruhnya', array_column($ch, 'key'), ['IG', 'EMAIL']);
+eq('kodenya dibakukan jadi huruf besar', $ch[0]['key'], 'IG');
+eq('channel tanpa nama memakai kodenya sendiri', $ch[1]['label'], 'EMAIL');
+eq('nol channel bukan setelan, jadi kembali ke bawaannya',
+   count(messi_config_normalize(['channels' => []])['channels']), 3);
+
+eq('pertanyaan bisa ditulis ulang',
+   messi_config_normalize(['questions' => ['detail' => ['label' => 'Nomor tiket mana?']]])
+     ['questions']['detail']['label'], 'Nomor tiket mana?');
+// Admin menulis teks yang dibaca pemain, jadi tidak boleh ada HTML yang lolos ke layar.
+eq('pertanyaan yang kosong kembali ke bawaannya',
+   messi_config_normalize(['questions' => ['detail' => ['label' => '   ']]])
+     ['questions']['detail']['label'], 'Yang mana saja?');
+eq('baris baru di pertanyaan dirapikan jadi satu baris',
+   messi_config_normalize(['questions' => ['detail' => ['label' => "Satu\n\nDua"]]])
+     ['questions']['detail']['label'], 'Satu Dua');
+
+// Validasi harus memakai kalimat yang ditulis admin, kalau tidak halaman setelannya bohong.
+$cfgTiket = messi_config_normalize(['questions' => [
+    'detail' => ['error' => 'Tulis nomor tiketnya dulu.'],
+]]);
+$gantung = ['grid' => ['WAG' => ['open' => 5, 'gt3' => 1]], 'declared' => true];
+eq('pesan kesalahan ikut yang ditulis admin',
+   messi_validate($gantung, $cfgTiket), 'Tulis nomor tiketnya dulu.');
+
+// Ambang hanya mengubah kalimatnya, bukan hitungannya: gt3 tetap kolom yang merah.
+eq('lampunya menyebut ambang yang berlaku',
+   messi_lamp(['gt3' => 1, 'hanging' => 1, 'open' => 5], 1)['label'],
+   'Ada yang gantung lebih dari 1 hari');
+eq('jam tutup yang diubah mengubah arti telat',
+   messi_submit_status(16, 16), 'late');
+eq('dan yang sebelum itu tetap tepat waktu',
+   messi_submit_status(15, 16), 'submitted');
+
+/* -------------------------------------- laporan mengikuti setelan yang ada */
+
+$cfgLain = messi_config_normalize([
+    'team_name' => 'Tim Dukungan',
+    'threshold_days' => 1,
+    'channels' => [['key' => 'IG', 'label' => 'IG', 'full' => 'Instagram']],
+    'questions' => ['prista' => ['show' => false]],
+]);
+$lap = messi_build_report(
+    ['day' => '2026-09-30', 'grid' => ['IG' => ['open' => 4, 'gt3' => 1]],
+     'detail' => 'DM @budi', 'plans' => [['action' => 'Balas', 'due' => '2026-10-01']],
+     'prista' => 'tidak akan tercetak'],
+    'Rio', $cfgLain);
+ok('nama tim ikut tercetak', str_contains($lap, 'Tim: Tim Dukungan   Report by: Rio'));
+ok('kolomnya menyebut ambang yang berlaku', str_contains($lap, 'b. Gantung >1 hari: 1'));
+ok('lampunya juga', str_contains($lap, 'lebih dari 1 hari'));
+ok('channel yang berlaku saja yang dihitung', str_contains($lap, 'a. Channel aktif/open: 4 IG'));
+// Pertanyaan yang dimatikan tidak muncul sebagai "Belum ada" — itu bukan jawaban kosong,
+// pertanyaannya memang tidak pernah diajukan.
+ok('pertanyaan yang dimatikan hilang dari laporan', !str_contains($lap, 'Calon project'));
+ok('dan jawabannya tidak bocor lewat jalan lain',
+   !str_contains($lap, 'tidak akan tercetak'));
+ok('yang masih hidup tetap ada', str_contains($lap, 'h. Eskalasi:'));
+ok('nama tim yang kosong tidak mencetak label kosong',
+   str_contains(messi_build_report(['day' => '2026-09-30', 'grid' => []], 'Rio', $CFG),
+                "\nReport by: Rio"));
+
+/* ------------------------------- laporan lama dibaca dengan setelan saat itu */
+
+// Mengganti setelan hari ini tidak boleh menulis ulang arti laporan bulan lalu.
+$lama = [
+    'day' => '2026-09-30',
+    'grid' => ['WAG' => ['open' => 6, 'gt3' => 1], 'IG' => ['open' => 2]],
+    'cfg' => ['channels' => [['key' => 'WAG', 'label' => 'WAG', 'full' => 'WhatsApp Group']],
+              'threshold_days' => 3],
+];
+$cetak = messi_build_report($lama, 'Nicho', $cfgLain);
+ok('laporan lama memakai channel yang berlaku saat dikirim',
+   str_contains($cetak, 'a. Channel aktif/open: 6 WAG'));
+ok('dan tidak kejatuhan channel yang baru ditambahkan', !str_contains($cetak, 'IG'));
+ok('ambang saat itu yang dipakai, bukan ambang hari ini',
+   str_contains($cetak, 'b. Gantung >3 hari: 1'));
+eq('cuplikan setelan berisi yang perlu saja, bukan seluruh dokumen',
+   array_keys(messi_config_snapshot($CFG)), ['channels', 'threshold_days']);
+eq('laporan tanpa cuplikan dibaca dengan setelan yang berlaku sekarang',
+   messi_doc_config(['day' => '2026-09-30'], $cfgLain)['threshold_days'], 1);
 
 /* -------------------------------------------------------------------- done */
 

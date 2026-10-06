@@ -11,7 +11,7 @@
                try { sessionStorage.setItem("__seeded__","1"); } catch {} }
   else { window.__STORE__ = load() || window.__SEED__ || empty; }
 
-  const PROFILES = { u_nicho:{name:"Nicho"}, u_chief:{name:"Chief"}, u_rio:{name:"Rio"} };
+  const PROFILES = { u_nicho:{name:"Nicho"}, u_lead:{name:"Lia"}, u_rio:{name:"Rio"} };
   window.claude = { use: async (n) => {
     if (n === "db") return { collection: (col) => ({
       get: async () => ({ docs: Object.entries(window.__STORE__[col] || {})
@@ -24,7 +24,7 @@
     if (n === "user") return {
       id: async () => window.__WHO__,
       me: async () => ({ name: (PROFILES[window.__WHO__]||{}).name || "" }),
-      isOwner: () => window.__WHO__ === "u_chief",
+      isOwner: () => window.__WHO__ === "u_lead",
       profiles: async (ids) => Object.fromEntries(ids.map(i => [i, PROFILES[i] || {name:""}])),
     };
     return null;

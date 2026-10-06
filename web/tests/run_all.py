@@ -6,7 +6,8 @@ import sys
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
-SUITES = ["test_player.py", "test_manager.py", "test_edge.py", "test_keyboard.py"]
+SUITES = ["test_player.py", "test_manager.py", "test_edge.py", "test_keyboard.py",
+          "test_catalog.py"]
 
 failed, lines = [], []
 for name in SUITES:

@@ -26,14 +26,18 @@ first module.
 ## Running it
 
 ```bash
-python3 web/tests/run_all.py   # 157 browser checks against the live page
+python3 web/tests/run_all.py   # 223 browser checks against the live page
 pytest -q                      # 29 engine-rule tests, no browser or database
-sh php/tests/run_all.sh        # 272 checks on the PHP + MySQL build
+sh php/tests/run_all.sh        # 340 checks on the PHP + MySQL build
 ./run.sh                       # the FastAPI + Postgres build on :8000
 ```
 
 The page people use is [`web/messi.html`](web/README.md) — mobile-first, one question per
-screen. [`php/`](php/README.md) is the same page with a PHP + MySQL back end, meant to be
+screen. It opens on **FURA** (Follow Up Report Automation), a catalogue of modules; MESSI
+is the first one that runs, and explains itself on a first visit. What each module asks —
+its channels, thresholds, hours and the wording of every question — is a settings document
+an admin edits from a page, not a constant in the code, because the same module is meant to
+run for teams that count different things. [`php/`](php/README.md) is the same page with a PHP + MySQL back end, meant to be
 uploaded to cPanel: it adds accounts, a database, the hourly job that opens each day and
 chases what was promised, and a Google Chat webhook that posts the morning link. See
 [RUNNING.md](RUNNING.md) for what works today and what does not.

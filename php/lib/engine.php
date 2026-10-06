@@ -18,6 +18,12 @@ const MESSI_TZ = 'Asia/Jakarta';
 const MESSI_OPEN_HOUR = 9;     // the day's report opens
 const MESSI_DUE_HOUR  = 18;    // after this, a submission is late
 const MESSI_WORKDAYS  = [1, 2, 3, 4, 5];   // Mon–Fri, ISO numbering
+const MESSI_THRESHOLD = 3;     // "gantung lebih dari N hari" — batas merahnya
+const MESSI_MAX_PLANS = 5;     // lebih dari ini bukan sapuan harian lagi, tapi daftar tugas
+const MESSI_MAX_CHANNELS = 12;  // sapuan harian, bukan inventaris seluruh perusahaan
+const MESSI_DECLARATION =
+    'Saya sudah memastikan semua channel yang saya pegang terkelola dengan baik tanpa '
+    . 'gantung, dan saya melaporkan laporan di atas dengan jujur sesuai kondisi sebenarnya.';
 
 /** A clock that tests can freeze, so weekends and deadlines are reachable. */
 final class Clock
@@ -61,6 +67,210 @@ final class Clock
     {
         return self::utc()->format('Y-m-d H:i:s');
     }
+}
+
+/* ---------------------------------------------------------------- konfigurasi */
+
+/**
+ * Pertanyaan MESSI, ambangnya, dan jamnya — sebagai data, bukan sebagai kode.
+ *
+ * Dulu semuanya konstanta: tiga channel, batas tiga hari, jam 9 sampai 18. Satu squad
+ * saja memang cukup begitu. Begitu modulnya dipakai squad lain, hal yang di sini
+ * kebetulan benar jadi hal yang harus bisa diubah tanpa menyentuh kode — "tidak boleh
+ * gantung lebih dari 3 hari" di satu tempat bisa berarti 1 hari di tempat lain.
+ *
+ * Satu dokumen, dibaca di satu tempat, dipakai halaman maupun server. Yang tidak boleh
+ * ikut: HTML. Semua teks di sini ditulis admin dan ditampilkan ke pemain, jadi semuanya
+ * teks biasa yang di-escape saat digambar — kalau tidak, admin punya jalan menyuntikkan
+ * skrip ke layar rekannya.
+ */
+function messi_config_default(): array
+{
+    return [
+        'channels' => [
+            ['key' => 'WAG', 'label' => 'WAG', 'full' => 'WhatsApp Group'],
+            ['key' => 'TGG', 'label' => 'TGG', 'full' => 'Telegram Group'],
+            ['key' => 'GCG', 'label' => 'GCG', 'full' => 'Google Chat'],
+        ],
+        'team_name'      => '',            // diisi tiap tim sendiri; kosong = tidak dicetak
+        'threshold_days' => MESSI_THRESHOLD,
+        'open_hour'      => MESSI_OPEN_HOUR,
+        'due_hour'       => MESSI_DUE_HOUR,
+        'max_plans'      => MESSI_MAX_PLANS,
+        'declaration'    => MESSI_DECLARATION,
+        'questions' => [
+            'grid' => [
+                'label' => 'Berapa banyak hari ini?',
+                'hint'  => 'Hitung channel yang kamu pegang. Gantung = ada yang nanya tapi belum dibalas.',
+            ],
+            'detail' => [
+                'label'       => 'Yang mana saja?',
+                'placeholder' => 'WAG Klien A — belum dibalas 4 hari',
+                'error'       => 'Tulis dulu yang mana saja yang gantung.',
+            ],
+            'plan' => [
+                'label'       => 'Mau diapakan?',
+                'placeholder' => 'Balas setelah harga di-approve',
+                'error'       => 'Tulis rencananya.',
+            ],
+            'due' => [
+                'label' => 'Kapan beres?',
+                'error' => 'Pilih tanggalnya. Tanpa tanggal, tidak ada yang bisa mengingatkan.',
+            ],
+            'escalation' => [
+                'label'       => 'Ada yang perlu atasan tahu?',
+                'hint'        => 'Ini yang dibaca atasan. Angkanya sudah otomatis.',
+                'placeholder' => 'Butuh approve harga Klien A',
+                'show'        => true,
+            ],
+            'prista' => [
+                'label'       => 'Ada yang perlu jadi project?',
+                'placeholder' => 'Revisi jadwal Vendor B',
+                'show'        => true,
+            ],
+        ],
+    ];
+}
+
+/** Satu baris teks yang ditulis admin: tanpa HTML, tanpa baris baru, tidak kosong. */
+function messi_cfg_text($v, string $fallback, int $max = 300): string
+{
+    $t = trim(preg_replace('/\s+/u', ' ', (string) $v) ?? '');
+    $t = mb_substr($t, 0, $max);
+    return $t === '' ? $fallback : $t;
+}
+
+function messi_cfg_int($v, int $fallback, int $min, int $max): int
+{
+    if (!is_numeric($v)) {
+        return $fallback;
+    }
+    $n = (int) $v;
+    return $n < $min || $n > $max ? $fallback : $n;
+}
+
+/**
+ * Dokumen apa pun yang masuk, dokumen yang bisa dipakai yang keluar.
+ *
+ * Dipakai dua kali: saat admin menyimpan, dan lagi saat dibaca. Yang kedua bukan
+ * berlebihan — baris di database bisa lebih tua dari kode yang membacanya, dan satu
+ * ambang yang hilang tidak boleh berarti halaman kosong.
+ */
+function messi_config_normalize($in): array
+{
+    $d = messi_config_default();
+    if (!is_array($in)) {
+        return $d;
+    }
+
+    $channels = [];
+    $seen = [];
+    foreach (is_array($in['channels'] ?? null) ? $in['channels'] : [] as $c) {
+        if (!is_array($c)) {
+            continue;
+        }
+        // Kodenya jadi kunci di grid dan atribut di halaman, jadi dibatasi keras.
+        $key = strtoupper(trim((string) ($c['key'] ?? '')));
+        if (!preg_match('/^[A-Z0-9_]{1,12}$/', $key) || isset($seen[$key])) {
+            continue;
+        }
+        $seen[$key] = true;
+        $label = messi_cfg_text($c['label'] ?? '', $key, 24);
+        $channels[] = ['key' => $key, 'label' => $label,
+                       'full' => messi_cfg_text($c['full'] ?? '', $label, 60)];
+        if (count($channels) >= MESSI_MAX_CHANNELS) {
+            break;
+        }
+    }
+    // Nol channel bukan konfigurasi, itu modul tanpa pertanyaan. Kembali ke bawaannya.
+    if (!$channels) {
+        $channels = $d['channels'];
+    }
+
+    $q = [];
+    $qin = is_array($in['questions'] ?? null) ? $in['questions'] : [];
+    foreach ($d['questions'] as $name => $def) {
+        $got = is_array($qin[$name] ?? null) ? $qin[$name] : [];
+        $one = [];
+        foreach ($def as $field => $fallback) {
+            if ($field === 'show') {
+                $one['show'] = !isset($got['show']) || (bool) $got['show'];
+            } else {
+                $one[$field] = messi_cfg_text($got[$field] ?? '', (string) $fallback);
+            }
+        }
+        $q[$name] = $one;
+    }
+
+    $open = messi_cfg_int($in['open_hour'] ?? null, $d['open_hour'], 0, 23);
+    $due  = messi_cfg_int($in['due_hour'] ?? null, $d['due_hour'], 1, 24);
+    // Batas sebelum pembukaan berarti setiap laporan telat sejak detik pertama.
+    if ($due <= $open) {
+        $due = $d['due_hour'] > $open ? $d['due_hour'] : 24;
+    }
+
+    return [
+        'channels'       => $channels,
+        'team_name'      => messi_cfg_text($in['team_name'] ?? '', '', 60),
+        'threshold_days' => messi_cfg_int($in['threshold_days'] ?? null, $d['threshold_days'], 1, 90),
+        'open_hour'      => $open,
+        'due_hour'       => $due,
+        'max_plans'      => messi_cfg_int($in['max_plans'] ?? null, $d['max_plans'], 1, 20),
+        'declaration'    => messi_cfg_text($in['declaration'] ?? '', $d['declaration'], 600),
+        'questions'      => $q,
+    ];
+}
+
+/** Kunci channel, urutannya seperti yang dicetak laporan. */
+function messi_channel_keys(array $cfg): array
+{
+    return array_column($cfg['channels'], 'key');
+}
+
+/** Channel sebagai kunci => label, bentuk yang dipakai laporan. */
+function messi_channel_defs(array $cfg): array
+{
+    return array_column($cfg['channels'], 'label', 'key');
+}
+
+/**
+ * Konfigurasi untuk membaca sebuah laporan — miliknya sendiri kalau ada.
+ *
+ * Laporan menyimpan channel dan ambang yang berlaku saat dikirim. Tanpa itu, mengganti
+ * batas dari 3 hari ke 1 hari akan mengubah arti laporan bulan lalu, dan menghapus satu
+ * channel akan menghilangkan angkanya dari laporan yang sudah jadi. Riwayat bukan milik
+ * halaman setelan untuk diubah.
+ */
+function messi_doc_config(array $doc, array $cfg): array
+{
+    $snap = $doc['cfg'] ?? null;
+    if (!is_array($snap)) {
+        return $cfg;
+    }
+    $out = $cfg;
+    if (is_array($snap['channels'] ?? null) && $snap['channels']) {
+        $kept = [];
+        foreach ($snap['channels'] as $c) {
+            if (is_array($c) && isset($c['key'])) {
+                $kept[] = ['key' => (string) $c['key'],
+                           'label' => messi_cfg_text($c['label'] ?? '', (string) $c['key'], 24),
+                           'full' => messi_cfg_text($c['full'] ?? '', (string) $c['key'], 60)];
+            }
+        }
+        if ($kept) {
+            $out['channels'] = $kept;
+        }
+    }
+    if (isset($snap['threshold_days'])) {
+        $out['threshold_days'] = messi_cfg_int($snap['threshold_days'], $cfg['threshold_days'], 1, 90);
+    }
+    return $out;
+}
+
+/** Yang ikut disimpan di dalam laporan, supaya nanti tetap terbaca seperti saat dikirim. */
+function messi_config_snapshot(array $cfg): array
+{
+    return ['channels' => $cfg['channels'], 'threshold_days' => $cfg['threshold_days']];
 }
 
 function messi_is_workday(string $day): bool
@@ -125,11 +335,12 @@ function messi_totals(array $grid, array $channels): array
     ];
 }
 
-/** The report's traffic light, derived from the figures instead of typed. */
-function messi_lamp(array $t): array
+/** The report's traffic light, derived from the figures instead of typed. The boundary is
+ *  whatever the squad set it to, so the label has to say the same number the grid asked. */
+function messi_lamp(array $t, int $days = 3): array
 {
     if ($t['gt3'] > 0) {
-        return ['level' => 'red', 'label' => 'Ada yang gantung lebih dari 3 hari'];
+        return ['level' => 'red', 'label' => 'Ada yang gantung lebih dari ' . $days . ' hari'];
     }
     if ($t['hanging'] > 0) {
         return ['level' => 'amber', 'label' => 'Masih ada yang gantung'];
@@ -149,9 +360,9 @@ function messi_cycle_status(string $day, ?array $row, string $today): string
     return $day < $today ? 'missed' : 'pending';
 }
 
-function messi_submit_status(int $hourNow): string
+function messi_submit_status(int $hourNow, int $dueHour = MESSI_DUE_HOUR): string
 {
-    return $hourNow >= MESSI_DUE_HOUR ? 'late' : 'submitted';
+    return $hourNow >= $dueHour ? 'late' : 'submitted';
 }
 
 /** A promise met after its date was not met. A rate that counts late as kept measures
@@ -175,8 +386,6 @@ function messi_missed_days(array $cyclesByDay, string $joinedOn, string $today, 
 
 /* ------------------------------------------------------------------- rencana */
 
-const MESSI_MAX_PLANS = 5;   // lebih dari ini bukan sapuan harian lagi, tapi daftar tugas
-
 /**
  * Rencana sebuah laporan, selalu sebagai daftar.
  *
@@ -184,7 +393,7 @@ const MESSI_MAX_PLANS = 5;   // lebih dari ini bukan sapuan harian lagi, tapi da
  * tempat saja supaya laporan dua minggu pertama tetap terbaca utuh tanpa diubah apa pun
  * di database.
  */
-function messi_plans(array $a): array
+function messi_plans(array $a, int $max = MESSI_MAX_PLANS): array
 {
     $rows = [];
     if (isset($a['plans']) && is_array($a['plans'])) {
@@ -202,7 +411,7 @@ function messi_plans(array $a): array
         if ($action !== '' || $due !== '') {
             $out[] = ['action' => $action, 'due' => $due];
         }
-        if (count($out) >= MESSI_MAX_PLANS) {
+        if (count($out) >= $max) {
             break;
         }
     }
@@ -213,11 +422,12 @@ function messi_plans(array $a): array
 
 /** Consistency first: the declaration attests that the figures above are true, so asking
  *  for it before they add up gets the order backwards. */
-function messi_validate(array $a, array $channels): ?string
+function messi_validate(array $a, array $cfg): ?string
 {
+    $q = $cfg['questions'];
     $grid = $a['grid'] ?? [];
     $typed = false;
-    foreach ($channels as $ch) {
+    foreach (messi_channel_keys($cfg) as $ch) {
         foreach (['open', 'gt3', 'lt3', 'reply'] as $col) {
             if (isset($grid[$ch][$col]) && $grid[$ch][$col] !== '') {
                 $typed = true;
@@ -227,24 +437,24 @@ function messi_validate(array $a, array $channels): ?string
     if (!$typed) {
         return 'Isi dulu angkanya. Kalau kosong semua, tulis 0.';
     }
-    $t = messi_totals($grid, $channels);
+    $t = messi_totals($grid, messi_channel_keys($cfg));
     if ($t['hanging'] > $t['open']) {
         return 'Yang gantung lebih banyak daripada yang masih aktif. Cek lagi angkanya.';
     }
     if ($t['hanging'] > 0) {
         if (trim((string) ($a['detail'] ?? '')) === '') {
-            return 'Tulis dulu yang mana saja yang gantung.';
+            return $q['detail']['error'];
         }
-        $plans = messi_plans($a);
+        $plans = messi_plans($a, $cfg['max_plans']);
         if (!$plans) {
-            return 'Tulis rencananya.';
+            return $q['plan']['error'];
         }
         foreach ($plans as $p) {
             if ($p['action'] === '') {
                 return 'Ada tanggal tanpa rencana. Tulis rencananya, atau hapus barisnya.';
             }
             if ($p['due'] === '') {
-                return 'Pilih tanggalnya. Tanpa tanggal, tidak ada yang bisa mengingatkan.';
+                return $q['due']['error'];
             }
         }
     }
@@ -256,18 +466,18 @@ function messi_validate(array $a, array $channels): ?string
 
 /* --------------------------------------------------------------------- report */
 
-const MESSI_DECLARATION =
-    'Saya sudah memastikan Messenger Squad saya semua terkelola dengan baik tanpa gantung, '
-    . 'dan saya melaporkan laporan di atas dengan jujur sesuai kondisi sebenarnya.';
-
 /** The format the squad already knows, generated instead of typed. Kept byte-identical to
  *  the browser's version so a report looks the same whichever built it. */
-function messi_build_report(array $doc, string $reporter, array $channelDefs): string
+function messi_build_report(array $doc, string $reporter, array $cfg): string
 {
+    // Laporan lama dibaca dengan channel dan ambang yang berlaku saat dikirim.
+    $cfg = messi_doc_config($doc, $cfg);
+    $channelDefs = messi_channel_defs($cfg);
+    $days = $cfg['threshold_days'];
+    $q = $cfg['questions'];
     $grid = $doc['grid'] ?? [];
-    $keys = array_keys($channelDefs);
-    $t = messi_totals($grid, $keys);
-    $lamp = messi_lamp($t);
+    $t = messi_totals($grid, array_keys($channelDefs));
+    $lamp = messi_lamp($t, $days);
     $tag = ['green' => '[HIJAU]', 'amber' => '[KUNING]', 'red' => '[MERAH]'][$lamp['level']];
 
     $open = [];
@@ -281,7 +491,7 @@ function messi_build_report(array $doc, string $reporter, array $channelDefs): s
     // Satu rencana tetap berbentuk satu baris, persis seperti laporan yang sudah dikenal
     // squad. Baru menjadi daftar begitu rencananya lebih dari satu.
     $rows = [];
-    foreach (messi_plans($doc) as $p) {
+    foreach (messi_plans($doc, $cfg['max_plans']) as $p) {
         $rows[] = $p['action'] . ($p['due'] !== '' ? ' (target ' . messi_fmt_day($p['due']) . ')' : '');
     }
     // $line() memangkas spasi di ujung, jadi daftar berbutir disusun di luar helper itu —
@@ -291,23 +501,31 @@ function messi_build_report(array $doc, string $reporter, array $channelDefs): s
         : null;
     $plan = $rows[0] ?? '';
 
-    return implode("\n", [
+    // Hurufnya berjalan terus walau satu pertanyaan dimatikan, supaya "poin h" di laporan
+    // seseorang tidak menunjuk hal lain daripada "poin h" di laporan rekannya.
+    $lines = [
         'MESSI Report',
         'Date: ' . messi_fmt_day($doc['day']) . ' (' . $doc['day'] . ')',
-        'Squad: OASYS   Report by: ' . $reporter,
+        ($cfg['team_name'] === '' ? '' : 'Tim: ' . $cfg['team_name'] . '   ') . 'Report by: ' . $reporter,
         '',
         $tag . ' ' . $lamp['label'],
         '',
         'a. Channel aktif/open: ' . implode(', ', $open),
-        'b. Gantung >3 hari: ' . $t['gt3'],
-        'c. Gantung <3 hari: ' . $t['lt3'],
+        'b. Gantung >' . $days . ' hari: ' . $t['gt3'],
+        'c. Gantung <' . $days . ' hari: ' . $t['lt3'],
         'd. Tidak gantung: ' . $t['clear'],
         'e. Sudah dibalas hari ini: ' . $t['reply'],
         $line('f. Yang masih gantung', $doc['detail'] ?? ''),
         $planLine ?? $line('g. Rencana', $plan),
-        $line('h. Eskalasi', $doc['escalation'] ?? ''),
-        $line('i. Calon PRISTA baru', $doc['prista'] ?? ''),
-        '',
-        'Deklarasi: ' . MESSI_DECLARATION,
-    ]);
+    ];
+    if (!empty($q['escalation']['show'])) {
+        $lines[] = $line('h. Eskalasi', $doc['escalation'] ?? '');
+    }
+    if (!empty($q['prista']['show'])) {
+        $lines[] = $line('i. Calon project baru', $doc['prista'] ?? '');
+    }
+    $lines[] = '';
+    $lines[] = 'Deklarasi: ' . $cfg['declaration'];
+
+    return implode("\n", $lines);
 }

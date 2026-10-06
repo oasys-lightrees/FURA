@@ -16,6 +16,7 @@ $mine = is_leader($user) ? null : (int) $user['id'];
 
 json_out([
     'ok' => true,
+    'config' => repo_config(),
     'me' => [
         'id'       => uid((int) $user['id']),
         'name'     => $user['name'],

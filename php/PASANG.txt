@@ -32,7 +32,12 @@ cPanel -> Software -> Select PHP Version (atau MultiPHP Manager) -> pilih 8.1 / 
 2. BUAT TABELNYA
    cPanel -> phpMyAdmin -> klik database tadi di kiri -> tab Import
    -> Choose File: install.sql -> Go
-   Harus muncul enam tabel: users, sessions, login_tokens, cycles, commitments, job_log
+   Harus muncul tujuh tabel: users, sessions, login_tokens, cycles, commitments,
+   job_log, settings
+
+   SUDAH PERNAH PASANG VERSI SEBELUMNYA? Import ulang install.sql yang baru.
+   Isinya aman diulang (CREATE TABLE IF NOT EXISTS) — data yang sudah ada tidak
+   tersentuh, yang terjadi cuma tabel `settings` ikut dibuat.
 
 
 3. UPLOAD
@@ -78,9 +83,23 @@ cPanel -> Software -> Select PHP Version (atau MultiPHP Manager) -> pilih 8.1 / 
 
 
 7. TAMBAH ORANG
-   Masuk sebagai admin -> di bawah halaman klik "Squad" -> Tambah orang.
+   Masuk sebagai admin -> di bawah halaman klik "Tim" -> Tambah orang.
    Tanggal "Mulai lapor" menentukan sejak kapan orang itu dihitung. Orang baru tidak
    akan pernah ditandai bolos untuk hari sebelum dia bergabung.
+
+
+8. SESUAIKAN PERTANYAANNYA (boleh dilewati)
+   Masuk sebagai admin -> di bawah halaman klik "Pertanyaan".
+   Yang bisa diubah dari situ, tanpa menyentuh kode:
+     - nama tim, yang dicetak di kepala laporan
+     - daftar channel: kode, nama pendek, nama panjang (tambah / ganti / hapus)
+     - batas gantung (3 hari bawaannya), jam buka, jam tutup, maksimal rencana
+     - kalimat tiap pertanyaan, contoh isian, dan pesan kalau dikosongkan
+     - mematikan pertanyaan yang tidak dipakai
+     - kalimat pernyataan di kaki laporan
+   Berlaku untuk laporan berikutnya. Laporan yang sudah terkirim tetap terbaca
+   dengan setelan yang berlaku saat dikirim — mengubah ambang hari ini tidak
+   mengubah arti laporan bulan lalu.
 
 
 GOOGLE CHAT (boleh dilewati dulu)

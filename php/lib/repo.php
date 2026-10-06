@@ -12,8 +12,49 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/bootstrap.php';
 
-/** Channel keys and their labels, in the order the report prints them. */
-const MESSI_CHANNELS = ['WAG' => 'WAG', 'TGG' => 'TGG', 'GCG' => 'GCG'];
+/**
+ * Setelan modul: pertanyaannya, ambangnya, jamnya.
+ *
+ * Dibaca sekali per permintaan, karena hampir setiap jalur membutuhkannya dan tidak ada
+ * satu pun yang boleh berubah di tengah satu permintaan — laporan yang divalidasi dengan
+ * satu ambang lalu disimpan dengan ambang lain adalah laporan yang tidak pernah benar.
+ */
+final class Cfg
+{
+    private static ?array $held = null;
+
+    public static function get(): array
+    {
+        if (self::$held === null) {
+            $row = q1('SELECT value FROM settings WHERE name = ?', ['messi']);
+            $raw = $row ? json_decode((string) $row['value'], true) : null;
+            self::$held = messi_config_normalize($raw);
+        }
+        return self::$held;
+    }
+
+    /** Dipakai setelah admin menyimpan, dan oleh tes yang berganti setelan. */
+    public static function forget(): void { self::$held = null; }
+}
+
+function repo_config(): array
+{
+    return Cfg::get();
+}
+
+function repo_save_config(array $user, $in): array
+{
+    if (($user['role'] ?? '') !== 'admin') {
+        throw new RepoError('Halaman ini untuk admin.');
+    }
+    $cfg = messi_config_normalize($in);
+    q('INSERT INTO settings (name, value, updated_at, updated_by) VALUES (?,?,?,?)
+       ON DUPLICATE KEY UPDATE value = VALUES(value), updated_at = VALUES(updated_at),
+                               updated_by = VALUES(updated_by)',
+      ['messi', json_encode($cfg, JSON_UNESCAPED_UNICODE), Clock::nowUtcSql(), (int) $user['id']]);
+    Cfg::forget();
+    return $cfg;
+}
 
 /** The page's ids for people and promises. Prefixed so the two can never be confused,
  *  and so a raw database id is never a valid document id by accident. */
@@ -132,17 +173,21 @@ function repo_save_cycle(array $user, string $docId, array $doc): array
         throw new RepoError('Tanggal mulai kamu belum tiba.');
     }
 
+    $cfg = repo_config();
     $answers = [
         'grid'       => is_array($doc['grid'] ?? null) ? $doc['grid'] : [],
         'detail'     => trim((string) ($doc['detail'] ?? '')),
-        'plans'      => messi_plans($doc),      // membaca bentuk lama maupun baru
+        'plans'      => messi_plans($doc, $cfg['max_plans']),   // bentuk lama maupun baru
         'escalation' => trim((string) ($doc['escalation'] ?? '')),
         'prista'     => trim((string) ($doc['prista'] ?? '')),
         'declared'   => !empty($doc['declared']),
+        // Pertanyaan boleh berubah; laporan yang sudah dikirim tidak. Cuplikan ini yang
+        // membuat laporan bulan lalu tetap terbaca dengan ambang dan channel saat itu.
+        'cfg'        => messi_config_snapshot($cfg),
     ];
 
     // The same check the page ran, run again where it cannot be skipped.
-    $problem = messi_validate($answers, array_keys(MESSI_CHANNELS));
+    $problem = messi_validate($answers, $cfg);
     if ($problem !== null) {
         throw new RepoError($problem);
     }
@@ -152,7 +197,7 @@ function repo_save_cycle(array $user, string $docId, array $doc): array
         }
     }
 
-    $status = messi_submit_status(Clock::hour());
+    $status = messi_submit_status(Clock::hour(), $cfg['due_hour']);
     $now = Clock::nowUtcSql();
     $cycleId = repo_ensure_cycle($userId, $today);
 

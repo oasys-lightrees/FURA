@@ -164,12 +164,12 @@ with Host("messi_live_test") as host, sync_playwright() as p:
 
     print("\n=== yang dilihat leader ===")
     lead_ctx = browser.new_context(viewport={"width": 420, "height": 900})
-    lead = sign_in(lead_ctx, base, "chief@example.test", results=results)
+    lead = sign_in(lead_ctx, base, "lead@example.test", results=results)
     check("leader punya tab squad", lead.eval_on_selector("#tabs", "e=>!e.hidden"))
-    lead.click('[data-tab="chief"]')
+    lead.click('[data-tab="tim"]')
     lead.wait_for_timeout(500)
     body = lead.inner_text("body")
-    check("judulnya rekap, bukan daftar masalah", lead.inner_text("h1"), "Rekap squad")
+    check("judulnya rekap, bukan daftar masalah", lead.inner_text("h1"), "Rekap tim")
     check("hitungannya 1 dari 3", lead.inner_text(".stats"), lambda s: "1/3" in s)
     check("nama, bukan id database", "u_1" not in body and "u_2" not in body)
     check("semua orang terdaftar, bukan cuma yang bermasalah",
@@ -192,7 +192,7 @@ with Host("messi_live_test") as host, sync_playwright() as p:
     lead.click("#next")
     lead.wait_for_timeout(900)
     check("leader juga mengisi laporannya", lead.inner_text("h1"), "Sudah terkirim")
-    lead.click('[data-tab="chief"]')
+    lead.click('[data-tab="tim"]')
     lead.wait_for_timeout(500)
     check("hitungannya naik jadi 2 dari 3", lead.inner_text(".stats"), lambda s: "2/3" in s)
 
@@ -218,7 +218,7 @@ with Host("messi_live_test") as host, sync_playwright() as p:
     check("hari itu memang belum ada yang lapor",
           lead.inner_text("body"), lambda s: "belum lapor" in s or "tidak lapor" in s)
     lead.click('[data-tab="hari-ini"]')
-    lead.click('[data-tab="chief"]')
+    lead.click('[data-tab="tim"]')
     lead.wait_for_timeout(400)
     check("ganti tab mengembalikan ke hari ini",
           lead.inner_text(".stats"), lambda s: "2/3" in s)
@@ -252,7 +252,7 @@ with Host("messi_live_test") as host, sync_playwright() as p:
     lead.reload()
     lead.wait_for_load_state("networkidle")
     lead.wait_for_timeout(700)
-    lead.click('[data-tab="chief"]')
+    lead.click('[data-tab="tim"]')
     lead.wait_for_timeout(400)
     check("nama berisi HTML tidak dijalankan sebagai kode",
           lead.evaluate("window.__PWNED__ === undefined"))

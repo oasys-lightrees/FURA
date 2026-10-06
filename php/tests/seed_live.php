@@ -31,7 +31,7 @@ if (($argv[1] ?? '') === 'empty') {
 $joined = messi_add_days(Clock::today(), -2);
 foreach ([['nicho@example.test', 'Nicho', 'player'],
           ['rio@example.test',   'Rio',   'player'],
-          ['chief@example.test', 'Chief', 'leader']] as [$email, $name, $role]) {
+          ['lead@example.test', 'Lia', 'leader']] as [$email, $name, $role]) {
     q('INSERT INTO users (email, name, password_hash, role, joined_on, created_at) VALUES (?,?,?,?,?,?)',
       [$email, $name, password_hash('kata-sandi-panjang', PASSWORD_DEFAULT), $role, $joined, Clock::nowUtcSql()]);
 }

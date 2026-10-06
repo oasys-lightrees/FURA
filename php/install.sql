@@ -78,6 +78,18 @@ CREATE TABLE IF NOT EXISTS commitments (
   CONSTRAINT fk_commitments_cycle FOREIGN KEY (cycle_id) REFERENCES cycles(id) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+-- Setelan per modul, satu baris per modul, isinya JSON. Sebuah tabel dan bukan berkas
+-- config karena yang mengubahnya adalah admin lewat halaman, bukan orang lewat FTP —
+-- dan karena halaman setelannya harus bisa salah tanpa membuat situsnya mati.
+CREATE TABLE IF NOT EXISTS settings (
+  name            VARCHAR(40) NOT NULL,
+  value           LONGTEXT NOT NULL CHECK (JSON_VALID(value)),
+  updated_at      DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_by      INT UNSIGNED DEFAULT NULL,
+  PRIMARY KEY (name),
+  CONSTRAINT fk_settings_user FOREIGN KEY (updated_by) REFERENCES users(id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 -- Append-only record of what the cron and the bot did. Without it, "kenapa saya tidak
 -- dapat pesan?" has no answer.
 CREATE TABLE IF NOT EXISTS job_log (

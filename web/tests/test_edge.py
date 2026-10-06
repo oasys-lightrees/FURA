@@ -4,7 +4,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from harness import (SHOTS, check, context, launch, new_page, report, results,
-                     store_of, txt, sync_playwright)
+                     stored, store_of, txt, sync_playwright)
 
 with sync_playwright() as p:
     b = launch(p)
@@ -71,7 +71,13 @@ with sync_playwright() as p:
     pgM.click("#next"); pgM.wait_for_timeout(250)
     check("rencana tanpa tanggal ditolak", pgM.inner_text("body"), lambda s: "Pilih tanggalnya" in s)
     pgM.click("[data-drop='4']"); pgM.wait_for_timeout(200)
-    pgM.click("#next"); pgM.wait_for_timeout(300)
+    # Ditunggu sampai langkahnya benar-benar berganti, bukan sekadar dihitung milidetik:
+    # kalau tidak, suite ini jadi rewel begitu mesinnya sedang sibuk.
+    pgM.click("#next")
+    try:
+        pgM.wait_for_selector("[name=declared]", timeout=10_000)
+    except Exception:
+        pass
     check("empat rencana lolos ke langkah berikutnya", pgM.query_selector("[name=escalation]") is not None)
 
     pgM.check("[name=declared]"); pgM.click("#next"); pgM.wait_for_timeout(500)
@@ -194,16 +200,18 @@ with sync_playwright() as p:
     pgN.click("#next"); pgN.wait_for_timeout(250)
     pgN.fill("[name=detail]","WAG Klien C"); pgN.fill("[data-pa='0']","Telepon besok")
     pgN.fill("[data-pd='0']","2026-10-01"); pgN.click("#next"); pgN.wait_for_timeout(250)
-    pgN.fill("[name=escalation]","Minta bantuan Chief soal Klien C")
+    pgN.fill("[name=escalation]","Minta bantuan atasan soal Klien C")
     pgN.check("[name=declared]"); pgN.click("#next"); pgN.wait_for_timeout(400)
     check("Nicho berhasil kirim", txt(pgN,"h1"), "Sudah terkirim")
 
-    pgC = new_page(shared, "u_chief", at="2026-09-30T04:05:00Z", reset=False)   # store yang sama
-    pgC.click('[data-tab="chief"]'); pgC.wait_for_timeout(400)
+    # Kirimannya ditulis tanpa ditunggu, jadi layar kedua bisa mendahului tulisannya.
+    stored(pgN, "cycles", 1)
+    pgC = new_page(shared, "u_lead", at="2026-09-30T04:05:00Z", reset=False)   # store yang sama
+    pgC.click('[data-tab="tim"]'); pgC.wait_for_timeout(400)
     body = pgC.inner_text("body")
-    check("Chief melihat kiriman Nicho yang baru", "Minta bantuan Chief soal Klien C" in body)
-    check("Chief melihat namanya, bukan id", "Nicho" in body and "u_nicho" not in body)
-    check("Chief belum lapor -> terhitung", txt(pgC,".stats"), lambda s: "1/2" in s)
+    check("leader melihat kiriman Nicho yang baru", "Minta bantuan atasan soal Klien C" in body)
+    check("leader melihat namanya, bukan id", "Nicho" in body and "u_nicho" not in body)
+    check("leader belum lapor -> terhitung", txt(pgC,".stats"), lambda s: "1/2" in s)
     pgC.screenshot(path=str(SHOTS)+"/t-cross.png", full_page=True)
     b.close()
 

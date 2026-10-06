@@ -1,4 +1,4 @@
-<title>MESSI Squad OASYS</title>
+<title>FURA</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Public+Sans:ital,wght@0,400;0,500;0,600;0,700;1,400&family=IBM+Plex+Mono:wght@400;500&display=swap">
@@ -36,13 +36,58 @@ body { margin:0; background:var(--paper); color:var(--ink); font-family:var(--ui
 main { padding:22px 16px 132px; }
 
 /* header */
-.top { position:sticky; top:env(safe-area-inset-top,0px); z-index:30;
-       background:color-mix(in srgb,var(--paper) 94%,transparent); backdrop-filter:blur(10px);
+/* Kepala dan baris modul menempel sebagai satu blok. Dulu keduanya menempel sendiri-sendiri
+   dan yang bawah perlu tahu tinggi yang atas — padahal tingginya berubah ikut lebar layar,
+   jadi di satu lebar tertentu baris modulnya selalu tersembunyi di balik kepalanya. */
+.chrome { position:sticky; top:env(safe-area-inset-top,0px); z-index:30; }
+.top { background:color-mix(in srgb,var(--paper) 94%,transparent); backdrop-filter:blur(10px);
        border-bottom:1px solid var(--line); }
 .top-in { max-width:var(--shell); margin:0 auto; padding:11px 16px; display:flex;
           align-items:center; gap:10px; }
-.logo { font-weight:700; letter-spacing:.14em; font-size:13px; }
-.when { margin-left:auto; font-family:var(--mono); font-size:12px; color:var(--muted); }
+.logo { display:block; text-align:left; padding:0; border:0; background:none; color:inherit;
+        font:inherit; cursor:pointer; }
+.logo .brand { display:block; font-weight:700; letter-spacing:.14em; font-size:13px; }
+.logo .tagline { display:block; font-size:9.5px; letter-spacing:.07em; color:var(--muted);
+                 text-transform:uppercase; margin-top:1px; white-space:nowrap; }
+.logo:hover .tagline { color:var(--ink); }
+
+/* baris modul: di mana kamu sekarang, dan jalan keluarnya */
+.modbar { background:var(--surface); border-bottom:1px solid var(--line); }
+.modbar-in { max-width:var(--shell); margin:0 auto; padding:8px 16px; display:flex;
+             align-items:center; gap:10px; font-size:13px; }
+.modbar b { font-weight:600; letter-spacing:.06em; }
+.modbar .back, .modbar .what { background:none; border:0; padding:0; cursor:pointer;
+             font:inherit; color:var(--muted); }
+.modbar .back:hover, .modbar .what:hover { color:var(--ink); }
+.modbar .what { margin-left:auto; text-decoration:underline; text-underline-offset:2px; }
+
+/* katalog modul */
+.mods { display:grid; gap:12px; }
+.mod { width:100%; text-align:left; display:block; background:var(--surface); color:inherit;
+       border:1px solid var(--line); border-radius:14px; padding:16px; font:inherit; }
+button.mod { cursor:pointer; }
+button.mod:hover { border-color:var(--ink); }
+.mod .head { display:flex; align-items:baseline; gap:9px; }
+.mod .name { font-weight:700; letter-spacing:.1em; font-size:15px; }
+.mod .full { color:var(--muted); font-size:12.5px; }
+.mod .pill { margin-left:auto; font-size:11px; letter-spacing:.04em; padding:2px 8px;
+             border-radius:999px; background:var(--kept-bg); color:var(--kept); }
+.mod.soon { opacity:.72; }
+.mod.soon .pill { background:var(--raise); color:var(--muted); }
+.mod p { margin:7px 0 0; font-size:13.5px; color:var(--muted); }
+.mod .state { margin-top:10px; font-size:13px; font-weight:500; display:flex;
+              align-items:center; gap:7px; }
+.mod .state i { width:7px; height:7px; border-radius:50%; background:var(--muted); flex:none; }
+.mod .state.todo i { background:var(--due); }
+.mod .state.done i { background:var(--kept); }
+
+/* penjelasan modul */
+.intro h2 { font-size:14px; margin:22px 0 7px; }
+.intro ol, .intro ul { margin:0; padding-left:20px; }
+.intro li { margin:5px 0; font-size:14.5px; }
+.intro .lead { font-size:15px; }
+.when { margin-left:auto; font-family:var(--mono); font-size:12px; color:var(--muted);
+        text-align:right; }
 .theme { width:30px; height:30px; border-radius:50%; flex:none; cursor:pointer;
           font-size:14px; line-height:1; background:var(--surface); color:var(--muted);
           border:1px solid var(--line); display:grid; place-items:center; padding:0; }
@@ -224,7 +269,7 @@ h2 { font-size:11.5px; font-weight:700; letter-spacing:.09em; text-transform:upp
   .btns { justify-content:flex-end; }
   .btn { flex:0 0 auto; min-width:190px; }
   .btn.sec { min-width:120px; }
-  /* Rekap: yang perlu ditindak di kiri, seluruh squad di kanan — terbaca sekaligus
+  /* Rekap: yang perlu ditindak di kiri, seluruh tim di kanan — terbaca sekaligus
      tanpa menggulir, yang memang gunanya layar lebar buat seorang leader. */
   .cols { display:grid; grid-template-columns:1fr 1fr; gap:0 28px; align-items:start; }
   .cols h2:first-child { margin-top:0; }
@@ -232,12 +277,16 @@ h2 { font-size:11.5px; font-weight:700; letter-spacing:.09em; text-transform:upp
 
 </style>
 
-<div class="top"><div class="top-in">
-  <span class="logo">MESSI</span>
+<div class="chrome"><div class="top"><div class="top-in">
+  <button class="logo" id="home" type="button" aria-label="Kembali ke daftar modul">
+    <span class="brand">FURA</span>
+    <span class="tagline">Follow Up Report Automation</span>
+  </button>
   <span class="when" id="whenLbl">—</span>
   <button class="theme" id="theme" type="button" aria-label="Ganti terang/gelap"></button>
   <span class="avatar" id="avatar">·</span>
 </div></div>
+<div class="modbar" id="modbar" hidden><div class="modbar-in" id="modbarIn"></div></div></div>
 <nav class="tabs" id="tabs" role="tablist" hidden></nav>
 <div class="app"><main id="view"></main></div>
 <div class="bar" id="bar" hidden><div class="bar-in" id="barIn"></div></div>
@@ -250,29 +299,101 @@ h2 { font-size:11.5px; font-weight:700; letter-spacing:.09em; text-transform:upp
 
    Built to be answered on a phone, in the middle of doing something else, by
    someone who was never trained on it. One question per screen; the report
-   format the squad knows is generated at the end rather than typed.
+   format the team already knows is generated at the end rather than typed.
    ========================================================================== */
 
-const TZ = "Asia/Jakarta", OPEN_AT = 9, DUE_AT = 18;
+const TZ = "Asia/Jakarta";
 const WORKDAYS = [1,2,3,4,5], FIRST_DAY = "2026-09-28", DRAFT = "messi.draft.";
 const ID_DAY = ["Minggu","Senin","Selasa","Rabu","Kamis","Jumat","Sabtu"];
 const ID_SHORT = ["Min","Sen","Sel","Rab","Kam","Jum","Sab"];
 const MON = ["Jan","Feb","Mar","Apr","Mei","Jun","Jul","Agu","Sep","Okt","Nov","Des"];
 
-const CHANNELS = [
-  { key:"WAG", label:"WAG", full:"WhatsApp Group" },
-  { key:"TGG", label:"TGG", full:"Telegram Group" },
-  { key:"GCG", label:"GCG", full:"Google Chat" },
-];
+/* ---- konfigurasi --------------------------------------------------------- */
+/* Pertanyaan, ambang, dan jamnya tidak lagi tertanam di sini: admin mengubahnya dari
+   halaman Pertanyaan, dan server mengirimkannya lewat window.FURA_CONFIG. Bawaan di
+   bawah ini tetap ada supaya halaman ini utuh tanpa server sama sekali — dan harus sama
+   persis dengan messi_config_default() di lib/engine.php. Kalau keduanya berbeda, satu
+   laporan akan divalidasi dengan dua aturan yang berlainan. */
+const CFG_DEFAULT = {
+  channels: [
+    { key:"WAG", label:"WAG", full:"WhatsApp Group" },
+    { key:"TGG", label:"TGG", full:"Telegram Group" },
+    { key:"GCG", label:"GCG", full:"Google Chat" },
+  ],
+  team_name: "",
+  threshold_days: 3,
+  open_hour: 9,
+  due_hour: 18,
+  max_plans: 5,
+  declaration:
+    "Saya sudah memastikan semua channel yang saya pegang terkelola dengan baik tanpa " +
+    "gantung, dan saya melaporkan laporan di atas dengan jujur sesuai kondisi sebenarnya.",
+  questions: {
+    grid: { label:"Berapa banyak hari ini?",
+            hint:"Hitung channel yang kamu pegang. Gantung = ada yang nanya tapi belum dibalas." },
+    detail: { label:"Yang mana saja?", placeholder:"WAG Klien A — belum dibalas 4 hari",
+              error:"Tulis dulu yang mana saja yang gantung." },
+    plan: { label:"Mau diapakan?", placeholder:"Balas setelah harga di-approve",
+            error:"Tulis rencananya." },
+    due: { label:"Kapan beres?",
+           error:"Pilih tanggalnya. Tanpa tanggal, tidak ada yang bisa mengingatkan." },
+    escalation: { label:"Ada yang perlu atasan tahu?",
+                  hint:"Ini yang dibaca atasan. Angkanya sudah otomatis.",
+                  placeholder:"Butuh approve harga Klien A", show:true },
+    prista: { label:"Ada yang perlu jadi project?", placeholder:"Revisi jadwal Vendor B",
+              show:true },
+  },
+};
+
+const whole = (v, d, lo, hi) => {
+  const n = parseInt(v, 10);
+  return Number.isFinite(n) && n >= lo && n <= hi ? n : d;
+};
+function cfgOf(raw) {
+  const d = CFG_DEFAULT, c = raw && typeof raw === "object" ? raw : {};
+  const questions = {};
+  for (const k of Object.keys(d.questions)) {
+    questions[k] = { ...d.questions[k], ...(((c.questions || {})[k]) || {}) };
+  }
+  const channels = (Array.isArray(c.channels) ? c.channels : [])
+    .filter(x => x && x.key).map(x => ({ key:String(x.key),
+      label:String(x.label || x.key), full:String(x.full || x.label || x.key) }));
+  return {
+    channels: channels.length ? channels : d.channels,
+    team_name: typeof c.team_name === "string" ? c.team_name : d.team_name,
+    threshold_days: whole(c.threshold_days, d.threshold_days, 1, 90),
+    open_hour: whole(c.open_hour, d.open_hour, 0, 23),
+    due_hour:  whole(c.due_hour,  d.due_hour,  1, 24),
+    max_plans: whole(c.max_plans, d.max_plans, 1, 20),
+    declaration: typeof c.declaration === "string" && c.declaration.trim()
+      ? c.declaration : d.declaration,
+    questions,
+  };
+}
+const CFG = cfgOf(window.FURA_CONFIG);
+const Q = CFG.questions;
+const CHANNELS = CFG.channels, DECLARATION = CFG.declaration;
+const OPEN_AT = CFG.open_hour, DUE_AT = CFG.due_hour, MAX_PLANS = CFG.max_plans;
+const NDAYS = CFG.threshold_days;
+const hhmm = h => String(h).padStart(2, "0") + ":00";
 const COLS = [
   { key:"open",  head:"Masih<br>aktif" },
-  { key:"gt3",   head:"Gantung<br>&gt;3 hari" },
-  { key:"lt3",   head:"Gantung<br>&lt;3 hari" },
+  { key:"gt3",   head:`Gantung<br>&gt;${NDAYS} hari` },
+  { key:"lt3",   head:`Gantung<br>&lt;${NDAYS} hari` },
   { key:"reply", head:"Sudah<br>dibalas" },
 ];
-const DECLARATION =
-  "Saya sudah memastikan Messenger Squad saya semua terkelola dengan baik tanpa gantung, " +
-  "dan saya melaporkan laporan di atas dengan jujur sesuai kondisi sebenarnya.";
+
+/* ---- katalog modul -------------------------------------------------------- */
+/* FURA menampung banyak modul; MESSI yang pertama jalan. Yang belum jadi tetap
+   terlihat supaya orang tahu ke mana ini menuju, tapi tidak bisa dibuka — kartu yang
+   bisa diklik lalu tidak melakukan apa-apa lebih buruk daripada kartu yang jujur. */
+const MODULES = [
+  { key:"messi", name:"MESSI", full:"Messenger Screening", live:true,
+    what:"Sapuan harian semua channel chat: berapa yang aktif, berapa yang gantung, " +
+         "dan apa rencana untuk yang gantung." },
+  { key:"prista", name:"PRISTA", full:"Project Status", live:false,
+    what:"Status tiap project yang berjalan, hambatannya, dan tanggal beresnya." },
+];
 
 /* ---- tema ---------------------------------------------------------------- */
 /* Bawaannya mengikuti perangkat. Begitu orang menekan tombolnya, pilihannya dikunci
@@ -331,18 +452,33 @@ function pastWorkdays(end, n) {
 
 /* ---- numbers ------------------------------------------------------------- */
 const num = v => { const n = parseFloat(v); return Number.isFinite(n) ? n : 0; };
-const sum = (g,c) => CHANNELS.reduce((s,ch) => s + num((g[ch.key]||{})[c]), 0);
-function totals(g) {
+const sumIn = (g,chans,c) => chans.reduce((s,ch) => s + num((g[ch.key]||{})[c]), 0);
+function totalsIn(g, chans) {
   g = g || {};
-  const open = sum(g,"open"), gt3 = sum(g,"gt3"), lt3 = sum(g,"lt3");
-  return { open, gt3, lt3, hanging:gt3+lt3, clear:open-gt3-lt3, reply:sum(g,"reply") };
+  const open = sumIn(g,chans,"open"), gt3 = sumIn(g,chans,"gt3"), lt3 = sumIn(g,chans,"lt3");
+  return { open, gt3, lt3, hanging:gt3+lt3, clear:open-gt3-lt3, reply:sumIn(g,chans,"reply") };
 }
-function lampFor(g) {
-  const t = totals(g);
-  if (t.gt3 > 0)     return { level:"red",   label:"Ada yang gantung lebih dari 3 hari" };
+const totals = g => totalsIn(g, CHANNELS);
+function lampAt(t, days) {
+  if (t.gt3 > 0)     return { level:"red",   label:`Ada yang gantung lebih dari ${days} hari` };
   if (t.hanging > 0) return { level:"amber", label:"Masih ada yang gantung" };
   return { level:"green", label:"Tidak ada yang gantung" };
 }
+const lampFor = g => lampAt(totals(g), NDAYS);
+
+/* Laporan yang sudah dikirim dibaca dengan channel dan ambang yang berlaku saat itu —
+   kalau tidak, mengganti setelan hari ini diam-diam menulis ulang arti laporan kemarin. */
+function docCfg(doc) {
+  const snap = doc && doc.cfg;
+  if (!snap || typeof snap !== "object") return CFG;
+  const ch = (Array.isArray(snap.channels) ? snap.channels : []).filter(c => c && c.key)
+    .map(c => ({ key:String(c.key), label:String(c.label || c.key),
+                 full:String(c.full || c.label || c.key) }));
+  return { ...CFG, channels: ch.length ? ch : CFG.channels,
+           threshold_days: whole(snap.threshold_days, CFG.threshold_days, 1, 90) };
+}
+const docTotals = doc => totalsIn((doc || {}).grid, docCfg(doc).channels);
+const docLamp = doc => lampAt(docTotals(doc), docCfg(doc).threshold_days);
 const statusOf = (day, doc) =>
   doc && doc.submittedAt ? (doc.late ? "late" : "submitted") : (day < today() ? "missed" : "pending");
 
@@ -351,7 +487,39 @@ const S = { me:null, name:"", isLeader:false, cycles:new Map(), commitments:new 
             roster:new Map(), tab:"hari-ini", step:1, editing:false, error:null,
             copied:false, showReport:false, ready:false, offline:false, a:null, savedAt:null,
             // Layar leader: hari yang sedang dibaca, dan laporan siapa yang dibuka.
-            day:null, openRow:null };
+            day:null, openRow:null,
+            // Di mana orangnya: katalog modul, penjelasan sebuah modul, atau modulnya.
+            view:"catalog", intro:false };
+
+/* Penjelasan modul hanya muncul sekali per perangkat. Orang yang sudah paham tidak perlu
+   membacanya tiap pagi; yang mau membacanya lagi punya tautan "Apa ini?" di atas. */
+const SEEN = "fura.seen.";
+function seenIntro(mod) {
+  try { return localStorage.getItem(SEEN + mod) === "1"; } catch { return false; }
+}
+function markSeen(mod) {
+  try { localStorage.setItem(SEEN + mod, "1"); } catch { /* mode privat */ }
+}
+/* Modul yang sedang dibuka disimpan per tab, bukan per perangkat. Memuat ulang di
+   tengah pengisian harus kembali ke tempat yang sama — tapi besok pagi orangnya mulai
+   dari katalog lagi, bukan dilempar ke modul kemarin. */
+const AT = "fura.at";
+const atStore = fn => { try { return fn(sessionStorage); } catch { return null; } };
+function openModule(mod) {
+  S.view = mod; S.intro = !seenIntro(mod); S.error = null;
+  atStore(ss => ss.setItem(AT, mod));
+  render(); toTop();
+}
+function goCatalog() {
+  S.view = "catalog"; S.intro = false; S.error = null;
+  atStore(ss => ss.removeItem(AT));
+  render(); toTop();
+}
+/** Di mana tab ini tadi — kalau modulnya memang ada dan memang jalan. */
+function resumeModule() {
+  const at = atStore(ss => ss.getItem(AT));
+  return MODULES.some(m => m.key === at && m.live) ? at : "catalog";
+}
 
 let db = null, users = null;
 const key = (uid,day) => uid + "__" + day;
@@ -359,7 +527,6 @@ const mine = day => S.cycles.get(key(S.me, day));
 const myPromises = () => [...S.commitments.values()]
   .filter(c => c.owner === S.me && c.status === "open").sort((a,b) => a.due.localeCompare(b.due));
 const duePromises = () => myPromises().filter(c => c.due <= today());
-const MAX_PLANS = 5;      // lebih dari ini bukan sapuan harian lagi, tapi daftar tugas
 const blank = () => ({ grid:{}, detail:"", plans:[{action:"",due:""}],
                        escalation:"", prista:"", declared:false });
 
@@ -421,6 +588,7 @@ async function boot() {
   } else { S.offline = true; }
 
   S.a = loadDraft(today()) || blank();
+  S.view = resumeModule();
   S.ready = true;
   await names();
   render();
@@ -456,12 +624,12 @@ function checkStep() {
     if (t.hanging > t.open) return "Yang gantung lebih banyak daripada yang masih aktif. Cek lagi angkanya.";
   }
   if (stepName() === "gantung") {
-    if (!S.a.detail.trim()) return "Tulis dulu yang mana saja yang gantung.";
+    if (!S.a.detail.trim()) return Q.detail.error;
     const rows = plansOf(S.a);
-    if (!rows.length) return "Tulis rencananya.";
+    if (!rows.length) return Q.plan.error;
     for (const r of rows) {
       if (!r.action) return "Ada tanggal tanpa rencana. Tulis rencananya, atau hapus barisnya.";
-      if (!r.due)    return "Pilih tanggalnya. Tanpa tanggal, tidak ada yang bisa mengingatkan.";
+      if (!r.due)    return Q.due.error;
     }
   }
   if (stepName() === "kirim" && !S.a.declared) return "Centang pernyataannya dulu.";
@@ -470,7 +638,10 @@ function checkStep() {
 
 function submitNow(resolved) {
   const day = today(), late = nowHour() >= DUE_AT;
-  const doc = { owner:S.me, day, ...S.a, submittedAt:new Date().toISOString(), late };
+  // Cuplikan setelan ikut tersimpan: laporan ini harus tetap terbaca seperti hari ini
+  // walau pertanyaannya diubah bulan depan. Server menyimpan yang sama.
+  const doc = { owner:S.me, day, ...S.a, cfg:{ channels:CHANNELS, threshold_days:NDAYS },
+                submittedAt:new Date().toISOString(), late };
   S.cycles.set(key(S.me, day), doc);
   put("cycles", key(S.me, day), doc);
   for (const id of resolved) {
@@ -517,8 +688,8 @@ function progress() {
 function stepAngka() {
   const t = totals(S.a.grid), lamp = lampFor(S.a.grid);
   return `${progress()}
-    <h1>Berapa banyak hari ini?</h1>
-    <p class="sub">Hitung channel squad kamu. <b>Gantung</b> = ada yang nanya tapi belum dibalas.</p>
+    <h1>${esc(Q.grid.label)}</h1>
+    <p class="sub">${esc(Q.grid.hint)}</p>
     <div class="tbl">
       <table class="mx">
         <tr><th></th>${COLS.map(c => `<th>${c.head}</th>`).join("")}</tr>
@@ -546,12 +717,12 @@ function stepGantung() {
   // persis seperti sebelumnya — baris kedua hanya ada kalau dia memintanya.
   const plan = (r, i) => `<div class="prow2" data-plan="${i}">
       <div class="fld">
-        <label for="plan${i}">Mau diapakan?</label>
+        <label for="plan${i}">${esc(Q.plan.label)}</label>
         <textarea id="plan${i}" data-pa="${i}" rows="2"
-          placeholder="Balas setelah harga di-approve">${esc(r.action)}</textarea>
+          placeholder="${esc(Q.plan.placeholder)}">${esc(r.action)}</textarea>
       </div>
       <div class="fld">
-        <label for="due${i}">Kapan beres?</label>
+        <label for="due${i}">${esc(Q.due.label)}</label>
         <input id="due${i}" data-pd="${i}" type="date" min="${esc(day)}" value="${esc(r.due)}">
       </div>
       ${rows.length > 1 ? `<button class="drop" type="button" data-drop="${i}"
@@ -561,8 +732,9 @@ function stepGantung() {
     <h1>${t.hanging} yang masih gantung</h1>
     <p class="sub">Supaya tidak keskip, tiga hal ini perlu diisi.</p>
     <div class="fld">
-      <label for="detail">Yang mana saja?</label>
-      <textarea id="detail" name="detail" placeholder="WAG Klien A — belum dibalas 4 hari">${esc(S.a.detail)}</textarea>
+      <label for="detail">${esc(Q.detail.label)}</label>
+      <textarea id="detail" name="detail"
+        placeholder="${esc(Q.detail.placeholder)}">${esc(S.a.detail)}</textarea>
     </div>
     <p class="hint" style="margin:0 0 10px">Tiap rencana punya tanggalnya sendiri. Nanti kamu
       diingatkan tepat di tanggal itu — bukan tiap hari.</p>
@@ -596,44 +768,52 @@ function stepKirim() {
             c.due < day ? " · sudah lewat" : ""} — sudah beres?</span>
           </span></label>`).join("")
       : ""; })()}
-    <div class="fld"><label for="escalation">Ada yang perlu Chief tahu?
+    ${Q.escalation.show ? `<div class="fld"><label for="escalation">${esc(Q.escalation.label)}
       <span class="opt">— boleh dikosongkan</span>
-      <span class="hint">Ini yang dia baca. Angkanya sudah otomatis.</span></label>
-      <textarea id="escalation" name="escalation" placeholder="Butuh approve harga Klien A">${esc(S.a.escalation)}</textarea></div>
-    <div class="fld"><label for="prista">Ada yang perlu jadi project?
+      <span class="hint">${esc(Q.escalation.hint)}</span></label>
+      <textarea id="escalation" name="escalation"
+        placeholder="${esc(Q.escalation.placeholder)}">${esc(S.a.escalation)}</textarea></div>` : ""}
+    ${Q.prista.show ? `<div class="fld"><label for="prista">${esc(Q.prista.label)}
       <span class="opt">— boleh dikosongkan</span></label>
-      <textarea id="prista" name="prista" placeholder="Revisi jadwal Vendor B">${esc(S.a.prista)}</textarea></div>
+      <textarea id="prista" name="prista"
+        placeholder="${esc(Q.prista.placeholder)}">${esc(S.a.prista)}</textarea></div>` : ""}
     <label class="check decl"><input type="checkbox" name="declared" ${S.a.declared ? "checked" : ""}>
       <span class="t">${esc(DECLARATION)}</span></label>`;
 }
 
 function buildReport(doc) {
-  const t = totals(doc.grid), lamp = lampFor(doc.grid), g = doc.grid || {};
+  const c = docCfg(doc), days = c.threshold_days;
+  const t = totalsIn(doc.grid, c.channels), lamp = lampAt(t, days), g = doc.grid || {};
   const tag = { green:"[HIJAU]", amber:"[KUNING]", red:"[MERAH]" }[lamp.level];
   const ln = (k,v) => `${k}: ${(v||"").toString().trim() || "Belum ada"}`;
-  return ["MESSI Report", "Date: " + fmt(doc.day) + " (" + doc.day + ")",
-    "Squad: OASYS   Report by: " + nameOf(doc.owner), "", tag + " " + lamp.label, "",
-    "a. Channel aktif/open: " + CHANNELS.map(c => `${num((g[c.key]||{}).open)} ${c.label}`).join(", "),
-    "b. Gantung >3 hari: " + t.gt3, "c. Gantung <3 hari: " + t.lt3,
+  const lines = ["MESSI Report", "Date: " + fmt(doc.day) + " (" + doc.day + ")",
+    (CFG.team_name ? "Tim: " + CFG.team_name + "   " : "") + "Report by: " + nameOf(doc.owner),
+    "", tag + " " + lamp.label, "",
+    "a. Channel aktif/open: " + c.channels.map(x => `${num((g[x.key]||{}).open)} ${x.label}`).join(", "),
+    `b. Gantung >${days} hari: ` + t.gt3, `c. Gantung <${days} hari: ` + t.lt3,
     "d. Tidak gantung: " + t.clear, "e. Sudah dibalas hari ini: " + t.reply,
     ln("f. Yang masih gantung", doc.detail),
     (() => {
       const rows = plansOf(doc).filter(r => r.action)
         .map(r => r.action + (r.due ? ` (target ${fmt(r.due)})` : ""));
-      // Satu rencana tetap satu baris, persis laporan yang sudah dikenal squad.
+      // Satu rencana tetap satu baris, persis laporan yang sudah dikenal timnya.
       return rows.length > 1 ? "g. Rencana:\n- " + rows.join("\n- ")
                              : ln("g. Rencana", rows[0] || "");
-    })(),
-    ln("h. Eskalasi", doc.escalation), ln("i. Calon PRISTA baru", doc.prista), "",
-    "Deklarasi: " + DECLARATION].join("\n");
+    })()];
+  // Pertanyaan yang dimatikan tidak muncul sebagai "Belum ada" — itu bukan jawaban
+  // kosong, pertanyaannya memang tidak pernah diajukan.
+  if (Q.escalation.show) lines.push(ln("h. Eskalasi", doc.escalation));
+  if (Q.prista.show)     lines.push(ln("i. Calon project baru", doc.prista));
+  lines.push("", "Deklarasi: " + DECLARATION);
+  return lines.join("\n");
 }
 
 function screenDone(doc) {
-  const t = totals(doc.grid), lamp = lampFor(doc.grid);
+  const t = docTotals(doc), lamp = docLamp(doc);
   return `<div class="done">
       <div class="tick">✓</div>
       <h1>Sudah terkirim</h1>
-      <p class="sub">${esc(fmtLong(doc.day))}${doc.late ? " · setelah jam 18:00" : ""}</p>
+      <p class="sub">${esc(fmtLong(doc.day))}${doc.late ? ` · setelah jam ${hhmm(DUE_AT)}` : ""}</p>
     </div>
     <div class="lamp ${lamp.level}"><i></i>${esc(lamp.label)}</div>
     <div class="rev">
@@ -655,7 +835,7 @@ function recent() {
   if (!days.length) return "";
   return `<h2>Beberapa hari lalu</h2>` + days.map(day => {
     const doc = S.cycles.get(key(S.me, day)), st = statusOf(day, doc);
-    const t = doc ? totals(doc.grid) : null;
+    const t = doc ? docTotals(doc) : null;
     return `<div class="card ${st === "missed" ? "bad" : ""}"><div class="row">
       <span class="strong">${esc(fmt(day))}</span><span class="grow"></span>
       <span class="meta">${st === "missed" ? "tidak lapor"
@@ -664,13 +844,108 @@ function recent() {
   }).join("");
 }
 
+/**
+ * Katalog modul — layar pertama.
+ *
+ * Bukan sekadar pintu. Kartu modul yang hidup membawa keadaannya hari ini, jadi orang
+ * yang membuka FURA sudah tahu apa yang menunggu sebelum menekan apa pun. Pintu yang
+ * hanya pintu cuma menambah satu ketukan tiap pagi.
+ */
+function screenCatalog() {
+  const day = today();
+  const state = () => {
+    if (!isWorkday(day)) return { cls:"", text:"Hari ini libur" };
+    const doc = mine(day);
+    if (doc && doc.submittedAt) return { cls:"done", text:"Sudah lapor hari ini" };
+    if (nowHour() < OPEN_AT) return { cls:"", text:`Dibuka jam ${hhmm(OPEN_AT)}` };
+    const late = myPromises().filter(c => c.due <= day).length;
+    return { cls:"todo", text:"Belum lapor hari ini"
+      + (late ? ` · ${late} janji jatuh tempo` : "") };
+  };
+  const leader = () => {
+    if (!S.isLeader || !isWorkday(day)) return "";
+    const people = [...S.roster.keys()].filter(u => day >= joinedOn(u));
+    const done = people.filter(u => {
+      const c = S.cycles.get(key(u, day)); return c && c.submittedAt;
+    }).length;
+    return `<div class="state"><i></i>Tim: ${done}/${people.length} sudah lapor</div>`;
+  };
+
+  return `<h1>Modul</h1>
+    <p class="sub">Pilih yang mau kamu kerjakan.</p>
+    <div class="mods">
+      ${MODULES.map(m => {
+        if (!m.live) return `<div class="mod soon">
+          <div class="head"><span class="name">${esc(m.name)}</span>
+            <span class="full">${esc(m.full)}</span><span class="pill">segera</span></div>
+          <p>${esc(m.what)}</p></div>`;
+        const st = state();
+        return `<button class="mod" type="button" data-mod="${esc(m.key)}">
+          <div class="head"><span class="name">${esc(m.name)}</span>
+            <span class="full">${esc(m.full)}</span><span class="pill">aktif</span></div>
+          <p>${esc(m.what)}</p>
+          <div class="state ${st.cls}"><i></i>${esc(st.text)}</div>
+          ${leader()}
+        </button>`;
+      }).join("")}
+    </div>`;
+}
+
+/**
+ * Apa itu MESSI, untuk orang yang baru pertama membukanya.
+ *
+ * Isinya dibangun dari setelan yang berlaku, bukan ditulis ulang di sini: kalau admin
+ * memindahkan batas ke 1 hari atau menutup jam 17, penjelasannya ikut — penjelasan yang
+ * berbeda dari aplikasinya lebih buruk daripada tidak ada penjelasan.
+ */
+function screenIntro() {
+  const chans = CHANNELS.map(c => c.full || c.label).join(", ");
+  return `<div class="intro">
+    <h1>MESSI</h1>
+    <p class="sub">Messenger Screening</p>
+    <p class="lead">Satu pertanyaan yang diulang tiap hari kerja: dari semua chat yang masuk,
+      adakah yang dibiarkan menggantung? Satu menit mengisi, supaya tidak ada yang hilang
+      tanpa ada yang tahu.</p>
+
+    <h2>Yang kamu isi</h2>
+    <ol>
+      <li><b>Angkanya.</b> Untuk tiap channel (${esc(chans)}): berapa yang masih aktif,
+        berapa yang gantung, berapa yang sudah dibalas.</li>
+      <li><b>Kalau ada yang gantung:</b> yang mana saja, mau diapakan, dan kapan beres.</li>
+      <li><b>Centang pernyataannya</b> lalu kirim.</li>
+    </ol>
+
+    <h2>Setelah dikirim</h2>
+    <ul>
+      <li>Laporannya <b>dibuatkan sendiri</b> dalam format yang sudah dikenal. Kamu tidak
+        menulisnya, dan angkanya tidak bisa saling bertabrakan.</li>
+      <li>Tanggal yang kamu tulis jadi <b>janji</b>. Di tanggal itu kamu ditanya "sudah
+        beres?" — bukan tiap hari.</li>
+      <li>Atasan membaca rekapnya di sini juga, jadi tidak ada yang perlu disalin ke chat.</li>
+    </ul>
+
+    <h2>Yang perlu diketahui</h2>
+    <ul>
+      <li>Dibuka jam ${esc(hhmm(OPEN_AT))}, batasnya jam ${esc(hhmm(DUE_AT))}. Lewat dari
+        itu masih bisa, tapi ditandai telat.</li>
+      <li>Senin sampai Jumat. Hari yang terlewat tidak bisa diisi mundur.</li>
+      <li>Gantung lebih dari ${NDAYS} hari membuat laporannya merah.</li>
+      <li>Salah kirim? Ada tombol untuk memperbaikinya, dan tetap terhitung satu laporan.</li>
+    </ul>
+
+    <div class="btns" style="margin-top:26px">
+      <button class="btn" type="button" id="introGo">Mulai isi laporan</button>
+    </div>
+  </div>`;
+}
+
 function screenPlayer() {
   const day = today(), doc = mine(day), st = statusOf(day, doc);
 
   if (!isWorkday(day)) return `<div class="blank"><b>Hari ini libur.</b>
     MESSI diisi Senin sampai Jumat. Sampai ketemu Senin pagi.</div>` + recent();
   if (nowHour() < OPEN_AT && !doc) return `<div class="blank"><b>Belum dibuka.</b>
-    Pengisian dibuka jam ${OPEN_AT}:00. Nanti ada pesan dari bot.</div>` + recent();
+    Pengisian dibuka jam ${hhmm(OPEN_AT)}. Nanti ada pesan pengingat.</div>` + recent();
 
   if (st === "pending" || S.editing) {
     const n = stepName();
@@ -685,7 +960,7 @@ function screenPlayer() {
 }
 
 /**
- * Rekap squad — ini yang dibaca atasan.
+ * Rekap tim — ini yang dibaca atasan.
  *
  * Dulu rekap ini dikirim sebagai pesan jam 18:00, dan sebelum itu lagi orang menempel
  * laporan lengkapnya ke grup. Begitu keduanya hilang, layar ini yang menggantikan: bukan
@@ -716,7 +991,7 @@ function screenLeader() {
            : `<span></span>`}
   </div>`;
 
-  let html = `<h1>Rekap squad</h1>
+  let html = `<h1>Rekap tim</h1>
     <p class="sub">${people.length} orang${day === today() ? " · hari ini" : ""}</p>
     ${nav}
     <div class="stats">
@@ -758,7 +1033,7 @@ function screenLeader() {
         <span class="grow"></span><span class="meta">${
           r.st === "missed" ? "tidak lapor" : "belum lapor"}</span></div></div>`;
     }
-    const t = totals(r.doc.grid), lamp = lampFor(r.doc.grid);
+    const t = docTotals(r.doc), lamp = docLamp(r.doc);
     return `<div class="card">
       <button class="prow" type="button" data-open="${esc(r.uid)}">
         <span class="pip ${lamp.level}"></span>
@@ -779,7 +1054,8 @@ function screenLeader() {
 
 function renderBar() {
   const day = today(), doc = mine(day), st = statusOf(day, doc);
-  if (S.tab === "chief") { bar.hidden = true; return; }
+  if (S.view === "catalog" || S.intro) { bar.hidden = true; return; }
+  if (S.tab === "tim") { bar.hidden = true; return; }
   if (!isWorkday(day) || (nowHour() < OPEN_AT && !doc)) { bar.hidden = true; return; }
 
   bar.hidden = false;
@@ -810,17 +1086,31 @@ function render() {
   av.title = S.name || "";
   if (!S.ready) { view.innerHTML = `<div class="blank">Sebentar…</div>`; return; }
 
+  const inModule = S.view !== "catalog";
+  const mod = MODULES.find(m => m.key === S.view);
+
+  const modbar = el("modbar");
+  modbar.hidden = !inModule;
+  if (inModule) {
+    el("modbarIn").innerHTML =
+      `<button class="back" type="button" data-home>‹ Modul</button>
+       <b>${esc(mod ? mod.name : S.view.toUpperCase())}</b>
+       ${S.intro ? "" : `<button class="what" type="button" id="what">Apa ini?</button>`}`;
+  }
+
   const tabs = el("tabs");
-  if (S.isLeader) {
+  if (S.isLeader && inModule && !S.intro) {
     tabs.hidden = false;
     const late = [...S.commitments.values()].filter(c => c.status === "open" && c.due < today()).length;
     tabs.innerHTML =
       `<button role="tab" data-tab="hari-ini" aria-selected="${S.tab === "hari-ini"}">Punya saya</button>
-       <button role="tab" data-tab="chief" aria-selected="${S.tab === "chief"}">Squad${
+       <button role="tab" data-tab="tim" aria-selected="${S.tab === "tim"}">Tim${
          late ? `<span class="n">${late}</span>` : ""}</button>`;
   } else tabs.hidden = true;
 
-  let body = (S.tab === "chief" && S.isLeader) ? screenLeader() : screenPlayer();
+  let body = !inModule ? screenCatalog()
+    : S.intro ? screenIntro()
+    : (S.tab === "tim" && S.isLeader) ? screenLeader() : screenPlayer();
   if (S.offline) body += `<p class="note">Tersimpan di HP ini saja untuk sekarang.
     Isian kamu aman dan tidak hilang.</p>`;
   view.innerHTML = body;
@@ -893,11 +1183,18 @@ function onCopy() {
   try { navigator.clipboard.writeText(text).then(ok, fall); } catch { fall(); }
 }
 
+// Logo dan "‹ Modul" sama-sama jalan pulang; "Apa ini?" membuka penjelasannya lagi.
+el("home").addEventListener("click", goCatalog);
+el("modbar").addEventListener("click", ev => {
+  if (ev.target.closest("[data-home]")) { goCatalog(); return; }
+  if (ev.target.id === "what") { S.intro = true; render(); toTop(); }
+});
+
 el("tabs").addEventListener("click", ev => {
   const b = ev.target.closest("[data-tab]");
   if (!b) return;
   S.tab = b.dataset.tab; S.error = null;
-  S.day = null; S.openRow = null;          // tiap masuk tab Squad, mulai dari hari ini
+  S.day = null; S.openRow = null;          // tiap masuk tab Tim, mulai dari hari ini
   render(); toTop();
 });
 
@@ -911,6 +1208,11 @@ view.addEventListener("click", ev => {
 // Selecting on focus means tapping a cell and typing replaces the number, instead of
 // dropping the caret mid-digit and turning 13 into 173.
 view.addEventListener("click", ev => {
+  const card = ev.target.closest && ev.target.closest("[data-mod]");
+  if (card) { openModule(card.dataset.mod); return; }
+  if (ev.target && ev.target.id === "introGo") {
+    markSeen(S.view); S.intro = false; render(); toTop(); return;
+  }
   if (ev.target && ev.target.id === "edit") { reopen(); return; }
   if (ev.target && ev.target.id === "addPlan") {
     S.a = collect();

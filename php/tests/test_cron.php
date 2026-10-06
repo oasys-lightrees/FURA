@@ -47,7 +47,7 @@ function said(array $messages, string $needle): bool
 
 Clock::freeze('2026-09-28T01:00:00Z');
 $nicho = make_user('nicho@example.test', 'Nicho', 'player', '2026-09-28');
-$chief = make_user('chief@example.test', 'Chief', 'leader', '2026-09-28');
+$lead = make_user('lead@example.test', 'Lia', 'leader', '2026-09-28');
 $dita  = make_user('dita@example.test',  'Dita',  'player', '2026-09-28');
 $rio   = make_user('rio@example.test',   'Rio',   'player', '2026-09-30');   // masuk Rabu
 $budi  = make_user('budi@example.test',  'Budi',  'player', '2026-09-28');
@@ -97,7 +97,7 @@ repo_save_cycle($nicho, uid((int) $nicho['id']) . '__2026-09-28', hanging('2026-
 
 $m = tick_at('2026-09-28T10:00:00Z');                       // 17:00
 eq('pengingatnya satu pesan', count($m), 1);
-ok('yang disebut hanya yang belum lapor', said($m, 'Chief') && said($m, 'Dita'));
+ok('yang disebut hanya yang belum lapor', said($m, 'Lia') && said($m, 'Dita'));
 ok('Nicho yang sudah lapor tidak ikut disebut', !said($m, 'Nicho'));
 ok('bunyinya soal tenggat', said($m, '18:00'));
 
@@ -105,7 +105,7 @@ $m = tick_at('2026-09-28T10:00:00Z');
 eq('pengingat tidak diulang di jam yang sama', count($m), 0);
 
 Clock::freeze('2026-09-28T10:30:00Z');
-repo_save_cycle($chief, uid((int) $chief['id']) . '__2026-09-28', $clean);
+repo_save_cycle($lead, uid((int) $lead['id']) . '__2026-09-28', $clean);
 
 $m = tick_at('2026-09-28T11:00:00Z');                       // 18:00
 // Rekapnya tidak lagi dikirim ke mana-mana: atasan membacanya di layar Squad, yang bisa
@@ -134,8 +134,8 @@ eq('janji Nicho ditepati pada harinya',
    'kept');
 repo_save_cycle($nicho, uid((int) $nicho['id']) . '__2026-09-29', $clean);
 
-// Chief membuat janji yang tidak akan dia tepati.
-repo_save_cycle($chief, uid((int) $chief['id']) . '__2026-09-29', hanging('2026-09-30'));
+// Lia membuat janji yang tidak akan dia tepati.
+repo_save_cycle($lead, uid((int) $lead['id']) . '__2026-09-29', hanging('2026-09-30'));
 
 $m = tick_at('2026-09-29T11:00:00Z');                       // 18:00
 eq('tetap tidak ada rekap yang diposting', count($m), 0);
@@ -155,14 +155,14 @@ ok('orang baru ikut diingatkan pada hari pertamanya', said($m, 'Rio'));
 /* ================================== Kamis 1 Okt — janji yang tidak ditepati */
 
 $m = tick_at('2026-10-01T02:00:00Z');                       // 09:00
-eq('janji Chief yang lewat tanggal patah dengan sendirinya',
+eq('janji Lia yang lewat tanggal patah dengan sendirinya',
    q1('SELECT status FROM commitments WHERE user_id = ? ORDER BY id DESC LIMIT 1',
-      [$chief['id']])['status'], 'broken');
+      [$lead['id']])['status'], 'broken');
 eq('janji Nicho yang ditepati tetap ditepati',
    q1('SELECT status FROM commitments WHERE user_id = ? ORDER BY id LIMIT 1',
       [$nicho['id']])['status'], 'kept');
 ok('janji yang sudah patah tidak lagi ditagih di pesan pagi',
-   !said($m, 'Chief — Telepon Klien A'));
+   !said($m, 'Lia — Telepon Klien A'));
 
 /* ============================================== Sabtu 3 Okt — akhir pekan */
 
@@ -208,10 +208,10 @@ ok('janji orang kedua tidak tercampur', $baris[1] === '- Rio — Telepon Klien A
 
 /* ------------------------------------------------ bentuk pesan minta bantuan */
 
-$pesan = chat_escalation("Rio D'Souza", 'Butuh Chief approve harga Klien A');
+$pesan = chat_escalation("Rio D'Souza", 'Butuh approve harga Klien A');
 ok('menyebut siapa yang minta', str_contains($pesan, "Rio D'Souza"));
 ok('apostrof tetap utuh, bukan entitas HTML', !str_contains($pesan, '&#039;'));
-ok('membawa isi permintaannya', str_contains($pesan, 'Butuh Chief approve harga Klien A'));
+ok('membawa isi permintaannya', str_contains($pesan, 'Butuh approve harga Klien A'));
 ok('memakai markup Google Chat, bukan HTML',
    str_contains($pesan, '*') && !str_contains($pesan, '<b>'));
 ok('dan membawa link ke aplikasinya', str_contains($pesan, 'https://example.test/messi|'));

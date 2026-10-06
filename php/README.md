@@ -1,7 +1,7 @@
 # MESSI di cPanel
 
 Versi PHP + MySQL dari aplikasi di `web/`. Halamannya **sama persis** — `app.html`
-adalah salinan `web/messi.html` tanpa satu baris pun diubah, jadi 157 pemeriksaan browser
+adalah salinan `web/messi.html` tanpa satu baris pun diubah, jadi 223 pemeriksaan browser
 di `web/tests/` tetap menggambarkan apa yang dipakai squad. Yang ditulis ulang cuma
 bagian belakangnya: dulu data disimpan platform artifact, sekarang MySQL.
 
@@ -128,10 +128,11 @@ lib/auth.php       siapa yang sedang bertanya
 lib/repo.php       baca/tulis, dengan pemeriksaan yang tidak bisa dilewati browser
 lib/chat.php       Google Chat
 lib/require-php8.php  penjaga versi PHP, dibaca paling awal
-install.sql        enam tabel
+soal.php           halaman admin: pertanyaan, ambang, jam, channel
+install.sql        tujuh tabel
 PASANG.txt         langkah pemasangan, bahasa non-teknis
 make-zip.sh        bikin messi-cpanel.zip
-tests/             272 pemeriksaan (tidak ikut ke server)
+tests/             340 pemeriksaan (tidak ikut ke server)
 ```
 
 ## Yang diputuskan server, bukan browser
@@ -147,6 +148,12 @@ seseorang dihitung ulang di sini, dari jam servernya sendiri:
   diperiksa lagi di server, sebelum deklarasi ditanyakan.
 - **Hari bolos.** Dihitung dari `joined_on` di database, bukan dari apa pun yang
   dikirim browser.
+- **Pertanyaannya sendiri.** Channel, ambang gantung, jam buka/tutup, kalimat tiap
+  pertanyaan dan pernyataannya disimpan sebagai satu dokumen JSON di tabel `settings`,
+  diubah admin lewat `soal.php`, lalu dipakai halaman maupun server. Yang tidak masuk
+  akal dirapikan saat disimpan *dan* saat dibaca — baris di database bisa lebih tua
+  daripada kode yang membacanya, dan satu ambang yang hilang tidak boleh berarti
+  halaman kosong.
 - **Satu janji per rencana.** Laporan boleh berisi sampai lima rencana, masing-masing
   dengan tanggalnya sendiri, dan server membuat satu janji untuk tiap baris. Saat laporan
   diperbaiki, barisnya dicocokkan **lewat teks aksinya**, bukan lewat urutan — kalau lewat
@@ -173,11 +180,11 @@ menyebutkan mana yang barusan terjadi.
 
 | Berkas | Isinya |
 |--------|--------|
-| `tests/test_engine.php` | 67 — aturan, dicocokkan dengan `tests/test_core.py` |
-| `tests/test_repo.php` | 66 — terhadap MySQL sungguhan, di database yang dia buat sendiri |
+| `tests/test_engine.php` | 99 — aturan, dicocokkan dengan `tests/test_core.py` |
+| `tests/test_repo.php` | 81 — terhadap MySQL sungguhan, di database yang dia buat sendiri |
 | `tests/test_cron.php` | 46 — seminggu penuh jam demi jam, jam dibekukan, pesan bot ditangkap |
 | `tests/test_live.py` | 57 — browser terhadap aplikasi yang benar-benar jalan |
-| `tests/test_admin.py` | 36 — pemasangan pertama, tambah orang, ganti password, link sekali pakai |
+| `tests/test_admin.py` | 57 — pemasangan pertama, tambah orang, ganti password, link sekali pakai, mengubah pertanyaan |
 | `tests/check_sync.php` | memastikan `app.html` belum menyimpang dari `web/messi.html` |
 
 Yang dicoba juga: laporan atas nama orang lain, permintaan tanpa token, cron tanpa kunci,

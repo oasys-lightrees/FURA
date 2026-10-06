@@ -31,6 +31,7 @@ function messi_tick(): array
 {
     $today = Clock::today();
     $hour  = Clock::hour();
+    $cfg   = repo_config();
     $did   = [];
 
     /* -- housekeeping, every run -------------------------------------------- */
@@ -44,7 +45,7 @@ function messi_tick(): array
     $swept = auth_sweep();
     if ($swept) { $did['swept'] = $swept; }
 
-    if (!messi_is_workday($today) || $hour < MESSI_OPEN_HOUR) {
+    if (!messi_is_workday($today) || $hour < $cfg['open_hour']) {
         return $did;
     }
 
@@ -59,9 +60,10 @@ function messi_tick(): array
         log_job('notify_open', $today . ' sent=' . $did['asked']);
     }
 
-    // 17:00 — the nudge, and only to the people it is about.
-    if ($hour >= 17 && $hour < MESSI_DUE_HOUR && !job_done('notify_due', $today)) {
-        $did['nudged'] = (int) tick_notify_due($today);
+    // One hour before closing — the nudge, and only to the people it is about.
+    if ($hour >= $cfg['due_hour'] - 1 && $hour < $cfg['due_hour']
+        && !job_done('notify_due', $today)) {
+        $did['nudged'] = (int) tick_notify_due($today, $cfg['due_hour']);
         log_job('notify_due', $today . ' sent=' . $did['nudged']);
     }
 
@@ -78,7 +80,7 @@ function tick_notify_open(string $today): bool
 }
 
 /** Only sent when somebody is actually missing, and it names them. */
-function tick_notify_due(string $today): bool
+function tick_notify_due(string $today, int $dueHour): bool
 {
     $names = q('SELECT u.name FROM users u
                   LEFT JOIN cycles c ON c.user_id = u.id AND c.day = ?
@@ -87,5 +89,5 @@ function tick_notify_due(string $today): bool
     if (!$names) {
         return false;
     }
-    return chat_send(chat_reminder($names));
+    return chat_send(chat_reminder($names, $dueHour));
 }

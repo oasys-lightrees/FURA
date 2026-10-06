@@ -1,7 +1,13 @@
 # MESSI — web
 
-The MESSI module as a page people actually use. Mobile-first, no build step, no install:
-a link is posted to the squad space each morning and this is what opens.
+The app people actually use. Mobile-first, no build step, no install: a link is posted to
+the team's chat space each morning and this is what opens.
+
+It opens on the FURA module catalogue rather than straight into a form — each live module's
+card carries its state for today, so the catalogue answers "what is waiting for me?" before
+anyone taps anything. MESSI is the first module; on a first visit it explains itself, and
+that explainer is built from the settings in force, so it can never describe a threshold or
+an opening hour the app no longer uses.
 
 | File | What it is | Live |
 |---|---|---|
@@ -20,7 +26,7 @@ pip install playwright && playwright install chromium
 python3 web/tests/run_all.py
 ```
 
-157 checks across four suites. They drive a real browser against `messi.html` with
+223 checks across five suites. They drive a real browser against `messi.html` with
 `window.claude` faked (`tests/stub.js`): an in-memory store held in localStorage plus a
 switchable identity, so a submission made as one person can be read as another.
 
@@ -30,6 +36,7 @@ switchable identity, so a submission made as one person can be read as another.
 | `test_manager.py` (47) | The recap screen: every person with their figures, any past workday, a drill-down into one person's full report; escalations by name, overdue promises, repeat absentees; and that a player sees nobody else's data |
 | `test_edge.py` (46) | Weekend, before opening, after the deadline, one person's submission reaching another's screen, and the plan list: adding and dropping rows, the five-row cap, one promise per row, and corrections that keep each promise on its own date |
 | `test_keyboard.py` (16) | Grid navigation: Enter and arrows move between cells and never change a number; the wheel cannot either |
+| `test_catalog.py` (66) | The module catalogue and what each card says today, the MESSI explainer on a first visit, the sticky header measured at three widths, and a settings document changing every question, threshold, hour and channel the page asks about |
 
 Set `MESSI_CHROMIUM=/path/to/chromium` if Playwright's own browser is not installed.
 

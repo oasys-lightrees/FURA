@@ -47,7 +47,7 @@ header('X-Content-Type-Options: nosniff');
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="theme-color" content="#f5f3ef">
-<title>Masuk · MESSI</title>
+<title>Masuk · FURA</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Public+Sans:wght@400;500;600;700&display=swap">
@@ -74,8 +74,8 @@ button { width:100%; padding:0.6875rem; font:inherit; font-weight:600; color:#ff
 </head>
 <body>
 <main class="card">
-  <h1>MESSI</h1>
-  <p class="sub">Squad OASYS</p>
+  <h1>FURA</h1>
+  <p class="sub">Follow Up Report Automation</p>
   <?php if ($error): ?><p class="err"><?= h($error) ?></p><?php endif; ?>
   <form method="post" autocomplete="on">
     <label for="email">Email</label>

@@ -50,7 +50,7 @@ header('Content-Type: text/html; charset=utf-8');
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Setup · MESSI</title>
+<title>Setup · FURA</title>
 <style>
 body { margin:0; min-height:100vh; display:grid; place-items:center; background:#f5f3ef;
        color:#1a1c1f; font:400 1rem/1.55 system-ui, sans-serif; padding:1.5rem; }

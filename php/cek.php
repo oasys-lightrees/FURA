@@ -61,11 +61,12 @@ if ($hasConfig) {
     try {
         $db = db();
         row('ok', 'Koneksi database', 'berhasil');
-        $want = ['users', 'sessions', 'login_tokens', 'cycles', 'commitments', 'job_log'];
+        $want = ['users', 'sessions', 'login_tokens', 'cycles', 'commitments', 'job_log', 'settings'];
         $tables = $db->query('SHOW TABLES')->fetchAll(PDO::FETCH_COLUMN);
         $missing = array_diff($want, $tables);
         row($missing ? 'bad' : 'ok', 'Tabel', $missing
-            ? 'kurang: ' . implode(', ', $missing) : 'lengkap, enam tabel',
+            ? 'kurang: ' . implode(', ', $missing)
+            : 'lengkap, ' . count($want) . ' tabel',
             $missing ? 'Import <code>install.sql</code> lewat phpMyAdmin.' : '');
         $installed = !$missing;
     } catch (Throwable $e) {

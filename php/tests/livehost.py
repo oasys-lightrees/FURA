@@ -94,15 +94,33 @@ class Host:
             self.server.wait(timeout=10)
 
 
-def sign_in(ctx, base: str, email: str, password: str = PASSWORD, results=None):
-    """A browser page signed in as `email`, sitting on whatever the app showed next."""
+def sign_in(ctx, base: str, email: str, password: str = PASSWORD, results=None,
+            enter="messi"):
+    """A browser page signed in as `email`, sitting on whatever the app showed next.
+
+    Signing in lands on the module catalogue, so this walks into MESSI the way a
+    returning user does — with the explainer already read. Pass `enter=None` to stay
+    on the catalogue.
+    """
     pg = ctx.new_page()
     if results is not None:
         pg.on("pageerror", lambda e: results.append((False, "JS error: " + str(e), "")))
+    if enter:
+        pg.add_init_script(
+            f'try {{ localStorage.setItem("fura.seen.{enter}", "1"); }} catch (e) {{}}')
     pg.goto(base + "/login.php")
     pg.fill("#email", email)
     pg.fill("#password", password)
     pg.click("button[type=submit]")
     pg.wait_for_load_state("networkidle")
-    pg.wait_for_timeout(500)
+    # Halamannya menggambar setelah boot(), jadi menunggu "networkidle" saja belum tentu
+    # cukup di host yang sedang sibuk — tunggu sampai ada yang benar-benar tergambar.
+    try:
+        pg.wait_for_selector("#view *", timeout=10_000)
+    except Exception:                       # halaman login, atau galat: biar pemanggil yang menilai
+        pass
+    pg.wait_for_timeout(200)
+    if enter and pg.query_selector(f"[data-mod={enter}]"):
+        pg.click(f"[data-mod={enter}]")
+        pg.wait_for_timeout(300)
     return pg

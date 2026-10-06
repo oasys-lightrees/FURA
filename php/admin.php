@@ -92,7 +92,7 @@ header('Cache-Control: no-store');
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Squad · MESSI</title>
+<title>Tim · FURA</title>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Public+Sans:wght@400;500;600;700&display=swap">
 <style>
 * { box-sizing:border-box; }
@@ -130,8 +130,9 @@ a { color:#1a1c1f; }
 </head>
 <body>
 <main>
-  <h1>Squad OASYS</h1>
-  <p class="sub"><a href="index.php">← kembali ke laporan</a></p>
+  <h1>Tim</h1>
+  <p class="sub"><a href="index.php">← kembali ke laporan</a> ·
+     <a href="soal.php">Pertanyaan MESSI</a></p>
 
   <?php if ($notice): ?><p class="note ok"><?= h($notice) ?></p><?php endif; ?>
   <?php if ($error): ?><p class="note bad"><?= h($error) ?></p><?php endif; ?>
@@ -156,7 +157,7 @@ a { color:#1a1c1f; }
           <input type="hidden" name="do" value="role">
           <input type="hidden" name="id" value="<?= (int) $p['id'] ?>">
           <select name="role" onchange="this.form.submit()">
-            <?php foreach (['player' => 'Player', 'leader' => 'Leader', 'admin' => 'Admin'] as $k => $v): ?>
+            <?php foreach (['player' => 'Pelapor', 'leader' => 'Leader', 'admin' => 'Admin'] as $k => $v): ?>
               <option value="<?= $k ?>" <?= $p['role'] === $k ? 'selected' : '' ?>><?= $v ?></option>
             <?php endforeach; ?>
           </select>
@@ -203,7 +204,7 @@ a { color:#1a1c1f; }
         <div><label for="e">Email</label><input id="e" name="email" type="email" required></div>
         <div><label for="p">Password awal</label><input id="p" name="password" type="password" minlength="10" required></div>
         <div><label for="r">Peran</label><select id="r" name="role">
-          <option value="player">Player</option><option value="leader">Leader</option>
+          <option value="player">Pelapor</option><option value="leader">Leader</option>
           <option value="admin">Admin</option></select></div>
         <div><label for="j">Mulai lapor</label>
           <input id="j" name="joined" type="date" value="<?= h(Clock::today()) ?>"></div>

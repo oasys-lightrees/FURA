@@ -131,11 +131,13 @@ function chat_escalation(string $name, string $text): string
     ]);
 }
 
-/** 17:00 — named, because a reminder addressed to nobody is read by nobody. */
-function chat_reminder(array $names): string
+/** One hour before closing — named, because a reminder addressed to nobody is read by
+ *  nobody. */
+function chat_reminder(array $names, int $dueHour = MESSI_DUE_HOUR): string
 {
     return implode("\n", [
-        'Satu jam lagi tutup (18:00). Belum lapor: ' . implode(', ', $names) . '.',
+        'Satu jam lagi tutup (' . sprintf('%02d:00', $dueHour) . '). Belum lapor: '
+            . implode(', ', $names) . '.',
         '',
         chat_link('Isi sekarang'),
     ]);

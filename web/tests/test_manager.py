@@ -17,12 +17,12 @@ def cyc(owner, day, gt3=0, lt3=0, esc="", late=False):
              "declared":True, "submittedAt":day+"T09:05:00Z", "late":late }
 
 SEED = {
-  "roster": { "u_nicho":{"name":"Nicho","joined":D2}, "u_chief":{"name":"Chief","joined":D2},
+  "roster": { "u_nicho":{"name":"Nicho","joined":D2}, "u_lead":{"name":"Lia","joined":D2},
               "u_rio":{"name":"Rio","joined":D2} },
   "cycles": {
-    "u_nicho__"+TODAY: cyc("u_nicho", TODAY, gt3=2, lt3=1, esc="Butuh Chief approve harga Klien A"),
+    "u_nicho__"+TODAY: cyc("u_nicho", TODAY, gt3=2, lt3=1, esc="Butuh approve harga Klien A"),
     "u_nicho__"+YDAY:  cyc("u_nicho", YDAY),
-    "u_chief__"+YDAY:  cyc("u_chief", YDAY),
+    "u_lead__"+YDAY:  cyc("u_lead", YDAY),
     # Rio: tidak ada sama sekali -> 2 hari kerja terlewat + belum lapor hari ini
   },
   "commitments": {
@@ -35,22 +35,22 @@ with sync_playwright() as p:
     b = launch(p)
     ctx = context(b)
 
-    print("\n=== MANAGER (Chief, owner) ===")
-    pg = new_page(ctx, "u_chief", SEED, at=AT)
+    print("\n=== MANAGER (leader) ===")
+    pg = new_page(ctx, "u_lead", SEED, at=AT)
     check("manager melihat dua tab", pg.eval_on_selector("#tabs","e=>!e.hidden"))
-    check("tab bernama 'Punya saya' & 'Squad'", txt(pg,"#tabs"), lambda s: "Punya saya" in s and "Squad" in s)
+    check("tab bernama 'Punya saya' & 'Tim'", txt(pg,"#tabs"), lambda s: "Punya saya" in s and "Tim" in s)
     check("badge janji lewat di tab", txt(pg,"#tabs .n"), "1")
     check("default ke laporan sendiri", txt(pg,"h1"), "Berapa banyak hari ini?")
 
-    pg.click('[data-tab="chief"]'); pg.wait_for_timeout(400)
-    check("judul halaman manager", txt(pg,"h1"), "Rekap squad")
+    pg.click('[data-tab="tim"]'); pg.wait_for_timeout(400)
+    check("judul halaman manager", txt(pg,"h1"), "Rekap tim")
     body = pg.inner_text("body")
     stats = txt(pg,".stats")
     check("hitung sudah lapor (1 dari 3)", stats, lambda s: "1/3" in s)
     check("hitung janji lewat", stats, lambda s: "1" in s)
-    check("hitung belum lapor (Chief + Rio)", stats, lambda s: "2" in s)
+    check("hitung belum lapor (Lia + Rio)", stats, lambda s: "2" in s)
 
-    check("melihat eskalasi Nicho", "Butuh Chief approve harga Klien A" in body)
+    check("melihat eskalasi Nicho", "Butuh approve harga Klien A" in body)
     check("eskalasi diberi nama orangnya", body, lambda s: "Nicho" in s)
     check("melihat janji yang lewat", "Kirim revisi ke Vendor B" in body)
     check("menandai Rio jarang lapor", body, lambda s: "Rio" in s and "Belum lapor beberapa hari" in s)
@@ -76,7 +76,7 @@ with sync_playwright() as p:
     check("yang sudah lapor tampil dengan angkanya", body, lambda s: "21 aktif" in s)  # 13 WAG + 4 TGG + 4 GCG
     check("dan dengan berapa yang gantung", body, lambda s: "3 gantung" in s)
     check("yang belum lapor juga tetap tercantum", body, lambda s: "Rio" in s)
-    check("Chief sendiri ikut terdaftar", body, lambda s: "Chief" in s)
+    check("leader sendiri ikut terdaftar", body, lambda s: "Lia" in s)
 
     print("\n--- membaca hari kemarin ---")
     check("ada tombol ke hari sebelumnya", pg.query_selector('[data-day="2026-09-29"]') is not None)
@@ -96,19 +96,19 @@ with sync_playwright() as p:
     pg.click("#next"); pg.wait_for_timeout(250)
     pg.check("[name=declared]"); pg.click("#next"); pg.wait_for_timeout(400)
     check("manager bisa mengirim laporannya", txt(pg,"h1"), "Sudah terkirim")
-    pg.click('[data-tab="chief"]'); pg.wait_for_timeout(350)
+    pg.click('[data-tab="tim"]'); pg.wait_for_timeout(350)
     check("angka manager ikut terhitung (2/3)", txt(pg,".stats"), lambda s: "2/3" in s)
 
     print("\n--- yang sudah lapor hari ini bukan 'pembolos' hari ini ---")
     # Seed sendiri: Dita lapor hari ini tapi dua hari kerja sebelumnya kosong. Dulu dia
     # muncul sebagai kartu merah "belum lapor beberapa hari" — berbarengan dengan
     # barisnya sendiri yang hijau, dan menenggelamkan eskalasi yang sungguhan.
-    pgD = new_page(ctx, "u_chief", at=AT, store={
-      "roster": {"u_chief":{"name":"Chief","joined":D2}, "u_dita":{"name":"Dita","joined":D2}},
+    pgD = new_page(ctx, "u_lead", at=AT, store={
+      "roster": {"u_lead":{"name":"Lia","joined":D2}, "u_dita":{"name":"Dita","joined":D2}},
       "cycles": {"u_dita__"+TODAY: cyc("u_dita", TODAY),
-                 "u_chief__"+TODAY: cyc("u_chief", TODAY)},
+                 "u_lead__"+TODAY: cyc("u_lead", TODAY)},
       "commitments": {}})
-    pgD.click('[data-tab="chief"]'); pgD.wait_for_timeout(400)
+    pgD.click('[data-tab="tim"]'); pgD.wait_for_timeout(400)
     bodyD = pgD.inner_text("body")
     check("Dita tidak dituduh membolos padahal dia lapor hari ini",
           "Belum lapor beberapa hari." not in bodyD)
@@ -117,22 +117,22 @@ with sync_playwright() as p:
     check("dan dia tetap terhitung sudah lapor", txt(pgD,".stats"), lambda s: "2/2" in s)
 
     print("\n--- yang benar-benar tidak lapor tetap diangkat ---")
-    pgE = new_page(ctx, "u_chief", at=AT, store={
-      "roster": {"u_chief":{"name":"Chief","joined":D2}, "u_bayu":{"name":"Bayu","joined":D2}},
-      "cycles": {"u_chief__"+TODAY: cyc("u_chief", TODAY)},
+    pgE = new_page(ctx, "u_lead", at=AT, store={
+      "roster": {"u_lead":{"name":"Lia","joined":D2}, "u_bayu":{"name":"Bayu","joined":D2}},
+      "cycles": {"u_lead__"+TODAY: cyc("u_lead", TODAY)},
       "commitments": {}})
-    pgE.click('[data-tab="chief"]'); pgE.wait_for_timeout(400)
+    pgE.click('[data-tab="tim"]'); pgE.wait_for_timeout(400)
     check("Bayu yang memang tidak pernah lapor tetap diangkat",
           pgE.inner_text("body"), lambda s: "Belum lapor beberapa hari." in s)
 
     print("\n--- semua beres: halaman manager harus kosong ---")
     # Realistic: on the roster since day one, and reported every workday since.
-    pg2 = new_page(ctx, "u_chief", at=AT, store={
-      "roster": {"u_chief":{"name":"Chief","joined":D2}},
-      "cycles": {"u_chief__"+TODAY: cyc("u_chief", TODAY),
-                 "u_chief__"+YDAY:  cyc("u_chief", YDAY),
-                 "u_chief__"+D2:    cyc("u_chief", D2)}, "commitments": {}})
-    pg2.click('[data-tab="chief"]'); pg2.wait_for_timeout(400)
+    pg2 = new_page(ctx, "u_lead", at=AT, store={
+      "roster": {"u_lead":{"name":"Lia","joined":D2}},
+      "cycles": {"u_lead__"+TODAY: cyc("u_lead", TODAY),
+                 "u_lead__"+YDAY:  cyc("u_lead", YDAY),
+                 "u_lead__"+D2:    cyc("u_lead", D2)}, "commitments": {}})
+    pg2.click('[data-tab="tim"]'); pg2.wait_for_timeout(400)
     check("pesan 'tidak ada yang perlu dibaca'",
           "Tidak ada yang perlu dibaca" in pg2.inner_text("body"))
     check("tidak ada kartu peringatan", pg2.query_selector(".card.bad") is None
@@ -141,8 +141,8 @@ with sync_playwright() as p:
 
     print("\n--- di laptop, rekapnya dua kolom ---")
     wide = b.new_context(viewport={"width": 1280, "height": 900})
-    pgW = new_page(wide, "u_chief", SEED, at=AT)
-    pgW.click('[data-tab="chief"]'); pgW.wait_for_timeout(400)
+    pgW = new_page(wide, "u_lead", SEED, at=AT)
+    pgW.click('[data-tab="tim"]'); pgW.wait_for_timeout(400)
     check("kolomnya jadi dua", pgW.evaluate(
         "getComputedStyle(document.querySelector('.cols')).gridTemplateColumns"),
         lambda v: len(v.split()) == 2)
@@ -152,7 +152,7 @@ with sync_playwright() as p:
     check("batang tombol ikut mengalir, tidak menempel di dasar layar", pgW.evaluate(
         "getComputedStyle(document.querySelector('#bar')).position"), "static")
     check("isinya sama saja, cuma tata letaknya yang beda",
-          pgW.inner_text("body"), lambda s: "SEMUA (3)" in s and "Rekap squad" in s)
+          pgW.inner_text("body"), lambda s: "SEMUA (3)" in s and "Rekap tim" in s)
     wide.close()
 
     print("\n--- di telepon tetap satu kolom ---")
@@ -166,7 +166,7 @@ with sync_playwright() as p:
     pg3 = new_page(ctx, "u_rio", SEED, at=AT)
     check("Rio tidak punya tab manager", pg3.eval_on_selector("#tabs","e=>e.hidden"))
     check("Rio tidak melihat data orang lain",
-          "Butuh Chief approve" not in pg3.inner_text("body"))
+          "Butuh approve" not in pg3.inner_text("body"))
     check("Rio diberi tahu hari yang dia lewatkan",
           "Kamu belum lapor" in pg3.inner_text("body"))
     pg3.screenshot(path=str(SHOTS)+"/t-rio-miss.png", full_page=True)
