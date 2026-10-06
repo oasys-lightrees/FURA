@@ -23,9 +23,10 @@ except ImportError as exc:                                  # pragma: no cover
     print(f"Playwright tidak tersedia ({exc}) — dilewati.")
     sys.exit(0)
 
-from livehost import PASSWORD, Host, sign_in
+from livehost import PASSWORD, Host, accept_invite, sign_in
 
 NEW_PASSWORD = "password-baru-yang-panjang"
+PASSWORD2 = "password-ketiga-yang-panjang"
 
 # install.sql dijalankan ulang persis seperti phpMyAdmin menjalankannya: baris komentar
 # dibuang dulu, baru dipecah per titik koma.
@@ -67,53 +68,89 @@ with Host("messi_admin_test", seed="empty") as host, sync_playwright() as p:
     admin = sign_in(ctx, host.base, "lead@example.test", results=results)
     check("admin masuk ke aplikasinya", admin.inner_text("h1"),
           lambda s: "Berapa banyak" in s or "Sudah terkirim" in s)
-    check("admin melihat pintu ke halaman tim dan ke pertanyaannya",
-          admin.inner_text("footer"), lambda s: "Tim" in s and "Pertanyaan" in s)
+    check("admin melihat pintu ke halaman orang dan ke pertanyaannya",
+          admin.inner_text("footer"), lambda s: "Orang" in s and "Pertanyaan" in s)
 
     admin.goto(host.base + "/admin.php")
-    check("halaman tim terbuka", admin.inner_text("h1"), "Tim")
+    check("halaman orang & tim terbuka", admin.inner_text("h1"), "Orang & tim")
     check("dirinya sendiri tercatat", admin.inner_text("body"), lambda s: "lead@example.test" in s)
-    check("perannya sendiri tidak bisa diturunkan sendiri",
-          admin.inner_text("body"), lambda s: "admin (kamu)" in s)
+    # Akun pertama adalah owner: harus ada satu yang bisa mengangkat admin.
+    check("akun pertama jadi owner, dan perannya sendiri tidak bisa diturunkan sendiri",
+          admin.inner_text("body"), lambda s: "Owner (kamu)" in s)
+    check("dan sudah punya satu tim", admin.inner_text("body"), lambda s: "1 orang" in s)
 
-    print("\n=== menambah orang ===")
+    print("\n=== menambah orang lewat undangan ===")
     admin.fill("#n", "Nicho")
     admin.fill("#e", "nicho@example.test")
-    admin.fill("#p", PASSWORD)
     admin.select_option("#r", "player")
+    check("tidak ada kotak password untuk diketik admin",
+          admin.query_selector("#p") is None)
     admin.click("button:has-text('Tambah')")
     admin.wait_for_load_state("networkidle")
     check("orangnya masuk daftar", admin.inner_text("body"), lambda s: "Nicho ditambahkan" in s)
+    undangan = admin.inner_text(".ok code").strip()
+    check("dan yang keluar adalah link undangan", undangan,
+          lambda s: s.startswith(host.base) and "undang.php?t=" in s)
+    check("admin diingatkan mengirimnya japri",
+          admin.locator(".note.ok", has=admin.locator("code")).inner_text(),
+          lambda s: "japri" in s)
+    check("selama belum diterima, ditandai di daftarnya",
+          admin.inner_text("body"), lambda s: "belum terima undangan" in s)
 
     admin.fill("#n", "Nicho Lagi")
     admin.fill("#e", "nicho@example.test")
-    admin.fill("#p", PASSWORD)
     admin.click("button:has-text('Tambah')")
     admin.wait_for_load_state("networkidle")
     check("email yang sama ditolak", admin.inner_text(".bad"), lambda s: "sudah terdaftar" in s)
 
-    # The browser refuses to submit a short password before the server is troubled with
-    # it, which is the right order — so the server's own guard has to be poked directly,
-    # because that is the one that holds when the browser is not a browser.
-    csrf = admin.get_attribute("input[name=csrf]", "value")
-    short = admin.evaluate(
-        """async ([url, csrf]) => {
-             const body = new URLSearchParams({ do: "add", name: "Pendek",
-               email: "pendek@example.test", password: "123", role: "player",
-               joined: "2026-09-28", csrf });
-             const r = await fetch(url, { method: "POST", body });
-             return (await r.text()).includes("minimal 10");
-           }""", [host.base + "/admin.php", csrf])
-    check("password pendek ditolak juga di server", short)
+    print("\n=== yang diundang membuat passwordnya sendiri ===")
+    other = browser.new_context(viewport={"width": 400, "height": 900})
+    inv = other.new_page()
+    inv.goto(undangan)
+    inv.wait_for_load_state("networkidle")
+    check("halamannya menyapa orangnya dengan namanya",
+          inv.inner_text("h1"), lambda s: "Nicho" in s)
+    check("dan menyebutkan bahwa yang mengundang tidak akan tahu passwordnya",
+          inv.inner_text("body"), lambda s: "tidak akan tahu" in s)
+
+    # Password pendek dan dua kotak yang berbeda ditolak di server, bukan cuma di browser.
+    tolak = inv.evaluate(
+        """async ([url, t]) => {
+             const out = [];
+             for (const [a, b] of [["123", "123"], ["password-panjang", "beda-sekali"]]) {
+               const body = new URLSearchParams({ t, password: a, password2: b });
+               const r = await fetch(url, { method: "POST", body });
+               out.push(await r.text());
+             }
+             return out.map(x => x.includes("minimal 10") || x.includes("belum sama"));
+           }""", [undangan.split("?")[0], undangan.split("t=")[1]])
+    check("password pendek dan ketikan yang tidak sama ditolak di server", tolak, [True, True])
+
+    inv.fill("#password", NEW_PASSWORD)
+    inv.fill("#password2", NEW_PASSWORD)
+    inv.click("button[type=submit]")
+    inv.wait_for_load_state("networkidle")
+    inv.wait_for_timeout(600)
+    check("menerima undangan langsung memasukkannya ke aplikasi",
+          inv.inner_text("body"), lambda s: "Modul" in s or "Berapa banyak" in s)
+
+    gone = other.new_page()
+    gone.goto(undangan)
+    gone.wait_for_load_state("networkidle")
+    check("dan undangannya tidak bisa dipakai kedua kalinya",
+          gone.inner_text("h1"), lambda s: "tidak berlaku" in s)
+    gone.close()
+
     admin.reload()
     admin.wait_for_load_state("networkidle")
-    check("dan orangnya tidak jadi dibuat",
-          admin.inner_text("body"), lambda s: "pendek@example.test" not in s)
+    check("di daftar admin tandanya hilang",
+          admin.inner_text("body"), lambda s: "belum terima undangan" not in s)
 
     print("\n=== orang baru itu betul-betul bisa masuk ===")
+    other.close()
     other = browser.new_context(viewport={"width": 400, "height": 900})
-    nicho = sign_in(other, host.base, "nicho@example.test", results=results)
-    check("bisa masuk dengan password yang diberikan",
+    nicho = sign_in(other, host.base, "nicho@example.test", NEW_PASSWORD, results=results)
+    check("bisa masuk dengan password yang dia buat sendiri",
           nicho.inner_text("h1"), "Berapa banyak hari ini?")
     check("player tidak punya tab squad", nicho.eval_on_selector("#tabs", "e=>e.hidden"))
     check("dan tidak bisa membuka halaman squad", status(nicho, "/admin.php", host.base), 403)
@@ -133,23 +170,35 @@ with Host("messi_admin_test", seed="empty") as host, sync_playwright() as p:
     check("tapi halaman admin tetap tertutup untuk leader",
           status(nicho, "/admin.php", host.base), 403)
 
-    print("\n=== mengganti password ===")
+    print("\n=== lupa password: link, bukan password yang diketik admin ===")
     admin.reload()
     admin.wait_for_load_state("networkidle")
     row = admin.locator("tr", has_text="nicho@example.test")
-    row.locator("input[name=password]").fill(NEW_PASSWORD)
-    row.locator("button:has-text('Ganti')").click()
+    check("admin tidak punya kotak untuk mengetik password orang lain",
+          row.locator("input[name=password]").count(), 0)
+    row.locator("button:has-text('Link buat password baru')").click()
     admin.wait_for_load_state("networkidle")
-    check("passwordnya diganti", admin.inner_text(".ok"), lambda s: "Password diganti" in s)
-
-    nicho.goto(host.base + "/index.php")
-    check("sesi lamanya ikut mati — ganti password berarti keluar di mana-mana",
-          nicho.url, lambda u: u.endswith("/login.php"))
+    reset = admin.inner_text(".ok code").strip()
+    check("yang keluar adalah link, bukan password", reset,
+          lambda s: s.startswith(host.base) and "undang.php?t=" in s)
 
     stale = browser.new_context(viewport={"width": 400, "height": 900})
-    old = sign_in(stale, host.base, "nicho@example.test", PASSWORD, results=results)
+    rp = stale.new_page()
+    rp.goto(reset)
+    rp.wait_for_load_state("networkidle")
+    rp.fill("#password", PASSWORD2)
+    rp.fill("#password2", PASSWORD2)
+    rp.click("button[type=submit]")
+    rp.wait_for_load_state("networkidle")
+    rp.wait_for_timeout(600)
+    check("orangnya membuat password barunya sendiri lalu langsung masuk",
+          rp.inner_text("body"), lambda s: "Modul" in s or "Berapa banyak" in s)
+    stale.close()
+
+    stale = browser.new_context(viewport={"width": 400, "height": 900})
+    old = sign_in(stale, host.base, "nicho@example.test", NEW_PASSWORD, results=results)
     check("password lama tidak berlaku lagi", old.inner_text(".err"), lambda s: "salah" in s)
-    fresh = sign_in(stale, host.base, "nicho@example.test", NEW_PASSWORD, results=results)
+    fresh = sign_in(stale, host.base, "nicho@example.test", PASSWORD2, results=results)
     check("password baru berlaku", fresh.inner_text("h1"), "Berapa banyak hari ini?")
     stale.close()
 
@@ -191,7 +240,7 @@ with Host("messi_admin_test", seed="empty") as host, sync_playwright() as p:
     row.locator("button:has-text('Nonaktifkan')").click()
     admin.wait_for_load_state("networkidle")
     gone = browser.new_context(viewport={"width": 400, "height": 900})
-    blocked = sign_in(gone, host.base, "nicho@example.test", NEW_PASSWORD, results=results)
+    blocked = sign_in(gone, host.base, "nicho@example.test", PASSWORD2, results=results)
     check("yang dinonaktifkan tidak bisa masuk lagi",
           blocked.inner_text(".err"), lambda s: "salah" in s)
     gone.close()
@@ -302,12 +351,12 @@ with Host("messi_admin_test", seed="empty") as host, sync_playwright() as p:
     admin.wait_for_load_state("networkidle")
     admin.fill("#n", "Oki")
     admin.fill("#e", "oki@example.test")
-    admin.fill("#p", PASSWORD)
     admin.select_option("#r", "player")
     admin.click("button:has-text('Tambah')")
     admin.wait_for_load_state("networkidle")
+    undanganOki = admin.inner_text(".ok code").strip()
     pctx = browser.new_context(viewport={"width": 420, "height": 900})
-    player = sign_in(pctx, host.base, "oki@example.test", results=results)
+    player = accept_invite(pctx, undanganOki, PASSWORD, results=results)
     check("pemain melihat pertanyaan yang disetel admin",
           player.inner_text("h1"), "Berapa tiket hari ini?")
     check("dan channel yang disetel admin",
@@ -361,6 +410,121 @@ with Host("messi_admin_test", seed="empty") as host, sync_playwright() as p:
     check("dan penyusupnya tidak masuk daftar",
           admin.inner_text("body"), lambda s: "Penyusup" not in s)
 
+    print("\n=== owner, admin, dan batas di antaranya ===")
+    # Owner mengangkat dua admin, lalu salah satunya mencoba mengubah yang lain. Kalau
+    # bisa, "admin" berhenti berarti apa pun: satu admin tinggal menurunkan yang lain.
+    admin.goto(host.base + "/admin.php")
+    admin.wait_for_load_state("networkidle")
+    for nama, surel in [("Adi", "adi@example.test"), ("Bela", "bela@example.test")]:
+        admin.fill("#n", nama)
+        admin.fill("#e", surel)
+        admin.select_option("#r", "admin")
+        admin.click("button:has-text('Tambah')")
+        admin.wait_for_load_state("networkidle")
+        link = admin.inner_text(".ok code").strip()
+        kctx = browser.new_context(viewport={"width": 420, "height": 900})
+        accept_invite(kctx, link, PASSWORD, results=results).close()
+        kctx.close()
+    check("owner bisa mengangkat admin", admin.inner_text("body"),
+          lambda s: "adi@example.test" in s and "bela@example.test" in s)
+
+    actx = browser.new_context(viewport={"width": 1000, "height": 900})
+    adi = sign_in(actx, host.base, "adi@example.test", PASSWORD, results=results)
+    adi.goto(host.base + "/admin.php")
+    adi.wait_for_load_state("networkidle")
+    isi = adi.inner_text("body")
+    check("admin melihat owner dan sesama admin, tapi tanpa tombol", isi,
+          lambda s: "Owner" in s and "Bela" in s)
+    barisBela = adi.locator("tr", has_text="bela@example.test")
+    check("baris sesama admin tidak punya pemilih peran",
+          barisBela.locator("select[name=role]").count(), 0)
+    check("dan tidak punya tombol undangan sama sekali",
+          barisBela.locator("button").count(), 0)
+    check("peran yang bisa diberikan admin tidak sampai ke admin",
+          adi.inner_text("#r"), lambda s: "Admin" not in s and "Owner" not in s)
+    # Dan bukan cuma hilang dari pilihannya: kiriman yang menyebut peran di luar
+    # wewenangnya tidak boleh diterima diam-diam.
+    adi.evaluate(
+        """async ([url, csrf]) => {
+             const body = new URLSearchParams({ do: "add", name: "Curi", csrf,
+               email: "curi@example.test", role: "owner", team: "1", joined: "2026-09-28" });
+             await fetch(url, { method: "POST", body });
+           }""", [host.base + "/admin.php",
+                  adi.get_attribute("input[name=csrf]", "value")])
+    admin.reload()
+    admin.wait_for_load_state("networkidle")
+    check("admin yang mengirim peran di luar wewenangnya tidak jadi mengangkat siapa pun",
+          admin.evaluate("""() => {
+            const tr = [...document.querySelectorAll("tr")]
+              .find(t => t.textContent.includes("curi@example.test"));
+            return tr ? tr.querySelector("select[name=role]").value : "tidak ada"; }"""),
+          "player")
+
+    # Tombol yang hilang cuma menghalangi klik. Yang mengirim sendiri harus ikut ditolak,
+    # jadi id-nya diambil dari halaman owner — di halaman admin memang tidak ada.
+    idBela = admin.evaluate("""() => {
+        const tr = [...document.querySelectorAll("tr")]
+          .find(t => t.textContent.includes("bela@example.test"));
+        return tr.querySelector("input[name=id]").value; }""")
+    paksa = adi.evaluate(
+        """async ([url, csrf, id]) => {
+             const body = new URLSearchParams({ do: "role", id, role: "player", csrf });
+             const r = await fetch(url, { method: "POST", body });
+             return (await r.text()).includes("Tidak bisa mengubah baris itu");
+           }""", [host.base + "/admin.php",
+                  adi.get_attribute("input[name=csrf]", "value"), idBela])
+    check("admin yang mengirim paksa ke baris sesama admin ditolak", paksa, True)
+
+    # Dan bukan cuma kalimatnya: perannya memang tidak berubah.
+    admin.reload()
+    admin.wait_for_load_state("networkidle")
+    check("perannya memang tidak berubah", admin.evaluate("""() => {
+        const tr = [...document.querySelectorAll("tr")]
+          .find(t => t.textContent.includes("bela@example.test"));
+        return tr.querySelector("select[name=role]").value; }"""), "admin")
+
+    # Begitu juga menonaktifkan: admin tidak boleh mematikan akun sesama admin.
+    matikan = adi.evaluate(
+        """async ([url, csrf, id]) => {
+             const body = new URLSearchParams({ do: "active", id, active: "0", csrf });
+             const r = await fetch(url, { method: "POST", body });
+             return (await r.text()).includes("Tidak bisa mengubah baris itu");
+           }""", [host.base + "/admin.php",
+                  adi.get_attribute("input[name=csrf]", "value"), idBela])
+    check("menonaktifkan sesama admin juga ditolak", matikan, True)
+
+    # Owner boleh, karena memang wewenangnya.
+    bolehOwner = admin.evaluate(
+        """async ([url, csrf, id]) => {
+             const body = new URLSearchParams({ do: "role", id, role: "leader", csrf });
+             const r = await fetch(url, { method: "POST", body });
+             return (await r.text()).includes("Peran diubah");
+           }""", [host.base + "/admin.php",
+                  admin.get_attribute("input[name=csrf]", "value"), idBela])
+    check("owner boleh menurunkan admin", bolehOwner, True)
+    actx.close()
+
+    print("\n=== tim ===")
+    admin.goto(host.base + "/admin.php")
+    admin.wait_for_load_state("networkidle")
+    admin.fill("input[placeholder='nama tim baru']", "HR")
+    admin.click("button:has-text('Tambah tim')")
+    admin.wait_for_load_state("networkidle")
+    check("tim baru dibuat", admin.inner_text(".ok"), lambda s: "Tim ditambahkan" in s)
+    admin.fill("input[placeholder='nama tim baru']", "HR")
+    admin.click("button:has-text('Tambah tim')")
+    admin.wait_for_load_state("networkidle")
+    check("nama tim yang sama ditolak", admin.inner_text(".bad"), lambda s: "sudah ada" in s.lower())
+    check("tiap tim punya tautan ke pertanyaannya sendiri",
+          admin.eval_on_selector_all("a[href*='soal.php?team=']", "e=>e.length"), 2)
+
+    admin.goto(host.base + "/soal.php")
+    admin.wait_for_load_state("networkidle")
+    check("halaman pertanyaan menyebut tim mana yang sedang diatur",
+          admin.inner_text("body"), lambda s: "Pertanyaan milik tim" in s)
+    check("dan webhook tim tidak pernah ditampilkan kembali",
+          admin.input_value("input[name=chat_webhook]"), "")
+
     print("\n=== pemasangan lama yang kurang satu tabel ===")
     # Gejala yang benar-benar dilihat orangnya: halaman 500 kosong. Diuji dari sisi
     # browser, bukan cuma dari fungsinya, karena yang kosong itulah yang tidak bisa
@@ -404,7 +568,7 @@ with Host("messi_admin_test", seed="empty") as host, sync_playwright() as p:
     host.php("-r", REIMPORT)
     admin.goto(host.base + "/admin.php")
     admin.wait_for_load_state("networkidle")
-    check("import ulang memulihkannya", admin.inner_text("h1"), "Tim")
+    check("import ulang memulihkannya", admin.inner_text("h1"), "Orang & tim")
     check("dan orang-orangnya masih ada", admin.inner_text("body"),
           lambda s: "oki@example.test" in s)
 

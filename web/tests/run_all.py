@@ -24,6 +24,11 @@ for name in SUITES:
     counts = re.match(r"^(\d+)/(\d+) lolos", summary)
     if r.returncode != 0 or not counts or counts.group(1) != counts.group(2):
         failed.append(name)
+        # Namanya saja tidak cukup untuk ditindaklanjuti, apalagi kalau kegagalannya
+        # sesekali: yang perlu terbaca di ringkasan adalah pemeriksaan mana yang jatuh.
+        for l in r.stdout.splitlines():
+            if l.startswith("FAIL "):
+                lines.append(f"  {'':<20} ↳ {l[5:].split('   ->')[0]}")
 
 print(f"\n{'=' * 60}\nRINGKASAN\n{'=' * 60}")
 print("\n".join(lines))

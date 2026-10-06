@@ -62,6 +62,14 @@ main { padding:22px 16px 132px; }
 .modbar .what { margin-left:auto; text-decoration:underline; text-underline-offset:2px; }
 
 /* katalog modul */
+/* pemilih tim di rekap */
+.teampick { display:flex; flex-wrap:wrap; gap:6px; margin:0 0 14px; }
+.teampick button { font:inherit; font-size:13px; padding:5px 11px; border-radius:999px;
+                   cursor:pointer; background:var(--surface); color:var(--muted);
+                   border:1px solid var(--line); }
+.teampick button:hover { color:var(--ink); }
+.teampick button.on { background:var(--ink); color:var(--paper); border-color:var(--ink); }
+
 .mods { display:grid; gap:12px; }
 .mod { width:100%; text-align:left; display:block; background:var(--surface); color:inherit;
        border:1px solid var(--line); border-radius:14px; padding:16px; font:inherit; }
@@ -371,6 +379,11 @@ function cfgOf(raw) {
   };
 }
 const CFG = cfgOf(window.FURA_CONFIG);
+/* Tim yang boleh dibaca orang ini. Kosong berarti pemasangan tanpa server — satu tim
+   tanpa nama, dan layarnya persis seperti sebelum tim ada. */
+const TEAMS = (Array.isArray(window.FURA_TEAMS) ? window.FURA_TEAMS : [])
+  .filter(t => t && t.id).map(t => ({ id: +t.id, name: String(t.name || "Tim") }));
+const MY_TEAM = Number.isFinite(+window.FURA_TEAM) ? +window.FURA_TEAM : null;
 const Q = CFG.questions;
 const CHANNELS = CFG.channels, DECLARATION = CFG.declaration;
 const OPEN_AT = CFG.open_hour, DUE_AT = CFG.due_hour, MAX_PLANS = CFG.max_plans;
@@ -487,7 +500,7 @@ const S = { me:null, name:"", isLeader:false, cycles:new Map(), commitments:new 
             roster:new Map(), tab:"hari-ini", step:1, editing:false, error:null,
             copied:false, showReport:false, ready:false, offline:false, a:null, savedAt:null,
             // Layar leader: hari yang sedang dibaca, dan laporan siapa yang dibuka.
-            day:null, openRow:null,
+            day:null, openRow:null, teamView:null,
             // Di mana orangnya: katalog modul, penjelasan sebuah modul, atau modulnya.
             view:"catalog", intro:false };
 
@@ -589,6 +602,7 @@ async function boot() {
 
   S.a = loadDraft(today()) || blank();
   S.view = resumeModule();
+  S.teamView = MY_TEAM ?? (TEAMS[0] ? TEAMS[0].id : null);
   S.ready = true;
   await names();
   render();
@@ -864,11 +878,14 @@ function screenCatalog() {
   };
   const leader = () => {
     if (!S.isLeader || !isWorkday(day)) return "";
-    const people = [...S.roster.keys()].filter(u => day >= joinedOn(u));
+    const only = TEAMS.length > 1 ? S.teamView : null;
+    const people = [...S.roster.keys()].filter(u => day >= joinedOn(u))
+      .filter(u => only === null || teamOf(u) === only);
     const done = people.filter(u => {
       const c = S.cycles.get(key(u, day)); return c && c.submittedAt;
     }).length;
-    return `<div class="state"><i></i>Tim: ${done}/${people.length} sudah lapor</div>`;
+    const label = only === null ? "Tim" : esc(teamName(only));
+    return `<div class="state"><i></i>${label}: ${done}/${people.length} sudah lapor</div>`;
   };
 
   return `<h1>Modul</h1>
@@ -967,9 +984,17 @@ function screenPlayer() {
  * daftar masalah saja, tapi semua orang beserta angkanya — dan laporan utuh siapa pun
  * bisa dibuka dengan satu ketukan, seperti dulu terbaca di grup.
  */
+const teamOf = u => (S.roster.get(u) || {}).team ?? null;
+const teamName = id => (TEAMS.find(t => t.id === id) || {}).name || "";
+
 function screenLeader() {
   const day = S.day || today();
-  const people = [...S.roster.keys()].filter(uid => day >= joinedOn(uid));
+  // Rekap selalu tentang satu tim. Leader cuma menerima timnya sendiri dari server;
+  // owner dan admin menerima semuanya, dan memilih yang mana di sini.
+  const only = TEAMS.length > 1 ? S.teamView : null;
+  const people = [...S.roster.keys()]
+    .filter(uid => day >= joinedOn(uid))
+    .filter(uid => only === null || teamOf(uid) === only);
   const rows = people.map(uid => {
     const doc = S.cycles.get(key(uid, day));
     return { uid, doc, st: statusOf(day, doc), missed: missedDays(uid, 5).length };
@@ -978,8 +1003,10 @@ function screenLeader() {
 
   const done = rows.filter(r => r.doc && r.doc.submittedAt);
   const waiting = rows.filter(r => !(r.doc && r.doc.submittedAt));
+  const inView = new Set(people);
   const late = [...S.commitments.values()]
-    .filter(c => c.status === "open" && c.due < today());
+    .filter(c => c.status === "open" && c.due < today())
+    .filter(c => only === null || inView.has(c.owner));
 
   /* ---- kepala: hari apa yang sedang dibaca ---- */
   const prev = stepWorkday(day, -1), next = stepWorkday(day, 1);
@@ -991,8 +1018,13 @@ function screenLeader() {
            : `<span></span>`}
   </div>`;
 
-  let html = `<h1>Rekap tim</h1>
+  const picker = TEAMS.length > 1 ? `<div class="teampick">${TEAMS.map(t =>
+      `<button type="button" data-team="${t.id}" class="${t.id === only ? "on" : ""}">${
+        esc(t.name)}</button>`).join("")}</div>` : "";
+
+  let html = `<h1>Rekap ${esc(TEAMS.length > 1 ? teamName(only) : "tim")}</h1>
     <p class="sub">${people.length} orang${day === today() ? " · hari ini" : ""}</p>
+    ${picker}
     ${nav}
     <div class="stats">
       <div class="g"><b>${done.length}/${people.length}</b><span>sudah lapor</span></div>
@@ -1230,6 +1262,8 @@ view.addEventListener("click", ev => {
     saveDraft(today(), S.a); render();
     return;
   }
+  const tp = ev.target.closest && ev.target.closest("[data-team]");
+  if (tp) { S.teamView = +tp.dataset.team; S.openRow = null; render(); toTop(); return; }
   const day = ev.target.closest && ev.target.closest("[data-day]");
   if (day) { S.day = day.dataset.day; S.openRow = null; render(); toTop(); return; }
   const row = ev.target.closest && ev.target.closest("[data-open]");

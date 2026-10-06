@@ -26,34 +26,44 @@ require_once __DIR__ . '/bootstrap.php';
 /** A seam, so the tests can read what would be posted without a webhook or a network. */
 final class Chat
 {
-    /** @var null|callable(string):bool */
+    /** @var null|callable(string,string):bool  teks, lalu space mana yang dituju */
     public static $send = null;
 }
 
-function chat_webhook(): string
+/**
+ * Space mana yang disapa.
+ *
+ * Tiap tim punya space sendiri, jadi webhook-nya ikut setelan tim. Yang di config.php
+ * tetap berlaku sebagai cadangan: pemasangan satu tim tidak perlu memindahkan apa pun,
+ * dan tim yang belum mengisi webhook-nya tetap dapat pesan di space perusahaan.
+ */
+function chat_webhook(string $teamWebhook = ''): string
 {
-    return trim((string) cfg('chat_webhook'));
+    $team = trim($teamWebhook);
+    return $team !== '' ? $team : trim((string) cfg('chat_webhook'));
 }
 
-function chat_enabled(): bool
+function chat_enabled(string $teamWebhook = ''): bool
 {
-    return Chat::$send !== null || chat_webhook() !== '';
+    return Chat::$send !== null || chat_webhook($teamWebhook) !== '';
 }
 
 /**
  * Posts one message. A failure is logged, never fatal — the report is still reachable
  * in a browser on a day Google is having trouble.
  */
-function chat_send(string $text, int $timeout = 15): bool
+function chat_send(string $text, int $timeout = 15, string $teamWebhook = ''): bool
 {
-    if (!chat_enabled() || trim($text) === '') {
+    if (!chat_enabled($teamWebhook) || trim($text) === '') {
         return false;
     }
     if (Chat::$send !== null) {
-        return (Chat::$send)($text);
+        // Space-nya ikut diberikan, supaya tes bisa membuktikan pesan tim A tidak
+        // berakhir di space tim B — pembuktian yang tidak mungkin dari teksnya saja.
+        return (Chat::$send)($text, chat_webhook($teamWebhook));
     }
 
-    $url = chat_webhook();
+    $url = chat_webhook($teamWebhook);
     if ($url === '') {
         return false;
     }

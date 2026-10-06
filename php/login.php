@@ -1,6 +1,6 @@
 <?php
 /**
- * The door. A password, or the one-time link the bot sends at 09:00.
+ * The door. A password, or a one-time link an admin hands out privately.
  */
 
 declare(strict_types=1);
@@ -21,17 +21,24 @@ if (isset($_GET['t'])) {
         header('Location: index.php');
         exit;
     }
-    $error = 'Link-nya sudah dipakai atau kedaluwarsa. Masuk dengan password, atau minta link baru ke bot.';
+    $error = 'Link-nya sudah dipakai atau kedaluwarsa. Masuk dengan password, '
+           . 'atau minta link baru ke admin.';
 }
 
 if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST') {
-    if (auth_login((string) ($_POST['email'] ?? ''), (string) ($_POST['password'] ?? ''))) {
+    $email = (string) ($_POST['email'] ?? '');
+    if (auth_throttled($email)) {
+        // Kalimatnya boleh berbeda: yang diberitahukan adalah tentang alamat IP ini,
+        // bukan tentang ada atau tidaknya akun dengan email itu.
+        $error = 'Terlalu banyak percobaan dari perangkat ini. Coba lagi beberapa menit lagi.';
+    } elseif (auth_login($email, (string) ($_POST['password'] ?? ''))) {
         header('Location: index.php');
         exit;
+    } else {
+        // One message for both cases, so this page cannot be used to find out who has an
+        // account here.
+        $error = 'Email atau password-nya salah.';
     }
-    // One message for both cases, so this page cannot be used to find out who has an
-    // account here.
-    $error = 'Email atau password-nya salah.';
 } elseif (!$error && auth_user()) {
     header('Location: index.php');
     exit;

@@ -28,17 +28,24 @@ if (!$user) {
 // The first screen needs no round trip: everything it reads is already here — and
 // nothing it does not. A player gets their own reports; the squad view is a leader's.
 $mine = is_leader($user) ? null : (int) $user['id'];
-$cfg = repo_config();
+// Leader membaca timnya sendiri; admin dan owner membaca semuanya. Ini bukan penghematan
+// permintaan — nama dan laporan orang di tim lain bukan milik seorang leader untuk dibaca.
+$team = is_manager($user) ? null : repo_team_of($user);
+$myTeam = repo_team_of($user);
+$cfg = repo_config($myTeam);
+$teams = is_manager($user) ? repo_teams() : [$myTeam => (repo_teams()[$myTeam] ?? null)];
 $boot = [
-    'config' => $cfg,
+    'config' => messi_config_public($cfg),
+    'teams'  => array_values(array_filter($teams)),
     'me' => [
         'id'       => uid((int) $user['id']),
         'name'     => $user['name'],
         'isLeader' => is_leader($user),
+        'team'     => $myTeam,
     ],
-    'cycles'      => repo_cycles(90, $mine),
-    'commitments' => repo_commitments(90, $mine),
-    'roster'      => repo_roster(),
+    'cycles'      => repo_cycles(90, $mine, $team),
+    'commitments' => repo_commitments(90, $mine, $team),
+    'roster'      => repo_roster($team),
 ];
 
 $app = (string) file_get_contents(__DIR__ . '/app.html');
@@ -67,6 +74,10 @@ window.claude = (function () {
   // Pertanyaan, ambang dan jam datang dari server. Halaman punya bawaannya sendiri dan
   // tetap jalan tanpa ini, supaya versi artifact-nya tidak ikut butuh database.
   window.FURA_CONFIG = BOOT.config;
+  // Tim yang boleh dibaca orang ini, dan timnya sendiri. Leader cuma menerima satu;
+  // owner dan admin menerima semuanya, dan halamannya menyediakan pemilihnya.
+  window.FURA_TEAMS = BOOT.teams;
+  window.FURA_TEAM = BOOT.me.team;
 
   const snapshot = obj => ({
     docs: Object.entries(obj || {}).map(([id, d]) => ({ id, data: () => d })),
@@ -111,7 +122,7 @@ window.claude = (function () {
 <?= $app ?>
 <footer class="signout">
   Masuk sebagai <strong><?= h($user['name']) ?></strong> ·
-  <?php if ($user['role'] === 'admin'): ?><a href="admin.php">Tim</a> ·
+  <?php if (is_manager($user)): ?><a href="admin.php">Orang &amp; tim</a> ·
     <a href="soal.php">Pertanyaan</a> · <?php endif; ?>
   <a href="api/logout.php">Keluar</a>
 </footer>

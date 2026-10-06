@@ -111,11 +111,14 @@ function test_db(string $name): PDO
 
 const TEST_PASSWORD = 'kata-sandi-panjang';
 
-function make_user(string $email, string $name, string $role, string $joined): array
+function make_user(string $email, string $name, string $role, string $joined,
+                   ?int $team = null): array
 {
-    q('INSERT INTO users (email, name, password_hash, role, joined_on, created_at)
-       VALUES (?,?,?,?,?,?)',
-      [$email, $name, password_hash(TEST_PASSWORD, PASSWORD_DEFAULT), $role, $joined,
-       Clock::nowUtcSql()]);
+    $now = Clock::nowUtcSql();
+    q('INSERT INTO users (email, name, password_hash, role, team_id, joined_on,
+                          accepted_at, created_at)
+       VALUES (?,?,?,?,?,?,?,?)',
+      [$email, $name, password_hash(TEST_PASSWORD, PASSWORD_DEFAULT), $role,
+       $team ?? repo_default_team(), $joined, $now, $now]);
     return q1('SELECT * FROM users WHERE email = ?', [$email]);
 }

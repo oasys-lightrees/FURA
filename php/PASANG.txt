@@ -35,9 +35,13 @@ cPanel -> Software -> Select PHP Version (atau MultiPHP Manager) -> pilih 8.1 / 
    Harus muncul tujuh tabel: users, sessions, login_tokens, cycles, commitments,
    job_log, settings
 
-   SUDAH PERNAH PASANG VERSI SEBELUMNYA? Import ulang install.sql yang baru.
-   Isinya aman diulang (CREATE TABLE IF NOT EXISTS) — data yang sudah ada tidak
-   tersentuh, yang terjadi cuma tabel `settings` ikut dibuat.
+   SUDAH PERNAH PASANG VERSI SEBELUMNYA?
+   Upload dulu berkas barunya (langkah 3), lalu masuk sebagai admin dan buka
+   "Pemutakhiran database" dari halaman Orang & tim. Satu tombol, dan dia yang
+   mengurus tabel maupun kolom yang kurang. Data yang sudah ada tidak dihapus,
+   dan menjalankannya dua kali tidak melakukan apa-apa pada kali kedua.
+   (Import ulang install.sql lewat phpMyAdmin juga aman, tapi tidak cukup
+   sendirian: kolom baru di tabel yang sudah ada tidak ikut terbuat.)
 
 
 3. UPLOAD
@@ -83,15 +87,42 @@ cPanel -> Software -> Select PHP Version (atau MultiPHP Manager) -> pilih 8.1 / 
 
 
 7. TAMBAH ORANG
-   Masuk sebagai admin -> di bawah halaman klik "Tim" -> Tambah orang.
+   Masuk sebagai admin -> di bawah halaman klik "Orang & tim" -> Tambah orang.
+   Isi nama, email, tim dan perannya. Passwordnya TIDAK kamu ketik: yang keluar
+   adalah link undangan sekali pakai (berlaku 72 jam) — kirim japri, dan orangnya
+   yang membuat passwordnya sendiri. Jangan tempel ke space: siapa pun yang bisa
+   membaca space itu bisa memakainya.
+
    Tanggal "Mulai lapor" menentukan sejak kapan orang itu dihitung. Orang baru tidak
-   akan pernah ditandai bolos untuk hari sebelum dia bergabung.
+   akan pernah ditandai bolos untuk hari sebelum dia bergabung, dan yang belum
+   menerima undangannya tidak dihitung sama sekali.
+
+   Lupa password? Tombol "Link buat password baru" di baris orangnya. Tetap tidak
+   ada password yang perlu kamu ketik atau kirim.
+
+   PERAN
+     Owner    semua, termasuk mengangkat dan mencabut admin. Akun pertama otomatis
+              owner, dan selalu harus ada satu.
+     Admin    mengurus orang, tim dan pertanyaan. Tidak bisa menyentuh owner maupun
+              sesama admin.
+     Leader   membaca rekap timnya sendiri. Tidak melihat tim lain sama sekali.
+     Pelapor  mengisi laporannya sendiri.
+
+
+7b. BUAT TIM (kalau lebih dari satu divisi)
+   Di halaman yang sama, bagian "Tim". Tiap tim punya pertanyaan, ambang, jam buka
+   dan tutup, dan space Google Chat-nya sendiri — jadi HR tidak harus menghitung
+   hal yang sama dengan sales, dan pengingatnya masuk ke space masing-masing.
+   Satu orang satu tim. Memindahkan orang ke tim lain tidak mengubah rekap yang
+   sudah lewat: tiap laporan membawa timnya sendiri.
 
 
 8. SESUAIKAN PERTANYAANNYA (boleh dilewati)
-   Masuk sebagai admin -> di bawah halaman klik "Pertanyaan".
+   Masuk sebagai admin -> di bawah halaman klik "Pertanyaan". Kalau ada lebih dari
+   satu tim, pilih dulu timnya di atas — pertanyaan milik tim.
    Yang bisa diubah dari situ, tanpa menyentuh kode:
      - nama tim, yang dicetak di kepala laporan
+     - space Google Chat tim itu (kosongkan untuk memakai yang di config.php)
      - daftar channel: kode, nama pendek, nama panjang (tambah / ganti / hapus)
      - batas gantung (3 hari bawaannya), jam buka, jam tutup, maksimal rencana
      - kalimat tiap pertanyaan, contoh isian, dan pesan kalau dikosongkan

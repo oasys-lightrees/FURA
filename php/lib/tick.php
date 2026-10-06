@@ -31,7 +31,6 @@ function messi_tick(): array
 {
     $today = Clock::today();
     $hour  = Clock::hour();
-    $cfg   = repo_config();
     $did   = [];
 
     /* -- housekeeping, every run -------------------------------------------- */
@@ -45,49 +44,65 @@ function messi_tick(): array
     $swept = auth_sweep();
     if ($swept) { $did['swept'] = $swept; }
 
-    if (!messi_is_workday($today) || $hour < $cfg['open_hour']) {
+    if (!messi_is_workday($today)) {
         return $did;
     }
 
-    /* -- the working day ---------------------------------------------------- */
+    /* -- the working day, satu tim demi satu tim ----------------------------- */
 
-    $made = repo_generate($today);
-    if ($made) { $did['opened'] = count($made); log_job('generate', $today . ' n=' . count($made)); }
+    // Tiap tim punya jam, ambang dan space-nya sendiri, jadi hari kerja dijalankan per
+    // tim. Penanda job_log juga per tim: tim yang sudah disapa tidak menghalangi tim
+    // yang belum, dan cron yang jalan dua kali tetap mengirim satu pesan per tim.
+    foreach (repo_teams() as $teamId => $team) {
+        $cfg = repo_config($teamId);
+        if ($hour < $cfg['open_hour']) {
+            continue;
+        }
+        $tag = $today . ' t=' . $teamId;
 
-    // 09:00 — the ask.
-    if (!job_done('notify_open', $today)) {
-        $did['asked'] = (int) tick_notify_open($today);
-        log_job('notify_open', $today . ' sent=' . $did['asked']);
-    }
+        $made = repo_generate($today, $teamId);
+        if ($made) {
+            $did['opened'] = ($did['opened'] ?? 0) + count($made);
+            log_job('generate', $tag . ' n=' . count($made));
+        }
 
-    // One hour before closing — the nudge, and only to the people it is about.
-    if ($hour >= $cfg['due_hour'] - 1 && $hour < $cfg['due_hour']
-        && !job_done('notify_due', $today)) {
-        $did['nudged'] = (int) tick_notify_due($today, $cfg['due_hour']);
-        log_job('notify_due', $today . ' sent=' . $did['nudged']);
+        if (!job_done('notify_open', $tag)) {
+            $sent = (int) tick_notify_open($today, $teamId, $cfg);
+            $did['asked'] = ($did['asked'] ?? 0) + $sent;
+            log_job('notify_open', $tag . ' sent=' . $sent);
+        }
+
+        // One hour before closing — the nudge, and only to the people it is about.
+        if ($hour >= $cfg['due_hour'] - 1 && $hour < $cfg['due_hour']
+            && !job_done('notify_due', $tag)) {
+            $sent = (int) tick_notify_due($today, $teamId, $cfg);
+            $did['nudged'] = ($did['nudged'] ?? 0) + $sent;
+            log_job('notify_due', $tag . ' sent=' . $sent);
+        }
     }
 
     return $did;
 }
 
-/** One message to the space, naming what is already owed today. */
-function tick_notify_open(string $today): bool
+/** One message to the team's own space, naming what is already owed today. */
+function tick_notify_open(string $today, int $teamId, array $cfg): bool
 {
     $due = q('SELECT u.name, c.action_text FROM commitments c JOIN users u ON u.id = c.user_id
-               WHERE c.status = ? AND c.due_date <= ? AND u.active = 1
-               ORDER BY u.name', ['open', $today])->fetchAll();
-    return chat_send(chat_morning($today, $due));
+               WHERE c.status = ? AND c.due_date <= ? AND u.active = 1 AND u.team_id = ?
+               ORDER BY u.name', ['open', $today, $teamId])->fetchAll();
+    return chat_send(chat_morning($today, $due), 15, $cfg['chat_webhook']);
 }
 
 /** Only sent when somebody is actually missing, and it names them. */
-function tick_notify_due(string $today, int $dueHour): bool
+function tick_notify_due(string $today, int $teamId, array $cfg): bool
 {
     $names = q('SELECT u.name FROM users u
                   LEFT JOIN cycles c ON c.user_id = u.id AND c.day = ?
-                 WHERE u.active = 1 AND u.joined_on <= ? AND c.submitted_at IS NULL
-                 ORDER BY u.name', [$today, $today])->fetchAll(PDO::FETCH_COLUMN);
+                 WHERE u.active = 1 AND u.accepted_at IS NOT NULL AND u.joined_on <= ?
+                   AND u.team_id = ? AND c.submitted_at IS NULL
+                 ORDER BY u.name', [$today, $today, $teamId])->fetchAll(PDO::FETCH_COLUMN);
     if (!$names) {
         return false;
     }
-    return chat_send(chat_reminder($names, $dueHour));
+    return chat_send(chat_reminder($names, $cfg['due_hour']), 15, $cfg['chat_webhook']);
 }

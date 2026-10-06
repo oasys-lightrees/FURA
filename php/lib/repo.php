@@ -21,14 +21,16 @@ require_once __DIR__ . '/bootstrap.php';
  */
 final class Cfg
 {
-    private static ?array $held = null;
+    /** Per tim, karena satu permintaan bisa membaca setelan beberapa tim sekaligus —
+     *  cron menyapa semuanya, dan layar owner membaca rekap semuanya. */
+    private static array $held = [];
 
-    public static function get(): array
+    public static function get(int $teamId): array
     {
-        if (self::$held === null) {
-            self::$held = messi_config_normalize(self::stored());
+        if (!array_key_exists($teamId, self::$held)) {
+            self::$held[$teamId] = messi_config_normalize(self::stored($teamId));
         }
-        return self::$held;
+        return self::$held[$teamId];
     }
 
     /**
@@ -36,15 +38,18 @@ final class Cfg
      *
      * Tabel yang belum dibuat bukan alasan untuk mematikan aplikasinya: setelan punya
      * bawaan, dan bawaan itu persis yang dipakai sebelum halaman setelan ada. Yang
-     * memberitahu bahwa tabelnya kurang adalah messi_require_ready(), satu halaman yang
-     * menyebutkan nama tabelnya dan cara membuatnya — bukan 500 kosong dari sini.
+     * memberitahu bahwa tabelnya kurang adalah halaman cek dan halaman pemutakhiran —
+     * bukan 500 kosong dari sini.
      */
-    private static function stored(): ?array
+    private static function stored(int $teamId): ?array
     {
         try {
-            $row = q1('SELECT value FROM settings WHERE name = ?', ['messi']);
+            $row = q1('SELECT value FROM settings WHERE name = ? AND team_id = ?',
+                      ['messi', $teamId]);
         } catch (PDOException $e) {
-            if ($e->getCode() === '42S02') {
+            // 42S02 tabelnya belum ada, 42S22 kolom team_id-nya belum ada: dua-duanya
+            // pemasangan yang belum dimutakhirkan, dan dua-duanya berarti bawaan.
+            if (in_array($e->getCode(), ['42S02', '42S22'], true)) {
                 return null;
             }
             throw $e;
@@ -53,26 +58,84 @@ final class Cfg
     }
 
     /** Dipakai setelah admin menyimpan, dan oleh tes yang berganti setelan. */
-    public static function forget(): void { self::$held = null; }
+    public static function forget(): void { self::$held = []; }
 }
 
-function repo_config(): array
+/** Setelan sebuah tim. Tanpa argumen: tim bawaan, yang satu-satunya tim di pemasangan
+ *  yang belum pernah membuat tim kedua. */
+function repo_config(?int $teamId = null): array
 {
-    return Cfg::get();
+    return Cfg::get($teamId ?? repo_default_team());
 }
 
-function repo_save_config(array $user, $in): array
+function repo_save_config(array $user, int $teamId, $in): array
 {
-    if (($user['role'] ?? '') !== 'admin') {
+    if (!in_array($user['role'] ?? '', ['admin', 'owner'], true)) {
         throw new RepoError('Halaman ini untuk admin.');
     }
     $cfg = messi_config_normalize($in);
-    q('INSERT INTO settings (name, value, updated_at, updated_by) VALUES (?,?,?,?)
+    q('INSERT INTO settings (name, team_id, value, updated_at, updated_by) VALUES (?,?,?,?,?)
        ON DUPLICATE KEY UPDATE value = VALUES(value), updated_at = VALUES(updated_at),
                                updated_by = VALUES(updated_by)',
-      ['messi', json_encode($cfg, JSON_UNESCAPED_UNICODE), Clock::nowUtcSql(), (int) $user['id']]);
+      ['messi', $teamId, json_encode($cfg, JSON_UNESCAPED_UNICODE), Clock::nowUtcSql(),
+       (int) $user['id']]);
     Cfg::forget();
     return $cfg;
+}
+
+/* ------------------------------------------------------------------------ tim */
+
+/** Tim yang ada, berurut nama. */
+function repo_teams(bool $withInactive = false): array
+{
+    $where = $withInactive ? '' : ' WHERE active = 1';
+    $out = [];
+    foreach (q('SELECT id, name, active FROM teams' . $where . ' ORDER BY name') as $r) {
+        $out[(int) $r['id']] = ['id' => (int) $r['id'], 'name' => $r['name'],
+                                'active' => (bool) $r['active']];
+    }
+    return $out;
+}
+
+/**
+ * Tim yang dipakai kalau tidak ada yang menyebutkan tim mana.
+ *
+ * Selalu ada satu, dibuatkan kalau belum: orang tanpa tim tidak muncul di rekap mana pun,
+ * dan laporan tanpa tim tidak punya pertanyaan untuk dijawab.
+ */
+function repo_default_team(): int
+{
+    $row = q1('SELECT id FROM teams ORDER BY id LIMIT 1');
+    if ($row) {
+        return (int) $row['id'];
+    }
+    q('INSERT INTO teams (name, created_at) VALUES (?,?)', ['Tim', Clock::nowUtcSql()]);
+    return (int) db()->lastInsertId();
+}
+
+/** Tim orang ini, atau tim bawaan kalau dia belum punya. */
+function repo_team_of(array $user): int
+{
+    return !empty($user['team_id']) ? (int) $user['team_id'] : repo_default_team();
+}
+
+function repo_add_team(array $user, string $name): int
+{
+    if (!in_array($user['role'] ?? '', ['admin', 'owner'], true)) {
+        throw new RepoError('Halaman ini untuk admin.');
+    }
+    $name = trim((string) preg_replace('/\s+/u', ' ', $name));
+    if ($name === '') {
+        throw new RepoError('Isi nama timnya.');
+    }
+    if (mb_strlen($name) > 60) {
+        throw new RepoError('Nama timnya kepanjangan.');
+    }
+    if (q1('SELECT id FROM teams WHERE name = ?', [$name])) {
+        throw new RepoError('Sudah ada tim dengan nama itu.');
+    }
+    q('INSERT INTO teams (name, created_at) VALUES (?,?)', [$name, Clock::nowUtcSql()]);
+    return (int) db()->lastInsertId();
 }
 
 /** The page's ids for people and promises. Prefixed so the two can never be confused,
@@ -84,14 +147,28 @@ function uncid(string $c): ?int { return preg_match('/^k(\d+)$/', $c, $m) ? (int
 
 /* ------------------------------------------------------------------ reading */
 
-function repo_roster(): array
+/**
+ * Siapa saja yang ada, untuk halaman.
+ *
+ * `$onlyTeam` membatasi daftarnya ke satu tim: leader membaca rekap timnya sendiri, dan
+ * nama orang di tim lain bukan miliknya untuk dibaca. Owner dan admin tidak dibatasi.
+ */
+function repo_roster(?int $onlyTeam = null): array
 {
+    $where = 'active = 1 AND accepted_at IS NOT NULL';
+    $args = [];
+    if ($onlyTeam !== null) {
+        $where .= ' AND team_id = ?';
+        $args[] = $onlyTeam;
+    }
     $out = [];
-    foreach (q('SELECT id, name, joined_on, role FROM users WHERE active = 1 ORDER BY name') as $r) {
+    foreach (q('SELECT id, name, joined_on, role, team_id FROM users
+                 WHERE ' . $where . ' ORDER BY name', $args) as $r) {
         $out[uid((int) $r['id'])] = [
             'name'   => $r['name'],
             'joined' => $r['joined_on'],
             'leader' => $r['role'] !== 'player',
+            'team'   => $r['team_id'] === null ? null : (int) $r['team_id'],
         ];
     }
     return $out;
@@ -104,7 +181,7 @@ function repo_roster(): array
  * else's report, so sending them one would be handing out something they cannot see but
  * could read — and a report says what someone did all day.
  */
-function repo_cycles(int $sinceDays = 90, ?int $onlyUser = null): array
+function repo_cycles(int $sinceDays = 90, ?int $onlyUser = null, ?int $onlyTeam = null): array
 {
     $floor = messi_add_days(Clock::today(), -$sinceDays);
     $where = 'day >= ?';
@@ -113,13 +190,20 @@ function repo_cycles(int $sinceDays = 90, ?int $onlyUser = null): array
         $where .= ' AND user_id = ?';
         $args[] = $onlyUser;
     }
+    if ($onlyTeam !== null) {
+        // Timnya diambil dari laporannya, bukan dari orangnya: orang yang pindah tim
+        // tidak membawa laporan lamanya ikut pindah.
+        $where .= ' AND team_id = ?';
+        $args[] = $onlyTeam;
+    }
     $out = [];
-    foreach (q('SELECT user_id, day, status, answers, submitted_at FROM cycles
+    foreach (q('SELECT user_id, day, team_id, status, answers, submitted_at FROM cycles
                  WHERE ' . $where . ' ORDER BY day', $args) as $r) {
         $doc = json_decode((string) $r['answers'], true);
         $doc = is_array($doc) ? $doc : [];
         $doc['owner'] = uid((int) $r['user_id']);
         $doc['day']   = $r['day'];
+        $doc['team']  = $r['team_id'] === null ? null : (int) $r['team_id'];
         // submitted_at is UTC in the database; the page only ever tests it for presence
         // and prints the Jakarta time, so hand it over already converted.
         $doc['submittedAt'] = $r['submitted_at']
@@ -132,7 +216,7 @@ function repo_cycles(int $sinceDays = 90, ?int $onlyUser = null): array
     return $out;
 }
 
-function repo_commitments(int $sinceDays = 90, ?int $onlyUser = null): array
+function repo_commitments(int $sinceDays = 90, ?int $onlyUser = null, ?int $onlyTeam = null): array
 {
     $floor = messi_add_days(Clock::today(), -$sinceDays);
     $where = '(c.due_date >= ? OR c.status = ?)';
@@ -140,6 +224,10 @@ function repo_commitments(int $sinceDays = 90, ?int $onlyUser = null): array
     if ($onlyUser !== null) {
         $where .= ' AND c.user_id = ?';
         $args[] = $onlyUser;
+    }
+    if ($onlyTeam !== null) {
+        $where .= ' AND c.user_id IN (SELECT id FROM users WHERE team_id = ?)';
+        $args[] = $onlyTeam;
     }
     $out = [];
     foreach (q('SELECT c.id, c.user_id, c.action_text, c.due_date, c.status, c.resolved_at,
@@ -167,11 +255,11 @@ class RepoError extends RuntimeException {}
 
 /** Today's cycle row for this person, created if the cron has not run yet. Returns the
  *  row id. The unique key on (user_id, day) is what makes this safe to call twice. */
-function repo_ensure_cycle(int $userId, string $day): int
+function repo_ensure_cycle(int $userId, string $day, ?int $teamId = null): int
 {
-    q('INSERT INTO cycles (user_id, day, status, created_at) VALUES (?,?,?,?)
+    q('INSERT INTO cycles (user_id, day, team_id, status, created_at) VALUES (?,?,?,?,?)
         ON DUPLICATE KEY UPDATE id = LAST_INSERT_ID(id)',
-      [$userId, $day, 'pending', Clock::nowUtcSql()]);
+      [$userId, $day, $teamId, 'pending', Clock::nowUtcSql()]);
     return (int) db()->lastInsertId();
 }
 
@@ -192,7 +280,8 @@ function repo_save_cycle(array $user, string $docId, array $doc): array
         throw new RepoError('Tanggal mulai kamu belum tiba.');
     }
 
-    $cfg = repo_config();
+    $team = repo_team_of($user);
+    $cfg = repo_config($team);
     $answers = [
         'grid'       => is_array($doc['grid'] ?? null) ? $doc['grid'] : [],
         'detail'     => trim((string) ($doc['detail'] ?? '')),
@@ -218,7 +307,10 @@ function repo_save_cycle(array $user, string $docId, array $doc): array
 
     $status = messi_submit_status(Clock::hour(), $cfg['due_hour']);
     $now = Clock::nowUtcSql();
-    $cycleId = repo_ensure_cycle($userId, $today);
+    $cycleId = repo_ensure_cycle($userId, $today, $team);
+    // Timnya ditetapkan saat laporan dikirim, dan tidak diubah lagi sesudahnya: rekap
+    // bulan lalu tidak boleh ikut berpindah waktu orangnya pindah tim.
+    q('UPDATE cycles SET team_id = ? WHERE id = ? AND team_id IS NULL', [$team, $cycleId]);
 
     // Apakah permintaan bantuan ini perlu diumumkan? Hanya kalau ada isinya dan berbeda
     // dari yang sudah pernah diumumkan untuk hari yang sama — memperbaiki angka tidak
@@ -336,15 +428,23 @@ function repo_save_roster(array $user, string $docId, array $doc): array
 
 /** Opens today's cycles. Idempotent by the unique key, so the cron may run hourly.
  *  Returns the user ids that now have a cycle waiting. */
-function repo_generate(string $day): array
+function repo_generate(string $day, ?int $teamId = null): array
 {
     if (!messi_is_workday($day)) {
         return [];
     }
     $made = [];
-    foreach (q('SELECT id FROM users WHERE active = 1 AND joined_on <= ?', [$day]) as $u) {
+    // Yang diundang tapi belum membuat passwordnya belum pernah bisa masuk, jadi hari
+    // yang tidak dia isi bukan hari yang dia lewatkan.
+    $where = 'active = 1 AND accepted_at IS NOT NULL AND joined_on <= ?';
+    $args = [$day];
+    if ($teamId !== null) {
+        $where .= ' AND team_id = ?';
+        $args[] = $teamId;
+    }
+    foreach (q('SELECT id, team_id FROM users WHERE ' . $where, $args) as $u) {
         $before = q1('SELECT id FROM cycles WHERE user_id = ? AND day = ?', [$u['id'], $day]);
-        repo_ensure_cycle((int) $u['id'], $day);
+        repo_ensure_cycle((int) $u['id'], $day, $u['team_id'] === null ? null : (int) $u['team_id']);
         if (!$before) {
             $made[] = (int) $u['id'];
         }

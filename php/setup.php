@@ -34,10 +34,16 @@ if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST') {
     } elseif (strlen($pass) < 10) {
         $error = 'Password minimal 10 karakter.';
     } else {
-        q('INSERT INTO users (email, name, password_hash, role, joined_on, created_at)
-           VALUES (?,?,?,?,?,?)',
-          [$email, $name, password_hash($pass, PASSWORD_DEFAULT), 'admin',
-           (string) (cfg('first_day') ?: Clock::today()), Clock::nowUtcSql()]);
+        // Akun pertama adalah owner: harus ada satu yang bisa mengangkat admin. Dan satu
+        // tim, karena orang tanpa tim tidak muncul di rekap mana pun.
+        require_once __DIR__ . '/lib/repo.php';
+        $team = repo_default_team();
+        $now = Clock::nowUtcSql();
+        q('INSERT INTO users (email, name, password_hash, role, team_id, joined_on,
+                              accepted_at, created_at)
+           VALUES (?,?,?,?,?,?,?,?)',
+          [$email, $name, password_hash($pass, PASSWORD_DEFAULT), 'owner', $team,
+           (string) (cfg('first_day') ?: Clock::today()), $now, $now]);
         header('Location: login.php');
         exit;
     }

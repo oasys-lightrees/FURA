@@ -18,8 +18,8 @@ require_once __DIR__ . '/../lib/tick.php';
 
 /* What would be posted to Google Chat, caught in a bucket instead. */
 $sent = [];
-Chat::$send = function (string $text) use (&$sent): bool {
-    $sent[] = ['text' => $text];
+Chat::$send = function (string $text, string $webhook = '') use (&$sent): bool {
+    $sent[] = ['text' => $text, 'webhook' => $webhook];
     return true;
 };
 
@@ -186,8 +186,8 @@ Clock::freeze('2026-10-06T02:00:00Z');
 $did = messi_tick();
 ok('tanpa webhook, hari tetap dibuka — pesannya saja yang tidak ada',
    ($did['opened'] ?? 0) > 0 && ($did['asked'] ?? 0) === 0);
-Chat::$send = function (string $text) use (&$sent): bool {
-    $sent[] = ['text' => $text];
+Chat::$send = function (string $text, string $webhook = '') use (&$sent): bool {
+    $sent[] = ['text' => $text, 'webhook' => $webhook];
     return true;
 };
 
@@ -215,6 +215,55 @@ ok('membawa isi permintaannya', str_contains($pesan, 'Butuh approve harga Klien 
 ok('memakai markup Google Chat, bukan HTML',
    str_contains($pesan, '*') && !str_contains($pesan, '<b>'));
 ok('dan membawa link ke aplikasinya', str_contains($pesan, 'https://example.test/messi|'));
+
+/* ------------------------------------------------------------ dua tim, dua space */
+
+/**
+ * Tiap tim disapa di space-nya sendiri, dengan jamnya sendiri, dan hanya tentang
+ * orangnya sendiri. Yang membuktikannya bukan teks pesannya — pesan tim HR dan pesan
+ * tim sales bisa saja berbunyi mirip — tapi ke space mana pesan itu pergi.
+ */
+$sales = repo_default_team();
+$hr = repo_add_team($admin ?? ['role' => 'owner', 'id' => 1], 'HR');
+q('UPDATE teams SET name = ? WHERE id = ?', ['Sales', $sales]);
+
+$ani = make_user('ani@example.test', 'Ani', 'player', '2026-09-28', $hr);
+q('UPDATE users SET team_id = ? WHERE id IN (?,?)', [$sales, $nicho['id'], $rio['id']]);
+
+$owner = make_user('owner@example.test', 'Owi', 'owner', '2026-09-28', $sales);
+repo_save_config($owner, $sales, ['chat_webhook' => 'https://chat.example/sales',
+                                  'open_hour' => 9, 'due_hour' => 18]);
+repo_save_config($owner, $hr, ['chat_webhook' => 'https://chat.example/hr',
+                               'open_hour' => 7, 'due_hour' => 16]);
+
+// Jam 07:30 Jakarta: HR sudah buka, Sales belum.
+$pagi = tick_at('2026-10-05T00:30:00Z');
+$spaces = array_values(array_unique(array_column($pagi, 'webhook')));
+eq('jam buka tiap tim berlaku sendiri-sendiri', $spaces, ['https://chat.example/hr']);
+ok('dan pesannya menyapa harinya', said($pagi, 'laporan hari ini sudah dibuka'));
+
+// Jam 09:30: Sales ikut buka, HR tidak disapa dua kali.
+$siang = tick_at('2026-10-05T02:30:00Z');
+eq('tim yang belum disapa menyusul di jamnya',
+   array_values(array_unique(array_column($siang, 'webhook'))), ['https://chat.example/sales']);
+
+$lagi = tick_at('2026-10-05T03:30:00Z');
+eq('dan tidak ada yang disapa dua kali', $lagi, []);
+
+// Jam tutup HR jam 16, jadi pengingatnya jam 15 — bukan jam 17 seperti Sales.
+$ingat = tick_at('2026-10-05T08:30:00Z');          // 15:30 Jakarta
+eq('pengingat HR memakai jam tutup HR',
+   array_values(array_unique(array_column($ingat, 'webhook'))), ['https://chat.example/hr']);
+ok('dan menyebut jam tutup tim itu, bukan jam tim lain', said($ingat, '16:00'));
+ok('menyebut orang tim itu', said($ingat, 'Ani'));
+ok('dan tidak menyebut orang tim lain',
+   !said($ingat, 'Nicho') && !said($ingat, 'Rio'));
+
+$ingat2 = tick_at('2026-10-05T10:30:00Z');         // 17:30 Jakarta
+eq('giliran Sales di jamnya sendiri',
+   array_values(array_unique(array_column($ingat2, 'webhook'))), ['https://chat.example/sales']);
+ok('menyebut orang Sales', said($ingat2, 'Nicho'));
+ok('dan tidak menyebut orang HR', !said($ingat2, 'Ani'));
 
 /* ------------------------------------------------------- catatan yang tertinggal */
 

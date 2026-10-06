@@ -1,0 +1,259 @@
+<?php
+/**
+ * Membawa database yang sudah jalan ke bentuk yang dibutuhkan kode hari ini.
+ *
+ * `install.sql` hanya berisi CREATE TABLE IF NOT EXISTS. Itu tepat untuk pemasangan baru
+ * dan aman diulang, tapi tidak pernah menyentuh tabel yang sudah ada — jadi kolom dan
+ * nilai enum yang baru tidak akan pernah sampai ke database yang sudah berisi laporan
+ * tiga bulan. Berkas ini yang menutup jarak itu.
+ *
+ * Dua aturan yang membuatnya bisa dipercaya:
+ *
+ * 1. Tiap langkah memeriksa dirinya sendiri lewat information_schema, bukan lewat catatan
+ *    versi. Catatan versi bisa salah; keadaan database tidak. Dijalankan dua kali tidak
+ *    melakukan apa-apa pada kali kedua.
+ * 2. Hasil akhirnya harus sama persis dengan hasil install.sql yang baru. Itu bukan
+ *    harapan, itu yang diperiksa tests/test_schema.php dengan membandingkan kedua skema
+ *    kolom demi kolom — satu-satunya cara agar dua jalur ini tidak pelan-pelan berbeda.
+ */
+
+declare(strict_types=1);
+
+require_once __DIR__ . '/bootstrap.php';
+
+function schema_has_table(string $table): bool
+{
+    return (bool) q1('SELECT 1 AS n FROM information_schema.TABLES
+                       WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ?', [$table]);
+}
+
+function schema_has_column(string $table, string $column): bool
+{
+    return (bool) q1('SELECT 1 AS n FROM information_schema.COLUMNS
+                       WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? AND COLUMN_NAME = ?',
+                     [$table, $column]);
+}
+
+function schema_column_type(string $table, string $column): string
+{
+    $row = q1('SELECT COLUMN_TYPE AS t FROM information_schema.COLUMNS
+                WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? AND COLUMN_NAME = ?',
+              [$table, $column]);
+    return (string) ($row['t'] ?? '');
+}
+
+/** Kunci asing diperiksa sendiri: kolom boleh sudah ada sementara kuncinya belum,
+ *  misalnya karena upgrade sebelumnya berhenti di antara keduanya. */
+function schema_has_fk(string $table, string $name): bool
+{
+    return (bool) q1('SELECT 1 AS n FROM information_schema.TABLE_CONSTRAINTS
+                       WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ?
+                         AND CONSTRAINT_NAME = ? AND CONSTRAINT_TYPE = ?',
+                     [$table, $name, 'FOREIGN KEY']);
+}
+
+function schema_has_key(string $table, string $key): bool
+{
+    return (bool) q1('SELECT 1 AS n FROM information_schema.STATISTICS
+                       WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? AND INDEX_NAME = ?',
+                     [$table, $key]);
+}
+
+/**
+ * Langkah-langkahnya, berurutan.
+ *
+ * `why` ditulis untuk admin yang membaca halaman upgrade, bukan untuk programer: dia
+ * yang menekan tombolnya, dan dia berhak tahu apa yang akan berubah di datanya.
+ */
+function schema_steps(): array
+{
+    return [
+        [
+            'id'   => 'teams',
+            'why'  => 'Membuat tabel tim, lalu memindahkan semua orang yang ada ke satu tim '
+                    . 'bernama "Tim" — yang bisa diganti namanya setelah ini.',
+            'todo' => fn() => !schema_has_table('teams')
+                           || !schema_has_column('users', 'team_id')
+                           || !schema_has_key('users', 'ix_users_team')
+                           || !schema_has_fk('users', 'fk_users_team')
+                           || (int) q1('SELECT COUNT(*) AS n FROM users WHERE team_id IS NULL')['n'] > 0,
+            'run'  => function (): void {
+                if (!schema_has_column('users', 'team_id')) {
+                    db()->exec('ALTER TABLE users ADD COLUMN team_id INT UNSIGNED DEFAULT NULL
+                                  AFTER role');
+                }
+                if (!schema_has_key('users', 'ix_users_team')) {
+                    db()->exec('ALTER TABLE users ADD KEY ix_users_team (team_id)');
+                }
+                if (!schema_has_fk('users', 'fk_users_team')) {
+                    db()->exec('ALTER TABLE users ADD CONSTRAINT fk_users_team
+                                  FOREIGN KEY (team_id) REFERENCES teams(id) ON DELETE SET NULL');
+                }
+                // Semua orang harus punya tim, kalau tidak rekapnya kehilangan mereka.
+                if ((int) q1('SELECT COUNT(*) AS n FROM users WHERE team_id IS NULL')['n'] > 0) {
+                    $team = q1('SELECT id FROM teams ORDER BY id LIMIT 1');
+                    if (!$team) {
+                        q('INSERT INTO teams (name, created_at) VALUES (?,?)',
+                          ['Tim', Clock::nowUtcSql()]);
+                        $team = ['id' => db()->lastInsertId()];
+                    }
+                    q('UPDATE users SET team_id = ? WHERE team_id IS NULL', [(int) $team['id']]);
+                }
+            },
+        ],
+        [
+            'id'   => 'users.role owner',
+            'why'  => 'Menambah peran owner. Peran yang sudah ada tidak berubah; akun admin '
+                    . 'pertama dinaikkan jadi owner supaya ada yang bisa mengangkat admin.',
+            'todo' => fn() => !str_contains(schema_column_type('users', 'role'), "'owner'")
+                           || (!q1("SELECT id FROM users WHERE role = 'owner' LIMIT 1")
+                               && q1("SELECT id FROM users WHERE role = 'admin' LIMIT 1")),
+            'run'  => function (): void {
+                if (!str_contains(schema_column_type('users', 'role'), "'owner'")) {
+                    db()->exec("ALTER TABLE users MODIFY COLUMN role
+                                  ENUM('player','leader','admin','owner') NOT NULL DEFAULT 'player'");
+                }
+                // Perusahaan tanpa owner adalah perusahaan yang tidak bisa mengangkat admin.
+                if (!q1("SELECT id FROM users WHERE role = 'owner' LIMIT 1")) {
+                    $first = q1("SELECT id FROM users WHERE role = 'admin' ORDER BY id LIMIT 1");
+                    if ($first) {
+                        q("UPDATE users SET role = 'owner' WHERE id = ?", [(int) $first['id']]);
+                    }
+                }
+            },
+        ],
+        [
+            'id'   => 'users.invited_at',
+            'why'  => 'Mencatat siapa yang diundang dan siapa yang sudah membuat passwordnya '
+                    . 'sendiri. Akun yang sudah ada dianggap sudah menerima undangannya.',
+            // Sisa pekerjaan ikut dihitung, bukan cuma ada-tidaknya kolom: kalau langkah
+            // ini pernah berhenti separuh jalan, menjalankannya lagi harus menyelesaikannya.
+            'todo' => fn() => !schema_has_column('users', 'invited_at')
+                           || (int) q1("SELECT COUNT(*) AS n FROM users
+                                         WHERE accepted_at IS NULL AND password_hash <> ''")['n'] > 0,
+            'run'  => function (): void {
+                if (!schema_has_column('users', 'invited_at')) {
+                    db()->exec('ALTER TABLE users
+                                  ADD COLUMN invited_at DATETIME DEFAULT NULL AFTER active,
+                                  ADD COLUMN accepted_at DATETIME DEFAULT NULL AFTER invited_at');
+                }
+                // Mereka sudah punya password yang dipakai; jangan sampai terkunci di luar.
+                q("UPDATE users SET accepted_at = created_at
+                    WHERE accepted_at IS NULL AND password_hash <> ''");
+            },
+        ],
+        [
+            'id'   => 'login_tokens.kind',
+            'why'  => 'Membedakan link masuk dari undangan. Link yang sudah ada tetap '
+                    . 'berlaku sebagai link masuk.',
+            'todo' => fn() => !schema_has_column('login_tokens', 'kind'),
+            'run'  => fn() => db()->exec("ALTER TABLE login_tokens ADD COLUMN kind
+                                  ENUM('login','invite') NOT NULL DEFAULT 'login' AFTER user_id"),
+        ],
+        [
+            'id'   => 'cycles.team_id',
+            'why'  => 'Mencatat tim di tiap laporan, supaya memindahkan orang ke tim lain '
+                    . 'tidak mengubah rekap bulan lalu. Laporan yang sudah ada diisi dengan '
+                    . 'tim orangnya sekarang.',
+            'todo' => fn() => !schema_has_column('cycles', 'team_id')
+                           || !schema_has_fk('cycles', 'fk_cycles_team')
+                           || (int) q1('SELECT COUNT(*) AS n FROM cycles c
+                                          JOIN users u ON u.id = c.user_id
+                                         WHERE c.team_id IS NULL AND u.team_id IS NOT NULL')['n'] > 0,
+            'run'  => function (): void {
+                if (!schema_has_column('cycles', 'team_id')) {
+                    db()->exec('ALTER TABLE cycles ADD COLUMN team_id INT UNSIGNED DEFAULT NULL
+                                  AFTER day');
+                }
+                if (!schema_has_fk('cycles', 'fk_cycles_team')) {
+                    db()->exec('ALTER TABLE cycles ADD CONSTRAINT fk_cycles_team
+                                  FOREIGN KEY (team_id) REFERENCES teams(id) ON DELETE SET NULL');
+                }
+                q('UPDATE cycles c JOIN users u ON u.id = c.user_id
+                      SET c.team_id = u.team_id WHERE c.team_id IS NULL');
+            },
+        ],
+        [
+            'id'   => 'settings.team_id',
+            'why'  => 'Pertanyaan dan ambang jadi milik tim, bukan milik seluruh perusahaan. '
+                    . 'Setelan yang sudah ada diberikan ke tim pertama.',
+            // Langkah ini punya empat bagian, jadi syaratnya memeriksa keempatnya. Berhenti
+            // di tengah lalu dijalankan lagi harus menyelesaikan sisanya, bukan melewatinya.
+            'todo' => fn() => schema_has_table('settings')
+                           && (!schema_has_column('settings', 'team_id')
+                               || (int) q1('SELECT COUNT(*) AS n FROM settings WHERE team_id = 0')['n'] > 0
+                               || !schema_has_key('settings', 'ix_settings_team')
+                               || !schema_has_fk('settings', 'fk_settings_team')),
+            'run'  => function (): void {
+                if (!schema_has_column('settings', 'team_id')) {
+                    db()->exec('ALTER TABLE settings ADD COLUMN team_id INT UNSIGNED NOT NULL
+                                  DEFAULT 0 AFTER name');
+                }
+                $team = q1('SELECT id FROM teams ORDER BY id LIMIT 1');
+                if ($team) {
+                    q('UPDATE settings SET team_id = ? WHERE team_id = 0', [(int) $team['id']]);
+                }
+                // Baris yatim: tidak ada tim yang bisa memilikinya, dan setelan tanpa
+                // pemilik tidak pernah terbaca lagi. Bawaannya tetap berlaku.
+                q('DELETE FROM settings WHERE team_id = 0');
+                if (!schema_has_key('settings', 'ix_settings_team')) {
+                    db()->exec('ALTER TABLE settings
+                                  DROP PRIMARY KEY,
+                                  ADD PRIMARY KEY (name, team_id),
+                                  ALTER COLUMN team_id DROP DEFAULT,
+                                  ADD KEY ix_settings_team (team_id)');
+                }
+                if (!schema_has_fk('settings', 'fk_settings_team')) {
+                    db()->exec('ALTER TABLE settings ADD CONSTRAINT fk_settings_team
+                                  FOREIGN KEY (team_id) REFERENCES teams(id) ON DELETE CASCADE');
+                }
+            },
+        ],
+    ];
+}
+
+/** Langkah yang masih harus dijalankan. Daftar kosong berarti databasenya sudah pas. */
+function schema_pending(): array
+{
+    $out = [];
+    foreach (schema_steps() as $step) {
+        if (($step['todo'])()) {
+            $out[] = ['id' => $step['id'], 'why' => $step['why']];
+        }
+    }
+    return $out;
+}
+
+/** install.sql dijalankan persis seperti phpMyAdmin menjalankannya. */
+function schema_run_install_sql(): void
+{
+    $path = dirname(__DIR__) . '/install.sql';
+    if (!is_file($path)) {
+        return;
+    }
+    // Baris komentar dibuang dulu: memecah per ";" tanpa itu akan menyisakan potongan
+    // yang diawali "--" dan menelan perintah berikutnya.
+    $sql = preg_replace('/^\s*--.*$/m', '', (string) file_get_contents($path));
+    foreach (explode(';', (string) $sql) as $one) {
+        if (trim($one) !== '') {
+            db()->exec($one);
+        }
+    }
+}
+
+/**
+ * Membuat tabel yang belum ada, lalu menjalankan langkah yang belum dijalankan.
+ * Mengembalikan daftar apa yang barusan dikerjakan — kosong berarti tidak ada yang perlu.
+ */
+function schema_upgrade(): array
+{
+    schema_run_install_sql();
+    $did = [];
+    foreach (schema_steps() as $step) {
+        if (($step['todo'])()) {
+            ($step['run'])();
+            $did[] = $step['id'];
+        }
+    }
+    return $did;
+}

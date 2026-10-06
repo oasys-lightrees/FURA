@@ -24,7 +24,14 @@ messi_require_ready();
 
 $me = auth_user();
 if (!$me) { header('Location: login.php'); exit; }
-if ($me['role'] !== 'admin') { http_response_code(403); exit('Halaman ini untuk admin.'); }
+if (!is_manager($me)) { http_response_code(403); exit('Halaman ini untuk admin.'); }
+
+// Pertanyaan milik tim, jadi halaman ini selalu tentang satu tim tertentu.
+$teams = repo_teams();
+$teamId = (int) ($_POST['team'] ?? $_GET['team'] ?? 0);
+if (!isset($teams[$teamId])) {
+    $teamId = repo_team_of($me);
+}
 
 $notice = null;
 // Setelan disimpan di tabel `settings`. Kalau pemasangannya belum meng-import versi
@@ -37,7 +44,7 @@ if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST' && !$noTable) {
     csrf_check();
 
     if (($_POST['do'] ?? '') === 'reset') {
-        repo_save_config($me, messi_config_default());
+        repo_save_config($me, $teamId, messi_config_default());
         $notice = 'Dikembalikan ke pertanyaan bawaan.';
     } else {
         $q = is_array($_POST['q'] ?? null) ? $_POST['q'] : [];
@@ -46,7 +53,13 @@ if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST' && !$noTable) {
         foreach (['escalation', 'prista'] as $name) {
             $q[$name]['show'] = isset($q[$name]['show']);
         }
-        repo_save_config($me, [
+        // Webhook hanya diganti kalau diisi. Kotaknya selalu tampil kosong, jadi
+        // menyimpan tanpa menyentuhnya tidak boleh berarti menghapusnya.
+        $webhook = trim((string) ($_POST['chat_webhook'] ?? ''));
+        if ($webhook === '' && ($_POST['chat_webhook_keep'] ?? '') === '1') {
+            $webhook = repo_config($teamId)['chat_webhook'];
+        }
+        repo_save_config($me, $teamId, [
             'team_name'      => (string) ($_POST['team_name'] ?? ''),
             'channels'       => array_values(is_array($_POST['ch'] ?? null) ? $_POST['ch'] : []),
             'threshold_days' => $_POST['threshold_days'] ?? null,
@@ -54,6 +67,7 @@ if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST' && !$noTable) {
             'due_hour'       => $_POST['due_hour'] ?? null,
             'max_plans'      => $_POST['max_plans'] ?? null,
             'declaration'    => (string) ($_POST['declaration'] ?? ''),
+            'chat_webhook'   => $webhook,
             'questions'      => $q,
         ]);
         // Yang tidak masuk akal dirapikan diam-diam oleh messi_config_normalize(), jadi
@@ -63,7 +77,7 @@ if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST' && !$noTable) {
     }
 }
 
-$cfg = repo_config();
+$cfg = repo_config($teamId);
 $q = $cfg['questions'];
 $csrf = csrf_token();
 $days = $cfg['threshold_days'];
@@ -137,7 +151,18 @@ a { color:#1a1c1f; }
 <body>
 <main>
   <h1>Pertanyaan MESSI</h1>
-  <p class="sub"><a href="index.php">← kembali ke laporan</a> · <a href="admin.php">Tim</a></p>
+  <p class="sub"><a href="index.php">← kembali ke laporan</a> · <a href="admin.php">Orang &amp; tim</a></p>
+
+  <?php if (count($teams) > 1): ?>
+    <p class="why" style="margin:0 0 0.5rem">Pertanyaan milik tim. Yang di bawah ini
+       berlaku untuk:</p>
+    <p style="margin:0 0 1.5rem">
+      <?php foreach ($teams as $t): ?>
+        <a href="?team=<?= (int) $t['id'] ?>" style="margin-right:0.75rem;<?=
+           $t['id'] === $teamId ? 'font-weight:600' : 'color:#6b6d73' ?>"><?= h($t['name']) ?></a>
+      <?php endforeach; ?>
+    </p>
+  <?php endif; ?>
 
   <?php if ($notice): ?><p class="note ok"><?= h($notice) ?></p><?php endif; ?>
   <?php if ($noTable): ?>
@@ -149,12 +174,27 @@ a { color:#1a1c1f; }
 
   <form method="post">
   <input type="hidden" name="csrf" value="<?= h($csrf) ?>">
+  <input type="hidden" name="team" value="<?= (int) $teamId ?>">
 
   <h2>Nama tim</h2>
   <p class="why">Dicetak di kepala laporan. Kosongkan kalau tidak perlu.</p>
   <div class="card">
     <input type="text" name="team_name" maxlength="60" value="<?= h($cfg['team_name']) ?>"
            placeholder="mis. OASYS">
+  </div>
+
+  <h2>Space Google Chat tim ini</h2>
+  <p class="why">Ke sinilah pengingat jam buka dan jam tutup dikirim. Kosongkan untuk
+     memakai space yang ada di <code>config.php</code>. Alamat ini rahasia — siapa pun
+     yang memilikinya bisa menulis ke space itu — jadi tidak pernah ditampilkan kembali
+     di sini, bahkan kepada admin.</p>
+  <div class="card">
+    <input type="hidden" name="chat_webhook_keep" value="1">
+    <label><?= $cfg['chat_webhook'] === ''
+      ? 'Belum diisi — memakai space di config.php'
+      : 'Sudah diisi. Isi kotak ini hanya kalau mau menggantinya.' ?></label>
+    <input type="text" name="chat_webhook" value="" autocomplete="off"
+           placeholder="https://chat.googleapis.com/v1/spaces/…">
   </div>
 
   <h2>Channel</h2>

@@ -24,6 +24,10 @@ echo "== database sungguhan =="
 MESSI_TEST_DB=messi_test php tests/test_repo.php
 
 echo
+echo "== pemasangan lama menyusul =="
+MESSI_TEST_DB=messi_schema_test php tests/test_schema.php
+
+echo
 echo "== seminggu penuh, jam demi jam =="
 MESSI_TEST_DB=messi_cron_test php tests/test_cron.php
 

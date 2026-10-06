@@ -27,6 +27,26 @@ except ImportError as exc:                                  # pragma: no cover
 
 from livehost import Host, sign_in
 
+# Satu tim kedua, satu orangnya, satu laporannya, dan satu owner yang berhak melihat
+# dua-duanya. Ditulis sebagai PHP karena yang diuji adalah apa yang dikirim server.
+TEAM_FIXTURE = """require 'lib/bootstrap.php';
+require_once 'lib/repo.php';
+$hr = repo_add_team(['role' => 'owner', 'id' => 1], 'HR');
+$now = date('Y-m-d H:i:s');
+q('INSERT INTO users (email, name, password_hash, role, team_id, joined_on, accepted_at, created_at)
+   VALUES (?,?,?,?,?,?,?,?)',
+  ['ani@example.test', 'Ani', password_hash('kata-sandi-panjang', PASSWORD_DEFAULT),
+   'player', $hr, '2026-09-28', $now, $now]);
+$ani = (int) db()->lastInsertId();
+q('INSERT INTO cycles (user_id, day, team_id, status, answers, submitted_at, created_at)
+   VALUES (?,?,?,?,?,?,?)',
+  [$ani, date('Y-m-d'), $hr, 'submitted', '{\"detail\":\"DM HR\"}', $now, $now]);
+q('INSERT INTO users (email, name, password_hash, role, team_id, joined_on, accepted_at, created_at)
+   VALUES (?,?,?,?,?,?,?,?)',
+  ['owi@example.test', 'Owi', password_hash('kata-sandi-panjang', PASSWORD_DEFAULT),
+   'owner', $hr, '2026-09-28', $now, $now]);
+"""
+
 with Host("messi_live_test") as host, sync_playwright() as p:
     browser = launch(p)
     base = host.base
@@ -242,6 +262,31 @@ with Host("messi_live_test") as host, sync_playwright() as p:
     check("pemain tahu dirinya bukan leader", player_data["me"]["isLeader"], False)
     check("tapi tetap dapat daftar nama squad, karena halamannya butuh",
           len(player_data["roster"]), 3)
+
+    print("\n--- dan tim lain tidak pernah ikut terkirim ---")
+    # Tim kedua dengan satu orang dan satu laporan. Yang diuji bukan tampilannya tapi
+    # muatan yang benar-benar sampai ke browser: leader tim lain tidak boleh pernah
+    # memegangnya, karena yang sudah sampai di browser tidak bisa ditarik kembali.
+    host.php("-r", TEAM_FIXTURE)
+    lead.reload()
+    lead.wait_for_load_state("networkidle")
+    lead.wait_for_timeout(700)
+    after = fetched(lead)
+    # Sebelum tim kedua ada, dua laporan. Tim kedua menambah satu — yang tidak boleh
+    # sampai ke sini.
+    check("leader tetap cuma menerima dua laporan timnya", len(after["cycles"]), 2)
+    check("nama orang tim lain pun tidak ikut",
+          [r["name"] for r in after["roster"].values()], lambda n: "Ani" not in n)
+    check("dan dia cuma diberi satu tim untuk dibaca", len(after["teams"]), 1)
+
+    # Owner melihat semuanya — itu memang layarnya.
+    octx = browser.new_context(viewport={"width": 1000, "height": 900})
+    owner = sign_in(octx, host.base, "owi@example.test", results=results)
+    odata = fetched(owner)
+    check("owner menerima semua tim", len(odata["teams"]), 2)
+    check("dan orang dari dua-duanya",
+          [r["name"] for r in odata["roster"].values()], lambda n: "Ani" in n)
+    octx.close()
 
     print("\n=== nama yang aneh tidak merusak halaman ===")
     host.php("-r", """

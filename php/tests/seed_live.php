@@ -32,7 +32,10 @@ $joined = messi_add_days(Clock::today(), -2);
 foreach ([['nicho@example.test', 'Nicho', 'player'],
           ['rio@example.test',   'Rio',   'player'],
           ['lead@example.test', 'Lia', 'leader']] as [$email, $name, $role]) {
-    q('INSERT INTO users (email, name, password_hash, role, joined_on, created_at) VALUES (?,?,?,?,?,?)',
-      [$email, $name, password_hash('kata-sandi-panjang', PASSWORD_DEFAULT), $role, $joined, Clock::nowUtcSql()]);
+    q('INSERT INTO users (email, name, password_hash, role, team_id, joined_on,
+                          accepted_at, created_at)
+       VALUES (?,?,?,?,?,?,?,?)',
+      [$email, $name, password_hash('kata-sandi-panjang', PASSWORD_DEFAULT), $role,
+       repo_default_team(), $joined, Clock::nowUtcSql(), Clock::nowUtcSql()]);
 }
 echo "seeded, joined=$joined today=" . Clock::today() . "\n";

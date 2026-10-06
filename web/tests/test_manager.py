@@ -170,6 +170,48 @@ with sync_playwright() as p:
     check("Rio diberi tahu hari yang dia lewatkan",
           "Kamu belum lapor" in pg3.inner_text("body"))
     pg3.screenshot(path=str(SHOTS)+"/t-rio-miss.png", full_page=True)
+    print("\n=== dua tim ===")
+    # Satu rekap selalu tentang satu tim. Owner dan admin menerima semuanya dan memilih
+    # yang mana; leader cuma menerima timnya sendiri dari server, jadi tidak ada yang
+    # bisa dipilih.
+    TEAMS = [{"id": 1, "name": "Sales"}, {"id": 2, "name": "HR"}]
+    SEED2 = {
+      "roster": { "u_nicho": {"name":"Nicho","joined":D2,"team":1},
+                  "u_lead":  {"name":"Lia","joined":D2,"team":1},
+                  "u_ani":   {"name":"Ani","joined":D2,"team":2} },
+      "cycles": { "u_nicho__"+TODAY: cyc("u_nicho", TODAY),
+                  "u_ani__"+TODAY:   cyc("u_ani", TODAY, gt3=1) },
+      "commitments": {
+        "c-ani-1": { "id":"c-ani-1", "owner":"u_ani", "action":"Panggil kandidat",
+                     "due":D2, "status":"open", "from":D2 },
+      },
+    }
+    dua = context(b)
+    pgT = new_page(dua, "u_lead", SEED2, at=AT, teams=TEAMS, team=1)
+    pgT.click('[data-tab="tim"]'); pgT.wait_for_timeout(400)
+    check("judulnya menyebut tim yang sedang dibaca", txt(pgT, "h1"), "Rekap Sales")
+    check("ada pemilih timnya", pgT.eval_on_selector_all("[data-team]", "e=>e.length"), 2)
+    body = pgT.inner_text("body")
+    check("orang tim itu terdaftar", body, lambda s: "Nicho" in s)
+    check("orang tim lain tidak ikut", body, lambda s: "Ani" not in s)
+    check("hitungannya pun cuma tim itu", txt(pgT, ".stats"), lambda s: "1/2" in s)
+    check("janji lewat milik tim lain tidak ikut dihitung",
+          txt(pgT, ".stats"), lambda s: s.split("janji lewat")[0].strip().endswith("0"))
+
+    pgT.click('[data-team="2"]'); pgT.wait_for_timeout(350)
+    check("pindah tim mengganti rekapnya", txt(pgT, "h1"), "Rekap HR")
+    body2 = pgT.inner_text("body")
+    check("sekarang orang tim itu yang terlihat", body2, lambda s: "Ani" in s)
+    check("dan yang tadi tidak lagi", body2, lambda s: "Nicho" not in s)
+    check("janjinya ikut tim itu", txt(pgT, ".stats"), lambda s: "1" in s)
+    pgT.screenshot(path=str(SHOTS) + "/t-dua-tim.png", full_page=True)
+
+    # Leader hanya menerima satu tim dari server, jadi tidak ada yang bisa dipilih.
+    pgL = new_page(dua, "u_lead", SEED2, at=AT, teams=[TEAMS[0]], team=1)
+    pgL.click('[data-tab="tim"]'); pgL.wait_for_timeout(400)
+    check("leader satu tim tidak diberi pemilih", pgL.query_selector("[data-team]") is None)
+    check("dan judulnya tetap sederhana", txt(pgL, "h1"), "Rekap tim")
+
     b.close()
 
 bad = [r for r in results if not r[0]]

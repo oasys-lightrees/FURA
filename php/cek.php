@@ -67,8 +67,20 @@ if ($hasConfig) {
         row($missing ? 'bad' : 'ok', 'Tabel', $missing
             ? 'kurang: ' . implode(', ', $missing)
             : 'lengkap, ' . count($want) . ' tabel',
-            $missing ? 'Import <code>install.sql</code> lewat phpMyAdmin.' : '');
+            $missing ? 'Buka <a href="upgrade.php">Pemutakhiran database</a>, atau import '
+                     . '<code>install.sql</code> lewat phpMyAdmin.' : '');
         $installed = !$missing;
+
+        // Tabel lengkap belum tentu bentuknya sudah sesuai: kolom dan nilai enum yang
+        // baru tidak pernah sampai lewat CREATE TABLE IF NOT EXISTS.
+        require_once __DIR__ . '/lib/schema.php';
+        $pending = schema_pending();
+        row($pending ? 'bad' : 'ok', 'Bentuk database',
+            $pending ? count($pending) . ' hal belum dikerjakan: '
+                     . implode(', ', array_column($pending, 'id'))
+                     : 'sesuai dengan versi yang terpasang',
+            $pending ? 'Buka <a href="upgrade.php">Pemutakhiran database</a> lalu tekan '
+                     . 'Jalankan. Aman diulang, data yang ada tidak dihapus.' : '');
     } catch (Throwable $e) {
         // messi_stop() already handles this on the real pages; here we want to keep going
         // and show everything else that is wrong in one pass.
@@ -90,7 +102,7 @@ if ($installed) {
         $open = true;
     } else {
         $me = auth_user();
-        if (!$me || $me['role'] !== 'admin') {
+        if (!$me || !is_manager($me)) {
             http_response_code(403);
             exit('Halaman ini untuk admin. <a href="login.php">Masuk dulu</a>.');
         }

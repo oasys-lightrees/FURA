@@ -1,7 +1,7 @@
 # MESSI di cPanel
 
 Versi PHP + MySQL dari aplikasi di `web/`. Halamannya **sama persis** — `app.html`
-adalah salinan `web/messi.html` tanpa satu baris pun diubah, jadi 223 pemeriksaan browser
+adalah salinan `web/messi.html` tanpa satu baris pun diubah, jadi 235 pemeriksaan browser
 di `web/tests/` tetap menggambarkan apa yang dipakai squad. Yang ditulis ulang cuma
 bagian belakangnya: dulu data disimpan platform artifact, sekarang MySQL.
 
@@ -128,11 +128,14 @@ lib/auth.php       siapa yang sedang bertanya
 lib/repo.php       baca/tulis, dengan pemeriksaan yang tidak bisa dilewati browser
 lib/chat.php       Google Chat
 lib/require-php8.php  penjaga versi PHP, dibaca paling awal
-soal.php           halaman admin: pertanyaan, ambang, jam, channel
+soal.php           halaman admin: pertanyaan, ambang, jam, channel — per tim
+upgrade.php        menyusulkan database lama ke bentuk versi ini
+undang.php         yang diundang membuat passwordnya sendiri
+lib/schema.php     langkah pemutakhiran, tiap langkah memeriksa dirinya sendiri
 install.sql        tujuh tabel
 PASANG.txt         langkah pemasangan, bahasa non-teknis
 make-zip.sh        bikin messi-cpanel.zip
-tests/             352 pemeriksaan (tidak ikut ke server)
+tests/             461 pemeriksaan (tidak ikut ke server)
 ```
 
 ## Yang diputuskan server, bukan browser
@@ -148,6 +151,16 @@ seseorang dihitung ulang di sini, dari jam servernya sendiri:
   diperiksa lagi di server, sebelum deklarasi ditanyakan.
 - **Hari bolos.** Dihitung dari `joined_on` di database, bukan dari apa pun yang
   dikirim browser.
+- **Siapa boleh melihat apa.** Leader menerima laporan timnya sendiri dan tidak pernah
+  menerima laporan tim lain — dibatasi di query, bukan disembunyikan di halaman, karena
+  yang sudah sampai di browser tidak bisa ditarik kembali. Owner dan admin menerima
+  semuanya, dan memilih tim mana yang dibaca.
+- **Owner dan admin.** Owner mengangkat admin; admin tidak bisa menyentuh owner maupun
+  sesama admin. Kalau bisa, satu admin tinggal menurunkan yang lain dan "admin" berhenti
+  berarti apa pun.
+- **Password tidak pernah diketik admin.** Menambah orang menghasilkan link undangan
+  sekali pakai; orangnya yang membuat passwordnya. Yang lupa password dapat link yang
+  sama, bukan password baru dari atasannya.
 - **Pertanyaannya sendiri.** Channel, ambang gantung, jam buka/tutup, kalimat tiap
   pertanyaan dan pernyataannya disimpan sebagai satu dokumen JSON di tabel `settings`,
   diubah admin lewat `soal.php`, lalu dipakai halaman maupun server. Yang tidak masuk
@@ -181,10 +194,11 @@ menyebutkan mana yang barusan terjadi.
 | Berkas | Isinya |
 |--------|--------|
 | `tests/test_engine.php` | 99 — aturan, dicocokkan dengan `tests/test_core.py` |
-| `tests/test_repo.php` | 85 — terhadap MySQL sungguhan, di database yang dia buat sendiri |
-| `tests/test_cron.php` | 46 — seminggu penuh jam demi jam, jam dibekukan, pesan bot ditangkap |
-| `tests/test_live.py` | 57 — browser terhadap aplikasi yang benar-benar jalan |
-| `tests/test_admin.py` | 65 — pemasangan pertama, tambah orang, ganti password, link sekali pakai, mengubah pertanyaan |
+| `tests/test_repo.php` | 111 — terhadap MySQL sungguhan, di database yang dia buat sendiri |
+| `tests/test_cron.php` | 57 — seminggu penuh jam demi jam, jam dibekukan, pesan bot ditangkap |
+| `tests/test_live.py` | 62 — browser terhadap aplikasi yang benar-benar jalan |
+| `tests/test_admin.py` | 90 — pemasangan pertama, tambah orang, ganti password, link sekali pakai, mengubah pertanyaan |
+| `tests/test_schema.php` | 42 — pemasangan lama di-upgrade, lalu dibandingkan kolom demi kolom dengan yang baru |
 | `tests/check_sync.php` | memastikan `app.html` belum menyimpang dari `web/messi.html` |
 
 Yang dicoba juga: laporan atas nama orang lain, permintaan tanpa token, cron tanpa kunci,

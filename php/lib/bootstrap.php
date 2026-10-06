@@ -51,10 +51,12 @@ function messi_stop(string $title, string $detail, string $whatToDo): void
 function cfg(?string $key = null)
 {
     static $config = null;
-    if ($config === null && isset($GLOBALS['MESSI_CONFIG'])) {
+    if (isset($GLOBALS['MESSI_CONFIG'])) {
         // Set by the test runner before anything else loads, so a test database never
-        // needs a config.php sitting next to the real one.
-        $config = $GLOBALS['MESSI_CONFIG'];
+        // needs a config.php sitting next to the real one. Dibaca ulang tiap kali, bukan
+        // disimpan: tes yang berpindah database mengubahnya di tengah jalan.
+        return $key === null ? $GLOBALS['MESSI_CONFIG']
+                             : ($GLOBALS['MESSI_CONFIG'][$key] ?? null);
     }
     if ($config === null) {
         // MESSI_CONFIG_FILE lets the config live outside the web root, which is the
@@ -74,11 +76,18 @@ function cfg(?string $key = null)
     return $key === null ? $config : ($config[$key] ?? null);
 }
 
+/** Satu sambungan per permintaan. Kelas, bukan static di dalam fungsi, supaya tes yang
+ *  berpindah database bisa membuangnya — static di dalam fungsi tidak bisa dibuang. */
+final class Db
+{
+    public static ?PDO $pdo = null;
+    public static function forget(): void { self::$pdo = null; }
+}
+
 function db(): PDO
 {
-    static $pdo = null;
-    if ($pdo instanceof PDO) {
-        return $pdo;
+    if (Db::$pdo instanceof PDO) {
+        return Db::$pdo;
     }
     $c = cfg('db');
     $dsn = 'mysql:host=' . $c['host'] . ';dbname=' . $c['name'] . ';charset=utf8mb4';
@@ -86,7 +95,7 @@ function db(): PDO
         $dsn = 'mysql:unix_socket=' . $c['socket'] . ';dbname=' . $c['name'] . ';charset=utf8mb4';
     }
     try {
-        $pdo = new PDO($dsn, $c['user'], $c['pass'], [
+        Db::$pdo = new PDO($dsn, $c['user'], $c['pass'], [
             PDO::ATTR_ERRMODE            => PDO::ERRMODE_EXCEPTION,
             PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
             PDO::ATTR_EMULATE_PREPARES   => false,
@@ -107,8 +116,8 @@ function db(): PDO
     }
     // Every DATETIME in this schema is UTC. Saying so stops the server's own timezone
     // from quietly shifting NOW() and CURRENT_TIMESTAMP.
-    $pdo->exec("SET time_zone = '+00:00'");
-    return $pdo;
+    Db::$pdo->exec("SET time_zone = '+00:00'");
+    return Db::$pdo;
 }
 
 /**

@@ -94,6 +94,35 @@ class Host:
             self.server.wait(timeout=10)
 
 
+def accept_invite(ctx, link: str, password: str, results=None, enter="messi"):
+    """Menerima undangan lalu berada di dalam aplikasi, seperti orangnya sendiri.
+
+    Menerima undangan sudah memulai sesinya, jadi halaman ini tidak perlu — dan tidak
+    bisa — lewat halaman login lagi.
+    """
+    pg = ctx.new_page()
+    if results is not None:
+        pg.on("pageerror", lambda e: results.append((False, "JS error: " + str(e), "")))
+    if enter:
+        pg.add_init_script(
+            f'try {{ localStorage.setItem("fura.seen.{enter}", "1"); }} catch (e) {{}}')
+    pg.goto(link)
+    pg.wait_for_load_state("networkidle")
+    pg.fill("#password", password)
+    pg.fill("#password2", password)
+    pg.click("button[type=submit]")
+    pg.wait_for_load_state("networkidle")
+    try:
+        pg.wait_for_selector("#view *", timeout=10_000)
+    except Exception:
+        pass
+    pg.wait_for_timeout(200)
+    if enter and pg.query_selector(f"[data-mod={enter}]"):
+        pg.click(f"[data-mod={enter}]")
+        pg.wait_for_timeout(300)
+    return pg
+
+
 def sign_in(ctx, base: str, email: str, password: str = PASSWORD, results=None,
             enter="messi"):
     """A browser page signed in as `email`, sitting on whatever the app showed next.

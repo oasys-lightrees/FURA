@@ -93,6 +93,7 @@ function messi_config_default(): array
             ['key' => 'GCG', 'label' => 'GCG', 'full' => 'Google Chat'],
         ],
         'team_name'      => '',            // diisi tiap tim sendiri; kosong = tidak dicetak
+        'chat_webhook'   => '',            // space tim ini; kosong = pakai yang di config.php
         'threshold_days' => MESSI_THRESHOLD,
         'open_hour'      => MESSI_OPEN_HOUR,
         'due_hour'       => MESSI_DUE_HOUR,
@@ -212,6 +213,7 @@ function messi_config_normalize($in): array
     return [
         'channels'       => $channels,
         'team_name'      => messi_cfg_text($in['team_name'] ?? '', '', 60),
+        'chat_webhook'   => messi_cfg_text($in['chat_webhook'] ?? '', '', 500),
         'threshold_days' => messi_cfg_int($in['threshold_days'] ?? null, $d['threshold_days'], 1, 90),
         'open_hour'      => $open,
         'due_hour'       => $due,
@@ -219,6 +221,19 @@ function messi_config_normalize($in): array
         'declaration'    => messi_cfg_text($in['declaration'] ?? '', $d['declaration'], 600),
         'questions'      => $q,
     ];
+}
+
+/**
+ * Setelan yang boleh dilihat browser.
+ *
+ * Webhook adalah alamat rahasia: siapa pun yang memegangnya bisa menulis ke space tim
+ * itu. Halaman tidak pernah membutuhkannya — yang mengirim pesan adalah cron di server —
+ * jadi dibuang di sini, satu tempat, bukan diingat satu per satu di tiap endpoint.
+ */
+function messi_config_public(array $cfg): array
+{
+    $cfg['chat_webhook'] = $cfg['chat_webhook'] === '' ? '' : 'tersimpan';
+    return $cfg;
 }
 
 /** Kunci channel, urutannya seperti yang dicetak laporan. */

@@ -68,7 +68,7 @@ def check(label, got, want=True):
 
 
 def new_page(ctx, who, store=None, reset=True, at=None, enter="messi", config=None,
-             seen="messi"):
+             seen="messi", teams=None, team=None):
     """A page acting as `who`. `store` seeds the shared database; `at` freezes the clock.
 
     Pages created from the SAME context share localStorage, which is how the
@@ -77,8 +77,9 @@ def new_page(ctx, who, store=None, reset=True, at=None, enter="messi", config=No
     The page opens on the module catalogue, so by default this walks straight into
     MESSI with its explainer already read — which is what a returning user sees.
     Pass `enter=None` to stay on the catalogue, `seen=None` to arrive as somebody who
-    has never opened the module (so its explainer shows), and `config` to serve the
-    page a settings document the way the server does.
+    has never opened the module (so its explainer shows), `config` to serve the page a
+    settings document the way the server does, and `teams`/`team` to serve it the teams
+    this viewer may read and which one is theirs.
     """
     pg = ctx.new_page()
     pg.on("pageerror", lambda e: results.append((False, "JS error: " + str(e), "")))
@@ -86,6 +87,9 @@ def new_page(ctx, who, store=None, reset=True, at=None, enter="messi", config=No
         pg.add_init_script(_CLOCK % json.dumps(at))
     if config is not None:
         pg.add_init_script(f"window.FURA_CONFIG={json.dumps(config)};")
+    if teams is not None:
+        pg.add_init_script(f"window.FURA_TEAMS={json.dumps(teams)};"
+                           f"window.FURA_TEAM={json.dumps(team)};")
     pg.add_init_script(
         f"window.__WHO__={json.dumps(who)};"
         f"window.__SEED__={json.dumps(store or {})};"

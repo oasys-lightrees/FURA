@@ -259,14 +259,15 @@ ok('penandanya ikut tersimpan, tanpa perlu kolom baru',
 /* ----------------------------------------------- setelan yang diubah admin */
 
 $admin = make_user('admin@example.test', 'Ami', 'admin', '2026-09-28');
+$tim = repo_default_team();
 
 eq('sebelum diubah, yang berlaku adalah bawaannya',
    repo_config(), messi_config_default());
 throws('pemain tidak bisa mengubah pertanyaan',
-       fn() => repo_save_config($nicho, ['threshold_days' => 1]), 'untuk admin');
-throws('leader pun tidak', fn() => repo_save_config($lead, ['threshold_days' => 1]), 'untuk admin');
+       fn() => repo_save_config($nicho, $tim, ['threshold_days' => 1]), 'untuk admin');
+throws('leader pun tidak', fn() => repo_save_config($lead, $tim, ['threshold_days' => 1]), 'untuk admin');
 
-repo_save_config($admin, [
+repo_save_config($admin, $tim, [
     'team_name' => 'Tim Dukungan',
     'threshold_days' => 1,
     'due_hour' => 16,
@@ -322,8 +323,119 @@ eq('laporan lama tanpa cuplikan tetap terbaca',
    str_contains(messi_build_report(['day' => '2026-09-30', 'grid' => ['IG' => ['open' => 2]]],
        'Nicho', repo_config()), 'a. Channel aktif/open: 2 IG'), true);
 
-repo_save_config($admin, messi_config_default());
+repo_save_config($admin, $tim, messi_config_default());
 eq('dikembalikan ke bawaan berarti benar-benar bawaan', repo_config(), messi_config_default());
+
+/* ------------------------------------------------------------------ dua tim */
+
+$timHr = repo_add_team($admin, 'HR');
+$ani = make_user('ani@example.test', 'Ani', 'player', '2026-09-28', $timHr);
+$bosHr = make_user('boshr@example.test', 'Bos HR', 'leader', '2026-09-28', $timHr);
+repo_save_cycle($ani, uid((int) $ani['id']) . '__2026-09-30',
+    ['grid' => ['WAG' => ['open' => 3, 'reply' => 3]], 'declared' => true]);
+
+// Inti dari tim: laporan tim lain bukan milik seorang leader untuk dibaca.
+$punyaHr = repo_cycles(90, null, $timHr);
+eq('leader HR cuma menerima laporan timnya',
+   array_values(array_unique(array_map(fn($c) => $c['owner'], $punyaHr))),
+   [uid((int) $ani['id'])]);
+ok('dan tidak satu pun laporan tim lain ikut terkirim',
+   !array_filter($punyaHr, fn($c) => $c['owner'] === uid((int) $nicho['id'])));
+ok('owner menerima dua-duanya, karena memang layarnya',
+   count(repo_cycles(90, null, null)) > count($punyaHr));
+
+eq('daftar orang pun dibatasi ke timnya',
+   array_keys(repo_roster($timHr)),
+   [uid((int) $ani['id']), uid((int) $bosHr['id'])]);
+ok('janji tim lain juga tidak ikut',
+   !array_filter(repo_commitments(90, null, $timHr),
+                 fn($c) => $c['owner'] === uid((int) $nicho['id'])));
+
+// Pindah tim tidak boleh menulis ulang rekap kemarin.
+q('UPDATE users SET team_id = ? WHERE id = ?', [$timSales ?? repo_default_team(), $ani['id']]);
+eq('laporan yang sudah dikirim tetap tercatat di tim lamanya',
+   count(repo_cycles(90, null, $timHr)), 1);
+eq('dan tidak ikut muncul di tim barunya',
+   count(array_filter(repo_cycles(90, null, repo_default_team()),
+                      fn($c) => $c['owner'] === uid((int) $ani['id']))), 0);
+
+// Setelan milik tim, bukan milik perusahaan.
+repo_save_config($admin, $timHr, ['threshold_days' => 7]);
+eq('ambang tim HR berlaku untuk HR', repo_config($timHr)['threshold_days'], 7);
+eq('dan tidak merembet ke tim lain',
+   repo_config(repo_default_team())['threshold_days'], MESSI_THRESHOLD);
+
+/* ------------------------------------------------------- undangan dan percobaan */
+
+// Akun yang baru diundang belum punya password, jadi belum bisa dipakai siapa pun —
+// termasuk yang menebak dengan password kosong.
+q('INSERT INTO users (email, name, password_hash, role, team_id, joined_on, created_at)
+   VALUES (?,?,?,?,?,?,?)',
+  ['baru@example.test', 'Baru', '', 'player', repo_default_team(), '2026-09-28',
+   Clock::nowUtcSql()]);
+$baruId = (int) db()->lastInsertId();
+ok('yang diundang belum bisa masuk dengan password apa pun',
+   auth_login('baru@example.test', '') === null && auth_login('baru@example.test', 'apa saja') === null);
+ok('dan belum dihitung sebagai orang yang harus lapor',
+   !in_array(uid($baruId), array_keys(repo_roster()), true));
+
+$undangan = auth_make_invite($baruId, 72);
+$tokenBaru = substr((string) parse_url($undangan, PHP_URL_QUERY), 2);
+eq('undangannya menunjuk halaman pembuatan password',
+   str_contains($undangan, 'undang.php?t='), true);
+eq('dan sebelum ditebus, orangnya sudah bisa dikenali',
+   (auth_peek_invite($tokenBaru) ?? [])['email'], 'baru@example.test');
+$_COOKIE = [];
+Auth::$looked = false;
+ok('menebusnya memberi password dan langsung memasukkan orangnya',
+   (auth_accept_invite($tokenBaru, 'password-yang-panjang') ?? [])['id'] === $baruId);
+ok('sekali pakai: tidak bisa ditebus lagi',
+   auth_accept_invite($tokenBaru, 'password-lain-lagi') === null);
+ok('sesudahnya dia bisa masuk dengan passwordnya sendiri',
+   auth_login('baru@example.test', 'password-yang-panjang') !== null);
+ok('dan sekarang ikut terhitung di rekap',
+   in_array(uid($baruId), array_keys(repo_roster()), true));
+
+// Undangan yang kedaluwarsa tidak lebih baik daripada undangan palsu.
+$basi = random_token();
+q('INSERT INTO login_tokens (token, user_id, kind, expires_at) VALUES (?,?,?,?)',
+  [$basi, $baruId, 'invite', '2026-09-29 00:00:00']);
+ok('undangan kedaluwarsa ditolak', auth_accept_invite($basi, 'password-yang-panjang') === null);
+// Token undangan bukan token link masuk, dan sebaliknya: dua pintu yang berbeda.
+$masuk = auth_make_login_link($baruId, 60);
+$tokenMasuk = substr((string) parse_url($masuk, PHP_URL_QUERY), 2);
+ok('token link masuk tidak bisa dipakai sebagai undangan',
+   auth_accept_invite($tokenMasuk, 'password-yang-panjang') === null);
+
+/* --------------------------------------------------- percobaan masuk yang gagal */
+
+$ipA = '203.0.113.9';
+$ipB = '198.51.100.4';
+q('DELETE FROM login_attempts');
+ok('awalnya tidak ada yang ditahan', !auth_throttled('nicho@example.test', $ipA));
+for ($i = 0; $i < MESSI_TRY_PAIR; $i++) {
+    auth_note_failure('nicho@example.test', $ipA);
+}
+ok('setelah sekian kali gagal, percobaan dari alamat itu ditahan',
+   auth_throttled('nicho@example.test', $ipA));
+// Dihitung per pasangan (email, IP). Kalau per email saja, siapa pun yang tahu alamat
+// email seseorang bisa mengunci orang itu di luar dengan sengaja salah berkali-kali.
+ok('orang yang sama dari perangkat lain tidak ikut terkunci',
+   !auth_throttled('nicho@example.test', $ipB));
+ok('dan email lain dari perangkat yang sama masih boleh mencoba',
+   !auth_throttled('dita@example.test', $ipA));
+
+for ($i = 0; $i < MESSI_TRY_IP; $i++) {
+    auth_note_failure('acak' . $i . '@example.test', $ipB);
+}
+ok('tapi satu alamat yang mencoba banyak email tetap ditahan',
+   auth_throttled('siapa-saja@example.test', $ipB));
+
+// Yang lama tidak boleh ikut menahan selamanya.
+q('UPDATE login_attempts SET at = ?', ['2026-09-29 00:00:00']);
+ok('percobaan di luar jendelanya tidak lagi menahan',
+   !auth_throttled('nicho@example.test', $ipA));
+ok('dan disapu oleh cron', auth_sweep() > 0);
 
 /* -------------------------------------------------------------------- auth */
 
