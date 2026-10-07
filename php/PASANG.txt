@@ -158,19 +158,19 @@ cPanel -> Software -> Select PHP Version (atau MultiPHP Manager) -> pilih 8.1 / 
 GOOGLE CHAT (boleh dilewati dulu)
 ---------------------------------
 Tanpa ini aplikasinya tetap jalan penuh; bedanya tidak ada pesan otomatis.
-Dengan ini, tiap hari kerja space squad dapat tiga pesan:
+Dengan ini, tiap hari kerja space tim dapat dua pesan:
 
   09:00  laporan hari ini dibuka + janji siapa saja yang jatuh tempo hari ini
   17:00  pengingat, menyebut siapa yang belum lapor
 
 Cuma dua, dan dua-duanya sekadar mengingatkan orang untuk membuka websitenya.
-Rekapnya TIDAK dikirim ke chat: atasan membacanya di tab "Squad" di website,
+Rekapnya TIDAK dikirim ke chat: atasan membacanya di tab "Tim" di website,
 yang bisa dibuka hari mana saja dan bisa membuka laporan utuh tiap orang —
 dua hal yang tidak bisa dilakukan sebuah pesan chat.
 
 Cara pasang, sekitar 2 menit:
 
- a. Buka space squad di Google Chat
+ a. Buka space tim di Google Chat
  b. Klik nama space di atas -> Apps & integrations -> Webhooks -> Add webhooks
  c. Beri nama "FURA" -> Save -> salin URL-nya
  d. Tempel ke halaman Kelola -> Pertanyaan -> "Space Google Chat tim ini"

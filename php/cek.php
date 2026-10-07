@@ -152,7 +152,7 @@ if ($hasConfig) {
     $hook = trim((string) cfg('chat_webhook'));
     if ($hook === '') {
         row('warn', 'Webhook Google Chat', 'belum diisi',
-            'Buka space squad &rarr; klik nama space &rarr; <em>Apps &amp; integrations</em> '
+            'Buka space tim &rarr; klik nama space &rarr; <em>Apps &amp; integrations</em> '
             . '&rarr; <em>Webhooks</em> &rarr; <em>Add webhooks</em> &rarr; salin URL-nya ke '
             . '<code>chat_webhook</code> di config.php. Tanpa ini aplikasinya tetap jalan, '
             . 'cuma tidak ada pesan pagi, pengingat, atau rekap.');
@@ -222,7 +222,7 @@ if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST' && isset($_POST['uji']) && $ha
     array_unshift($rows, [
         'state' => $sent ? 'ok' : 'bad',
         'what'  => 'Pesan uji',
-        'found' => $sent ? 'terkirim — cek space squad' : 'gagal terkirim',
+        'found' => $sent ? 'terkirim — cek space tim' : 'gagal terkirim',
         'fix'   => $sent ? '' : 'Salin ulang URL webhook-nya dari space. Kalau tetap gagal, '
                    . 'lihat tabel <code>job_log</code> baris <code>chat_error</code>.',
     ]);
@@ -287,7 +287,7 @@ CSS]);
   <form method="post" style="margin:0 0 .5rem">
     <button type="submit" name="uji" value="1">Kirim pesan uji</button>
   </form>
-  <p class="sub" style="margin:0 0 1rem">Satu pesan pendek akan muncul di space squad.</p>
+  <p class="sub" style="margin:0 0 1rem">Satu pesan pendek akan muncul di space tim.</p>
   <?php endif; ?>
 
   <h2>Perintah cron untuk hosting ini</h2>

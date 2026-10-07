@@ -18,7 +18,7 @@ return [
     // Where the app lives, with no trailing slash. Used to build login links.
     'base_url' => 'https://contoh.com/messi',
 
-    // Google Chat: open the squad's space -> nama space -> Apps & integrations ->
+    // Google Chat: open the team's space -> nama space -> Apps & integrations ->
     // Webhooks -> Add webhooks -> beri nama "MESSI" -> salin URL-nya ke sini.
     // Kosongkan dan aplikasinya tetap jalan penuh — cuma tidak ada pesan otomatis.
     'chat_webhook' => '',
@@ -27,7 +27,7 @@ return [
     // Make a long random one: openssl rand -hex 24
     'cron_key' => 'ganti-ini-jadi-acak-panjang',
 
-    // The squad's first reporting day. Nobody is marked absent before it.
+    // The team's first reporting day. Nobody is marked absent before it.
     'first_day' => '2026-09-28',
 
     // How long a login lasts. Long on purpose: a daily report people have to log in for
