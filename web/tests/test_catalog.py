@@ -37,6 +37,8 @@ with sync_playwright() as p:
     check("tapi ditandai segera", txt(pg, ".mod.soon .pill"), "segera")
     # Kartu yang bisa diklik lalu tidak melakukan apa-apa lebih buruk daripada kartu jujur.
     check("dan tidak bisa dibuka", pg.query_selector("[data-mod=prista]") is None)
+    check("katalognya menjelaskan untuk apa FURA, bukan cuma 'pilih satu'",
+          txt(pg, "p.sub"), lambda s: "tiap hari kerja" in s and "hilang" in s)
     pg.screenshot(path=str(SHOTS) + "/t-catalog.png", full_page=True)
 
     pg.click("[data-mod=messi]")
@@ -75,7 +77,15 @@ with sync_playwright() as p:
     stored(pgN, "cycles", 1)
     pgL = new_page(ctxN, "u_lead", at=AT, reset=False, enter=None)
     check("leader melihat keadaan timnya dari katalog",
-          pgL.inner_text("[data-mod=messi]"), lambda s: "Tim:" in s and "sudah lapor" in s)
+          pgL.inner_text("[data-card=messi]"), lambda s: "Tim:" in s and "sudah lapor" in s)
+    # Dulu baris itu cuma tulisan: rekapnya tiga ketukan jauhnya — katalog, modul, tab Tim —
+    # tiap hari, untuk layar yang dia buka tiap hari.
+    pgL.click("[data-rekap=messi]"); pgL.wait_for_timeout(350)
+    check("dan barisnya mengantar langsung ke rekapnya", txt(pgL, "h1"), "Rekap tim")
+    check("tab Tim yang terpilih, bukan 'Punya saya'",
+          pgL.get_attribute('[data-tab="tim"]', "aria-selected"), "true")
+    check("dan pemain tetap tidak punya baris itu",
+          pgN.query_selector("[data-rekap]") is None)
 
     print("\n--- memuat ulang tidak melempar orang keluar ---")
     pgR = new_page(context(b), "u_nicho", at=AT)
@@ -140,6 +150,29 @@ with sync_playwright() as p:
           txt(pgI, "h1"), "Berapa banyak hari ini?")
     pgI.click("#what"); pgI.wait_for_timeout(250)
     check("tapi masih bisa dibuka lewat 'Apa ini?'", txt(pgI, "h1"), "MESSI")
+
+    print("\n--- penjelasan bisa dibaca sebelum memutuskan masuk ---")
+    # Dulu penjelasannya terkunci di dalam modul: yang ragu harus masuk dulu untuk tahu
+    # apa yang akan dimintanya.
+    ctxA = context(b)
+    pgA = new_page(ctxA, "u_nicho", at=AT, enter=None, seen=None)
+    check("ada 'Apa ini?' di kartunya", pgA.query_selector("[data-intro=messi]") is not None)
+    pgA.click("[data-intro=messi]"); pgA.wait_for_timeout(300)
+    check("dan membukanya menampilkan penjelasannya", txt(pgA, "h1"), "MESSI")
+    pgA.click("[data-home]"); pgA.wait_for_timeout(250)
+    # Membaca bukan memulai: yang cuma menimbang belum kehilangan penjelasan yang
+    # seharusnya menyambutnya saat benar-benar mulai.
+    pgA.click("[data-mod=messi]"); pgA.wait_for_timeout(300)
+    check("membaca lewat 'Apa ini?' tidak dihitung sudah dibaca", txt(pgA, "h1"), "MESSI")
+    pgA.click("#introGo"); pgA.wait_for_timeout(300)
+    pgA.click("[data-home]"); pgA.wait_for_timeout(250)
+    pgA.click("[data-intro=messi]"); pgA.wait_for_timeout(300)
+    check("sesudah benar-benar mulai pun 'Apa ini?' tetap membuka penjelasannya",
+          txt(pgA, "h1"), "MESSI")
+    pgA.click("[data-home]"); pgA.wait_for_timeout(250)
+    pgA.click("[data-mod=messi]"); pgA.wait_for_timeout(300)
+    check("tanpa membuat penjelasannya muncul lagi tiap pagi",
+          txt(pgA, "h1"), "Berapa banyak hari ini?")
 
     print("\n=== PERTANYAAN YANG DISETEL ADMIN ===")
     CFG = {

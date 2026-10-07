@@ -11,6 +11,8 @@ from __future__ import annotations
 
 import json
 import sys
+import threading
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
@@ -41,6 +43,29 @@ def status(pg, path, base):
     return pg.evaluate("async p => (await fetch(p)).status", base + path)
 
 
+class Space(BaseHTTPRequestHandler):
+    """Sebuah space Google Chat, sejauh yang dilihat kode ini: satu alamat yang menerima
+    POST dan menjawab 200.
+
+    Dijalankan di proses tes, bukan di host PHP-nya: host tes itu `php -S`, yang melayani
+    satu permintaan pada satu waktu — mengarahkan webhook ke dirinya sendiri membuatnya
+    menunggu dirinya sendiri sampai waktunya habis.
+    """
+
+    diterima: list[str] = []
+
+    def do_POST(self):                                      # noqa: N802  (nama dari pustakanya)
+        n = int(self.headers.get("Content-Length") or 0)
+        Space.diterima.append(self.rfile.read(n).decode("utf-8", "replace"))
+        self.send_response(200)
+        self.send_header("Content-Type", "application/json")
+        self.end_headers()
+        self.wfile.write(b"{}")
+
+    def log_message(self, *a):                              # tanpa bising di keluaran tes
+        pass
+
+
 with Host("messi_admin_test", seed="empty") as host, sync_playwright() as p:
     browser = launch(p)
     ctx = browser.new_context(viewport={"width": 1000, "height": 900})
@@ -58,18 +83,37 @@ with Host("messi_admin_test", seed="empty") as host, sync_playwright() as p:
     pg.fill("#password", PASSWORD)
     pg.click("button[type=submit]")
     pg.wait_for_load_state("networkidle")
-    check("akun pertama dibuat lalu diantar ke login", pg.url, lambda u: u.endswith("/login.php"))
+    # Langsung masuk, bukan dilempar ke halaman masuk: orangnya baru saja membuktikan dia
+    # memegang pemasangan yang masih kosong ini, dan mengetik ulang password yang dibuatnya
+    # tiga detik lalu cuma menambah satu pintu tanpa menambah satu pun penjagaan.
+    check("akun pertama dibuat lalu langsung masuk ke penyiapan",
+          pg.url, lambda u: u.endswith("/kelola.php"))
+    check("dan dituntun tiga langkah penyiapan", pg.inner_text("body"),
+          lambda s: "Penyiapan" in s and "Undang orangnya" in s)
+    check("sambil disebutkan mana yang sudah", pg.inner_text("body"),
+          lambda s: "Hubungkan Google Chat" in s)
 
     pg.goto(host.base + "/setup.php")
     check("setup menolak jalan untuk kedua kalinya",
           pg.inner_text("body"), lambda s: "Sudah ada akun" in s)
 
+    # Setup sudah memasukkannya, jadi pintu masuknya diuji dari keadaan keluar.
+    pg.goto(host.base + "/api/logout.php")
+    pg.wait_for_load_state("networkidle")
+
     print("\n=== masuk sebagai admin ===")
     admin = sign_in(ctx, host.base, "lead@example.test", results=results)
     check("admin masuk ke aplikasinya", admin.inner_text("h1"),
           lambda s: "Berapa banyak" in s or "Sudah terkirim" in s)
-    check("admin melihat pintu ke halaman orang dan ke pertanyaannya",
-          admin.inner_text("footer"), lambda s: "Orang" in s and "Pertanyaan" in s)
+    # Pintunya pindah dari kaki halaman ke menu di bawah avatar — kaki halaman itu tempat
+    # orang mencari hal yang paling tidak penting.
+    admin.click("#avatar")
+    check("admin melihat pintu ke halaman kelola di menunya",
+          admin.inner_text("#usheet"), lambda s: "Kelola" in s)
+    admin.keyboard.press("Escape")
+    admin.goto(host.base + "/kelola.php")
+    check("dan halaman kelola menampung keempatnya", admin.inner_text("body"),
+          lambda s: "Orang & tim" in s and "Pertanyaan" in s and "Cek sistem" in s)
 
     admin.goto(host.base + "/admin.php")
     check("halaman orang & tim terbuka", admin.inner_text("h1"), "Orang & tim")
@@ -85,21 +129,21 @@ with Host("messi_admin_test", seed="empty") as host, sync_playwright() as p:
     admin.select_option("#r", "player")
     check("tidak ada kotak password untuk diketik admin",
           admin.query_selector("#p") is None)
-    admin.click("button:has-text('Tambah')")
+    admin.click("button:text-is('Undang')")
     admin.wait_for_load_state("networkidle")
     check("orangnya masuk daftar", admin.inner_text("body"), lambda s: "Nicho ditambahkan" in s)
-    undangan = admin.inner_text(".ok code").strip()
+    undangan = admin.inner_text(".links code").strip()
     check("dan yang keluar adalah link undangan", undangan,
           lambda s: s.startswith(host.base) and "undang.php?t=" in s)
     check("admin diingatkan mengirimnya japri",
-          admin.locator(".note.ok", has=admin.locator("code")).inner_text(),
+          admin.locator(".note.ok", has_text="japri").inner_text(),
           lambda s: "japri" in s)
     check("selama belum diterima, ditandai di daftarnya",
           admin.inner_text("body"), lambda s: "belum terima undangan" in s)
 
     admin.fill("#n", "Nicho Lagi")
     admin.fill("#e", "nicho@example.test")
-    admin.click("button:has-text('Tambah')")
+    admin.click("button:text-is('Undang')")
     admin.wait_for_load_state("networkidle")
     check("email yang sama ditolak", admin.inner_text(".bad"), lambda s: "sudah terdaftar" in s)
 
@@ -158,7 +202,7 @@ with Host("messi_admin_test", seed="empty") as host, sync_playwright() as p:
     print("\n=== menaikkan jadi leader ===")
     admin.reload()
     admin.wait_for_load_state("networkidle")
-    row = admin.locator("tr", has_text="nicho@example.test")
+    row = admin.locator("table.orang tr", has_text="nicho@example.test")
     row.locator("select[name=role]").select_option("leader")
     admin.wait_for_load_state("networkidle")
     check("perannya berubah", admin.inner_text(".ok"), lambda s: "Peran diubah" in s)
@@ -173,12 +217,12 @@ with Host("messi_admin_test", seed="empty") as host, sync_playwright() as p:
     print("\n=== lupa password: link, bukan password yang diketik admin ===")
     admin.reload()
     admin.wait_for_load_state("networkidle")
-    row = admin.locator("tr", has_text="nicho@example.test")
+    row = admin.locator("table.orang tr", has_text="nicho@example.test")
     check("admin tidak punya kotak untuk mengetik password orang lain",
           row.locator("input[name=password]").count(), 0)
     row.locator("button:has-text('Link buat password baru')").click()
     admin.wait_for_load_state("networkidle")
-    reset = admin.inner_text(".ok code").strip()
+    reset = admin.inner_text(".links code").strip()
     check("yang keluar adalah link, bukan password", reset,
           lambda s: s.startswith(host.base) and "undang.php?t=" in s)
 
@@ -197,7 +241,7 @@ with Host("messi_admin_test", seed="empty") as host, sync_playwright() as p:
 
     stale = browser.new_context(viewport={"width": 400, "height": 900})
     old = sign_in(stale, host.base, "nicho@example.test", NEW_PASSWORD, results=results)
-    check("password lama tidak berlaku lagi", old.inner_text(".err"), lambda s: "salah" in s)
+    check("password lama tidak berlaku lagi", old.inner_text(".note.bad"), lambda s: "salah" in s)
     fresh = sign_in(stale, host.base, "nicho@example.test", PASSWORD2, results=results)
     check("password baru berlaku", fresh.inner_text("h1"), "Berapa banyak hari ini?")
     stale.close()
@@ -205,15 +249,15 @@ with Host("messi_admin_test", seed="empty") as host, sync_playwright() as p:
     print("\n=== link masuk sekali pakai ===")
     admin.reload()
     admin.wait_for_load_state("networkidle")
-    row = admin.locator("tr", has_text="nicho@example.test")
+    row = admin.locator("table.orang tr", has_text="nicho@example.test")
     row.locator("button:has-text('Link masuk')").click()
     admin.wait_for_load_state("networkidle")
-    link = admin.inner_text(".ok code").strip()
+    link = admin.inner_text(".links code").strip()
     check("linknya lengkap dan sekali pakai", link,
           lambda s: s.startswith(host.base) and "login.php?t=" in s)
     # The warning belongs next to the link itself, not in the notice above it.
     check("admin diingatkan mengirimnya japri, bukan ke space",
-          admin.locator(".note.ok", has=admin.locator("code")).inner_text(),
+          admin.locator(".note.ok", has_text="japri").inner_text(),
           lambda s: "japri" in s)
 
     spent = browser.new_context(viewport={"width": 400, "height": 900})
@@ -230,19 +274,19 @@ with Host("messi_admin_test", seed="empty") as host, sync_playwright() as p:
     ag.goto(link)
     ag.wait_for_load_state("networkidle")
     check("dan tidak bisa dipakai kedua kalinya",
-          ag.inner_text(".err"), lambda s: "sudah dipakai" in s or "kedaluwarsa" in s)
+          ag.inner_text(".note.bad"), lambda s: "sudah dipakai" in s or "kedaluwarsa" in s)
     again.close()
 
     print("\n=== menonaktifkan ===")
     admin.reload()
     admin.wait_for_load_state("networkidle")
-    row = admin.locator("tr", has_text="nicho@example.test")
+    row = admin.locator("table.orang tr", has_text="nicho@example.test")
     row.locator("button:has-text('Nonaktifkan')").click()
     admin.wait_for_load_state("networkidle")
     gone = browser.new_context(viewport={"width": 400, "height": 900})
     blocked = sign_in(gone, host.base, "nicho@example.test", PASSWORD2, results=results)
     check("yang dinonaktifkan tidak bisa masuk lagi",
-          blocked.inner_text(".err"), lambda s: "salah" in s)
+          blocked.inner_text(".note.bad"), lambda s: "salah" in s)
     gone.close()
 
     print("\n=== halaman cek hosting ===")
@@ -252,7 +296,7 @@ with Host("messi_admin_test", seed="empty") as host, sync_playwright() as p:
     admin.goto(host.base + "/cek.php")
     admin.wait_for_load_state("networkidle")
     body = admin.inner_text("body")
-    check("admin melihat hasilnya", body, lambda s: "Cek hosting" in s)
+    check("admin melihat hasilnya", body, lambda s: "Cek sistem" in s)
     check("versi PHP diperiksa", body, lambda s: "Versi PHP" in s)
     check("tabelnya diperiksa", body, lambda s: "lengkap, 7 tabel" in s)
     check("base_url dicocokkan dengan alamat yang sedang dibuka",
@@ -356,9 +400,9 @@ with Host("messi_admin_test", seed="empty") as host, sync_playwright() as p:
     admin.fill("#n", "Oki")
     admin.fill("#e", "oki@example.test")
     admin.select_option("#r", "player")
-    admin.click("button:has-text('Tambah')")
+    admin.click("button:text-is('Undang')")
     admin.wait_for_load_state("networkidle")
-    undanganOki = admin.inner_text(".ok code").strip()
+    undanganOki = admin.inner_text(".links code").strip()
     pctx = browser.new_context(viewport={"width": 420, "height": 900})
     player = accept_invite(pctx, undanganOki, PASSWORD, results=results)
     check("pemain melihat pertanyaan yang disetel admin",
@@ -423,9 +467,9 @@ with Host("messi_admin_test", seed="empty") as host, sync_playwright() as p:
         admin.fill("#n", nama)
         admin.fill("#e", surel)
         admin.select_option("#r", "admin")
-        admin.click("button:has-text('Tambah')")
+        admin.click("button:text-is('Undang')")
         admin.wait_for_load_state("networkidle")
-        link = admin.inner_text(".ok code").strip()
+        link = admin.inner_text(".links code").strip()
         kctx = browser.new_context(viewport={"width": 420, "height": 900})
         accept_invite(kctx, link, PASSWORD, results=results).close()
         kctx.close()
@@ -439,7 +483,7 @@ with Host("messi_admin_test", seed="empty") as host, sync_playwright() as p:
     isi = adi.inner_text("body")
     check("admin melihat owner dan sesama admin, tapi tanpa tombol", isi,
           lambda s: "Owner" in s and "Bela" in s)
-    barisBela = adi.locator("tr", has_text="bela@example.test")
+    barisBela = adi.locator("table.orang tr", has_text="bela@example.test")
     check("baris sesama admin tidak punya pemilih peran",
           barisBela.locator("select[name=role]").count(), 0)
     check("dan tidak punya tombol undangan sama sekali",
@@ -528,6 +572,124 @@ with Host("messi_admin_test", seed="empty") as host, sync_playwright() as p:
           admin.inner_text("body"), lambda s: "Pertanyaan milik tim" in s)
     check("dan webhook tim tidak pernah ditampilkan kembali",
           admin.input_value("input[name=chat_webhook]"), "")
+
+    print("\n=== webhook diuji sekarang, bukan besok pagi ===")
+    # Alamat yang salah tempel tidak memberi tanda apa pun sampai jam buka berikutnya, dan
+    # yang terlihat besok cuma "botnya mati" — kabar buruk yang sampai ke orang yang sudah
+    # lupa dari mana dia menyalin alamatnya.
+    admin.fill("input[name=chat_webhook]", "http://127.0.0.1:1/tidak-ada")
+    admin.click("button:has-text('Simpan lalu kirim pesan tes')")
+    admin.wait_for_load_state("networkidle")
+    check("alamat yang tidak bisa dihubungi dikatakan gagal seketika",
+          admin.inner_text(".note.bad"), lambda s: "gagal terkirim" in s)
+    check("beserta apa yang harus dikerjakan",
+          admin.inner_text(".note.bad"), lambda s: "buat ulang webhook" in s)
+    # Dan jalur berhasilnya, ke space tiruan yang betul-betul menjawab 200.
+    space = ThreadingHTTPServer(("127.0.0.1", 0), Space)
+    threading.Thread(target=space.serve_forever, daemon=True).start()
+    admin.fill("input[name=chat_webhook]",
+               f"http://127.0.0.1:{space.server_address[1]}/space")
+    admin.click("button:has-text('Simpan lalu kirim pesan tes')")
+    admin.wait_for_load_state("networkidle")
+    check("alamat yang menjawab dikatakan terkirim",
+          admin.locator(".note.ok", has_text="terkirim").inner_text(),
+          lambda s: "terkirim" in s)
+    # Bukan cuma kalimatnya: pesannya memang sampai ke alamat itu.
+    check("dan pesannya memang sampai ke sana", Space.diterima,
+          lambda d: len(d) == 1 and "Tes dari FURA" in d[0])
+    space.shutdown()
+    check("dan menyimpannya tidak membuat alamatnya ditampilkan kembali",
+          admin.input_value("input[name=chat_webhook]"), "")
+
+    print("\n=== undangan borongan ===")
+    admin.goto(host.base + "/admin.php")
+    admin.wait_for_load_state("networkidle")
+    admin.fill("#daftar", "budi.santoso@example.test\n"
+                          "Sari Wijaya <sari@example.test>\n"
+                          "bukan-email\n")
+    admin.click("button:has-text('Undang semuanya')")
+    admin.wait_for_load_state("networkidle")
+    check("dua undangan keluar sekaligus",
+          admin.eval_on_selector_all("table.links code", "e=>e.length"), 2)
+    tabel = admin.inner_text("table.links")
+    check("nama ditebak dari depan tanda @ kalau tidak ditulis",
+          tabel, lambda s: "Budi Santoso" in s)
+    check("dan nama yang ditulis dipakai apa adanya", tabel, lambda s: "Sari Wijaya" in s)
+    # Satu baris salah ketik tidak boleh membatalkan sembilan baris yang benar — kalau
+    # begitu, seluruh tempelan harus diulang.
+    check("baris yang salah dikutip sendiri, yang lain tetap jadi",
+          admin.inner_text(".note.bad"), lambda s: "bukan-email" in s)
+    check("tiap baris punya tombol salinnya, plus satu untuk semuanya",
+          admin.eval_on_selector_all("[data-salin]", "e=>e.length"), 3)
+    check("yang disalin sekaligus berisi kedua linknya",
+          admin.get_attribute("#salinSemua", "data-salin"),
+          lambda s: s.count("undang.php?t=") == 2 and "Budi Santoso" in s)
+
+    # Bentuk tempelan yang paling mudah salah dibaca: satu baris penuh alamat dipisah
+    # koma, seperti isi kolom "To". Dibaca sebagai satu orang, alamat kedua jadi *nama*
+    # orang pertama dan sisanya hilang tanpa sepatah kata.
+    admin.fill("#daftar", "tono@example.test, wati@example.test, joko@example.test")
+    admin.click("button:has-text('Undang semuanya')")
+    admin.wait_for_load_state("networkidle")
+    check("satu baris berisi tiga alamat jadi tiga orang",
+          admin.eval_on_selector_all("table.links code", "e=>e.length"), 3)
+    check("dan tidak ada yang bernama alamat orang lain",
+          admin.inner_text("table.links"),
+          lambda s: "Tono" in s and "Wati" in s and "Joko" in s)
+
+    print("\n=== lupa password punya jalan pulang ===")
+    # Pelapor punya atasan di ruangan yang sama. Yang paling dirugikan oleh layar buntu
+    # adalah orang yang tidak tahu harus ke siapa.
+    lctx = browser.new_context(viewport={"width": 420, "height": 900})
+    lp = lctx.new_page()
+    lp.goto(host.base + "/login.php")
+    check("halaman masuk menyebutkan jalan pulangnya",
+          lp.inner_text("body"), lambda s: "Lupa password" in s)
+    lp.click("a[href='lupa.php']")
+    lp.wait_for_load_state("networkidle")
+    lp.fill("#email", "oki@example.test")
+    lp.click("button[type=submit]")
+    lp.wait_for_load_state("networkidle")
+    check("permintaannya dicatat", lp.inner_text(".note.ok"), lambda s: "dicatat" in s)
+    check("tanpa menjanjikan email yang tidak akan datang",
+          lp.inner_text("body"), lambda s: "inbox" not in s.lower())
+
+    # Jawaban yang berbeda untuk email yang tidak terdaftar menjadikan halaman ini daftar
+    # nama siapa saja yang bekerja di sini, dan siapa pun boleh membukanya.
+    lp2 = lctx.new_page()
+    lp2.goto(host.base + "/lupa.php")
+    lp2.fill("#email", "tidak-pernah-ada@example.test")
+    lp2.click("button[type=submit]")
+    lp2.wait_for_load_state("networkidle")
+    # Keberadaannya diperiksa dulu. Tanpa itu, jawaban yang berbeda bukan tertangkap
+    # sebagai kalimat yang berbeda tapi sebagai penantian tiga puluh detik — dan yang
+    # gagal dengan menggantung tidak memberi tahu apa yang berubah.
+    check("jawabannya tetap berupa kabar baik", lp2.query_selector(".note.ok") is not None)
+    check("dan jawabannya sama persis untuk email yang tidak terdaftar",
+          lp2.inner_text(".note.ok") if lp2.query_selector(".note.ok") else "(tidak ada)",
+          lp.inner_text(".note.ok"))
+    lctx.close()
+
+    admin.goto(host.base + "/admin.php")
+    admin.wait_for_load_state("networkidle")
+    check("admin melihat siapa yang menunggu, dengan namanya di atas",
+          admin.inner_text(".note.warn"), lambda s: "Oki" in s and "lupa password" in s)
+    check("dan barisnya ikut ditandai",
+          admin.inner_text("table.orang"), lambda s: "minta link masuk" in s)
+    baris = admin.locator("table.orang tr", has_text="oki@example.test")
+    baris.locator("button:has-text('Link masuk')").click()
+    admin.wait_for_load_state("networkidle")
+    check("mengeluarkan linknya menjawab permintaannya",
+          admin.inner_text("body"), lambda s: "minta link masuk" not in s)
+
+    print("\n=== penyiapan yang selesai berhenti menyuruh ===")
+    admin.goto(host.base + "/kelola.php")
+    admin.wait_for_load_state("networkidle")
+    kelola = admin.inner_text("body")
+    check("tuntunan tiga langkahnya hilang sendiri", kelola,
+          lambda s: "Penyiapan" not in s)
+    check("yang tinggal adalah rangkuman keadaannya", kelola,
+          lambda s: "orang aktif" in s and "Cron" in s and "Pengingat terakhir" in s)
 
     print("\n=== cron meninggalkan jejak, hidup maupun mati ===")
     # "Cron-nya mati lagi" adalah keluhan yang paling sering terdengar dan paling sulit

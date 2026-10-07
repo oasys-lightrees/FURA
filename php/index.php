@@ -46,6 +46,13 @@ $boot = [
     'cycles'      => repo_cycles(90, $mine, $team),
     'commitments' => repo_commitments(90, $mine, $team),
     'roster'      => repo_roster($team),
+    // Pintu ke halaman di luar aplikasi ini. Dikirim sebagai data, bukan ditulis di
+    // dalam app.html, karena versi artifact-nya tidak punya satu pun halaman ini.
+    'menu' => array_values(array_filter([
+        is_manager($user) ? ['label' => 'Kelola', 'href' => 'kelola.php'] : null,
+        ['label' => 'Keluar', 'href' => 'api/logout.php'],
+    ])),
+    'who' => ['email' => (string) $user['email']],
 ];
 
 $app = (string) file_get_contents(__DIR__ . '/app.html');
@@ -78,6 +85,8 @@ window.claude = (function () {
   // owner dan admin menerima semuanya, dan halamannya menyediakan pemilihnya.
   window.FURA_TEAMS = BOOT.teams;
   window.FURA_TEAM = BOOT.me.team;
+  window.FURA_MENU = BOOT.menu;
+  window.FURA_WHO = BOOT.who;
 
   const snapshot = obj => ({
     docs: Object.entries(obj || {}).map(([id, d]) => ({ id, data: () => d })),
@@ -120,16 +129,5 @@ window.claude = (function () {
 </head>
 <body>
 <?= $app ?>
-<footer class="signout">
-  Masuk sebagai <strong><?= h($user['name']) ?></strong> ·
-  <?php if (is_manager($user)): ?><a href="admin.php">Orang &amp; tim</a> ·
-    <a href="soal.php">Pertanyaan</a> · <?php endif; ?>
-  <a href="api/logout.php">Keluar</a>
-</footer>
-<style>
-.signout { max-width:44rem; margin:0 auto; padding:1.5rem 1.25rem 3rem;
-           font:400 0.8125rem/1.5 "Public Sans", system-ui, sans-serif; color:#6b6d73; }
-.signout a { color:inherit; }
-</style>
 </body>
 </html>

@@ -14,6 +14,7 @@ require __DIR__ . '/lib/require-php8.php';
 require_once __DIR__ . '/lib/auth.php';
 require_once __DIR__ . '/lib/repo.php';
 require_once __DIR__ . '/lib/schema.php';
+require_once __DIR__ . '/lib/layout.php';
 
 // Says what is missing on the first screen, not on the first click.
 messi_require_current();
@@ -30,8 +31,10 @@ if (!$teams) {                       // pemasangan baru: selalu ada satu tim
 $notice = null;
 
 $error = null;
-$oneTime = null;
-$oneTimeLabel = '';
+// Satu daftar, bukan satu link istimewa: menambah satu orang dan menempel sepuluh email
+// menghasilkan hal yang sama, jadi yang menampilkannya juga satu.
+$links = [];
+$linksLabel = '';
 
 /**
  * Boleh tidak orang ini menyentuh baris itu?
@@ -51,6 +54,93 @@ function admin_may_touch(array $me, ?array $target): bool
     return !in_array($target['role'], ['admin', 'owner'], true);
 }
 
+/**
+ * Menambah satu orang, lalu membuatkan undangannya.
+ *
+ * Dipakai formulir satu orang maupun kotak tempel-banyak. Satu tempat, karena aturan
+ * yang ditulis dua kali adalah aturan yang suatu hari berbeda di salah satunya.
+ *
+ * @return array{0: ?string, 1: ?array}  pesan kesalahan, atau undangan yang jadi
+ */
+function admin_tambah(array $teams, array $canGive, string $name, string $email,
+                      string $role, int $team, string $joined): array
+{
+    $email = strtolower(trim($email));
+    $name  = trim((string) preg_replace('/\s+/u', ' ', $name));
+    if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
+        // Barisnya ikut dikutip. "Email kosong" di tempelan sepuluh baris berarti admin
+        // harus menebak sendiri baris yang mana.
+        $apa = $email !== '' ? $email : ($name !== '' ? $name : '(kosong)');
+        return ['"' . $apa . '" bukan email yang benar.', null];
+    }
+    if ($name === '') {
+        return ['Nama untuk ' . $email . ' belum ada.', null];
+    }
+    if (!isset($teams[$team])) {
+        return ['Pilih timnya.', null];
+    }
+    if (!in_array($role, $canGive, true)) {
+        $role = 'player';
+    }
+    if (q1('SELECT id FROM users WHERE email = ?', [$email])) {
+        return [$email . ' sudah terdaftar.', null];
+    }
+    // Password dikosongkan: yang membuatnya adalah orangnya sendiri lewat undangan.
+    // Mulai hari ini berarti hari-hari sebelum hari ini tidak dihitung melawan dia.
+    q('INSERT INTO users (email, name, password_hash, role, team_id, joined_on, created_at)
+       VALUES (?,?,?,?,?,?,?)',
+      [$email, mb_substr($name, 0, 120), '', $role, $team, $joined, Clock::nowUtcSql()]);
+    $id = (int) db()->lastInsertId();
+    return [null, ['name' => $name, 'email' => $email, 'url' => auth_make_invite($id)]];
+}
+
+/**
+ * Membaca tempelan jadi daftar orang.
+ *
+ * Tiga bentuk diterima, karena ketiganya yang sebenarnya ditempel orang: alamat polos
+ * satu per baris, "Nama <alamat>" seperti yang tercopot dari daftar kontak, dan satu
+ * baris penuh alamat dipisah koma seperti isi kolom "To". Yang terakhir itu yang paling
+ * mudah salah: kalau barisnya dibaca sebagai satu orang, alamat kedua jadi *nama* orang
+ * pertama, dan yang lain hilang tanpa sepatah kata.
+ *
+ * Tanpa nama, namanya ditebak dari depan tanda @ — nama tebakan yang bisa diperbaiki
+ * nanti lebih baik daripada menolak seluruh tempelan karena satu baris kurang lengkap.
+ */
+function admin_baca_daftar(string $blob): array
+{
+    $out = [];
+    foreach (preg_split('/\R/u', $blob) ?: [] as $line) {
+        $line = trim($line);
+        if ($line === '') {
+            continue;
+        }
+        if (preg_match('/^(.*?)<([^>]*)>/u', $line, $m)) {
+            $out[] = ['name' => trim($m[1], " \t\"'"), 'email' => trim($m[2])];
+            continue;
+        }
+        $bits = preg_split('/[,;\s]+/u', $line) ?: [];
+        $alamat = array_values(array_filter($bits, fn($b) => str_contains($b, '@')));
+        $sisa = array_values(array_filter($bits, fn($b) => !str_contains($b, '@')));
+        if (count($alamat) > 1) {
+            // Banyak alamat dalam satu baris: tidak ada cara tahu nama mana milik alamat
+            // mana, jadi semuanya ditebak — dan tidak ada yang hilang.
+            foreach ($alamat as $satu) {
+                $out[] = ['name' => '', 'email' => $satu];
+            }
+            continue;
+        }
+        $out[] = ['name' => trim(implode(' ', $sisa)), 'email' => $alamat[0] ?? ''];
+    }
+
+    foreach ($out as $i => $satu) {
+        if ($satu['name'] === '' && $satu['email'] !== '') {
+            $local = substr($satu['email'], 0, (int) strpos($satu['email'], '@'));
+            $out[$i]['name'] = ucwords(trim((string) preg_replace('/[._\-]+/', ' ', $local)));
+        }
+    }
+    return $out;
+}
+
 // Peran yang boleh diberikan orang ini: hanya owner yang bisa mengangkat admin atau
 // owner. Satu tempat, dipakai formulirnya maupun pemeriksaan kirimannya — dua tempat
 // berarti suatu hari formulirnya menyembunyikan apa yang masih diterima server.
@@ -62,38 +152,52 @@ if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST') {
     $targetId = (int) ($_POST['id'] ?? 0);
     $target = $targetId ? q1('SELECT * FROM users WHERE id = ?', [$targetId]) : null;
 
-    if ($do === 'add') {
-        $email = strtolower(trim((string) ($_POST['email'] ?? '')));
-        $name  = trim((string) ($_POST['name'] ?? ''));
-        $role  = in_array($_POST['role'] ?? '', $canGive, true) ? (string) $_POST['role'] : 'player';
-        $team  = (int) ($_POST['team'] ?? 0);
+    if ($do === 'add' || $do === 'addmany') {
+        $role   = (string) ($_POST['role'] ?? 'player');
+        $team   = (int) ($_POST['team'] ?? 0);
         $joined = (string) ($_POST['joined'] ?? Clock::today());
+        // Satu orang lewat formulirnya, atau sepuluh lewat kotak tempelan: keduanya
+        // berakhir sebagai daftar yang sama dan lewat pemeriksaan yang sama.
+        $daftar = $do === 'addmany'
+            ? admin_baca_daftar((string) ($_POST['daftar'] ?? ''))
+            : [['name' => (string) ($_POST['name'] ?? ''),
+                'email' => (string) ($_POST['email'] ?? '')]];
 
-        if (!filter_var($email, FILTER_VALIDATE_EMAIL) || $name === '') {
-            $error = 'Nama dan email harus diisi dengan benar.';
-        } elseif (!isset($teams[$team])) {
-            $error = 'Pilih timnya.';
-        } elseif (q1('SELECT id FROM users WHERE email = ?', [$email])) {
-            $error = 'Email itu sudah terdaftar.';
-        } else {
-            // Password dikosongkan: yang membuatnya adalah orangnya sendiri lewat undangan.
-            // Joining today means nothing before today is counted against them.
-            q('INSERT INTO users (email, name, password_hash, role, team_id, joined_on, created_at)
-               VALUES (?,?,?,?,?,?,?)',
-              [$email, $name, '', $role, $team, $joined, Clock::nowUtcSql()]);
-            $oneTime = auth_make_invite((int) db()->lastInsertId());
-            $oneTimeLabel = 'Undangan untuk ' . $name . ' — berlaku 72 jam, sekali pakai.';
-            $notice = $name . ' ditambahkan. Kirim link di bawah ini japri kepadanya.';
+        $gagal = [];
+        foreach ($daftar as $satu) {
+            [$kenapa, $undangan] = admin_tambah($teams, $canGive, $satu['name'],
+                                                $satu['email'], $role, $team, $joined);
+            if ($undangan) { $links[] = $undangan; } else { $gagal[] = (string) $kenapa; }
+        }
+        if (!$daftar) {
+            $error = 'Belum ada email yang ditempel.';
+        } elseif ($gagal) {
+            // Yang berhasil tetap berhasil. Membatalkan sembilan orang karena satu
+            // emailnya salah ketik berarti seluruh tempelan harus diulang.
+            $error = implode(' ', array_slice($gagal, 0, 5))
+                   . (count($gagal) > 5 ? ' (dan ' . (count($gagal) - 5) . ' lagi)' : '');
+        }
+        if ($links) {
+            $linksLabel = count($links) === 1
+                ? 'Undangan untuk ' . $links[0]['name'] . ' — berlaku 72 jam, sekali pakai.'
+                : count($links) . ' undangan — masing-masing berlaku 72 jam, sekali pakai.';
+            $notice = count($links) === 1
+                ? $links[0]['name'] . ' ditambahkan.'
+                : count($links) . ' orang ditambahkan.';
         }
 
     } elseif ($do === 'invite') {
         if (!admin_may_touch($me, $target)) {
             $error = 'Tidak bisa mengubah baris itu.';
         } else {
-            $oneTime = auth_make_invite($targetId);
-            $oneTimeLabel = ($target['accepted_at'] === null ? 'Undangan baru untuk ' : 'Link buat password baru untuk ')
+            $links[] = ['name' => $target['name'], 'email' => $target['email'],
+                        'url' => auth_make_invite($targetId)];
+            $linksLabel = ($target['accepted_at'] === null ? 'Undangan baru untuk ' : 'Link buat password baru untuk ')
                           . $target['name'] . ' — berlaku 72 jam, sekali pakai.';
-            $notice = 'Kirim link di bawah ini japri, jangan ke space.';
+            // Tanpa $notice: peringatan "kirim japri" sudah ada tepat di sebelah linknya,
+            // dan peringatan yang sama dua kali di satu halaman berhenti dibaca.
+            // Permintaannya sudah dijawab, jadi baris "minta link masuk" ikut hilang.
+            auth_clear_reset($targetId);
         }
 
     } elseif ($do === 'link') {
@@ -102,9 +206,10 @@ if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST') {
         if (!admin_may_touch($me, $target)) {
             $error = 'Tidak bisa mengubah baris itu.';
         } else {
-            $oneTime = auth_make_login_link($targetId, 60);
-            $oneTimeLabel = 'Link masuk untuk ' . $target['name'] . ' — berlaku 60 menit, sekali pakai.';
-            $notice = 'Kirim japri, jangan ke space.';
+            $links[] = ['name' => $target['name'], 'email' => $target['email'],
+                        'url' => auth_make_login_link($targetId, 60)];
+            $linksLabel = 'Link masuk untuk ' . $target['name'] . ' — berlaku 60 menit, sekali pakai.';
+            auth_clear_reset($targetId);
         }
 
     } elseif ($do === 'active') {
@@ -174,62 +279,30 @@ if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST') {
     }
 }
 
-$people = q('SELECT id, name, email, role, active, joined_on, team_id, invited_at, accepted_at
+$people = q('SELECT id, name, email, role, active, joined_on, team_id, invited_at,
+                    accepted_at, reset_asked_at
                FROM users ORDER BY active DESC, name')->fetchAll();
+// Siapa yang bilang lupa passwordnya. Mereka tidak punya jalan pulang lain, jadi ini
+// disebutkan di atas dengan namanya — bukan cuma ditempeli label di barisnya, yang di
+// daftar dua puluh orang berarti harus dicari dulu.
+$mintaLink = array_values(array_filter($people, fn($p) => $p['reset_asked_at'] !== null));
 $csrf = csrf_token();
 $pendingSchema = schema_pending();
 
-header('Content-Type: text/html; charset=utf-8');
-header('Cache-Control: no-store');
+page_head('Orang & tim', ['me' => $me, 'wide' => true, 'css' => <<<'CSS'
+td.who strong { display:block }
+td.who span { color:var(--muted); font-size:0.8125rem }
+.off td { opacity:0.5 }
+.tag.minta { background:var(--due-bg); border-color:var(--due-bg); color:var(--due) }
+.links td { border-top:1px solid var(--line) }
+.links code { display:block }
+.pisah { display:flex; align-items:center; gap:0.75rem; margin:1.5rem 0 1rem;
+         color:var(--muted); font-size:0.8125rem }
+.pisah::before, .pisah::after { content:""; flex:1; border-top:1px solid var(--line) }
+CSS]);
 ?>
-<!doctype html>
-<html lang="id">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Tim · FURA</title>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Public+Sans:wght@400;500;600;700&display=swap">
-<style>
-* { box-sizing:border-box; }
-body { margin:0; background:#f5f3ef; color:#1a1c1f; padding:2rem 1.25rem 4rem;
-       font:400 0.9375rem/1.55 "Public Sans", system-ui, sans-serif; }
-main { max-width:52rem; margin:0 auto; }
-h1 { font-size:1.375rem; margin:0 0 0.25rem; letter-spacing:-0.01em; }
-p.sub { margin:0 0 1.75rem; color:#6b6d73; font-size:0.875rem; }
-h2 { font-size:1rem; margin:2rem 0 0.75rem; }
-.card { background:#fff; border:1px solid #e4e1db; border-radius:0.75rem; padding:1.25rem; }
-table { width:100%; border-collapse:collapse; }
-th { text-align:left; font-size:0.75rem; font-weight:600; color:#6b6d73; text-transform:uppercase;
-     letter-spacing:0.04em; padding:0 0.5rem 0.5rem 0; }
-td { padding:0.625rem 0.5rem 0.625rem 0; border-top:1px solid #efece7; vertical-align:middle; }
-td.who strong { display:block; }
-td.who span { color:#6b6d73; font-size:0.8125rem; }
-input, select { padding:0.4375rem 0.5rem; font:inherit; font-size:0.875rem; background:#faf9f6;
-                border:1px solid #d9d5ce; border-radius:0.375rem; }
-button { padding:0.4375rem 0.75rem; font:inherit; font-size:0.875rem; font-weight:500; cursor:pointer;
-         background:#1a1c1f; color:#fff; border:0; border-radius:0.375rem; }
-button.quiet { background:#faf9f6; color:#1a1c1f; border:1px solid #d9d5ce; }
-form.row { display:inline-flex; gap:0.375rem; align-items:center; margin:0 0.25rem 0.25rem 0; }
-.grid { display:grid; grid-template-columns:repeat(auto-fit, minmax(11rem, 1fr)); gap:0.75rem; }
-.grid label { display:block; font-size:0.75rem; font-weight:500; margin:0 0 0.25rem; }
-.grid input, .grid select { width:100%; }
-.note { padding:0.625rem 0.75rem; border-radius:0.5rem; margin:0 0 1rem; font-size:0.875rem; }
-.ok { background:#e8f0eb; color:#2f6248; }
-.bad { background:#f7e7e4; color:#97322a; }
-.warn { background:#f7eedd; color:#9a6410; }
-.tag { font-size:0.75rem; padding:0.125rem 0.4375rem; border-radius:0.25rem; background:#f0ede8; color:#6b6d73; }
-code { font:500 0.9375rem "IBM Plex Mono", ui-monospace, monospace; background:#f0ede8;
-       padding:0.125rem 0.375rem; border-radius:0.25rem; }
-a { color:#1a1c1f; }
-.off td { opacity:0.5; }
-p.why { margin:0 0 0.75rem; color:#6b6d73; font-size:0.8125rem; max-width:42rem; }
-</style>
-</head>
-<body>
-<main>
   <h1>Orang &amp; tim</h1>
-  <p class="sub"><a href="index.php">← kembali ke laporan</a> ·
-     <a href="soal.php">Pertanyaan MESSI</a></p>
+  <p class="sub"><a href="kelola.php">‹ Kelola</a> · <a href="soal.php">Pertanyaan</a></p>
 
   <?php if ($pendingSchema): ?>
     <p class="note warn"><strong>Database belum sesuai versi ini.</strong>
@@ -239,19 +312,43 @@ p.why { margin:0 0 0.75rem; color:#6b6d73; font-size:0.8125rem; max-width:42rem;
   <?php if ($notice): ?><p class="note ok"><?= h($notice) ?></p><?php endif; ?>
   <?php if ($error): ?><p class="note bad"><?= h($error) ?></p><?php endif; ?>
 
-  <?php if ($oneTime): ?>
-    <p class="note ok"><?= h($oneTimeLabel) ?><br>
+  <?php if ($mintaLink): ?>
+    <p class="note warn"><strong><?= h(implode(', ', array_map(
+         fn($p) => (string) $p['name'], $mintaLink))) ?></strong>
+       bilang lupa passwordnya. Tekan <em>Link masuk</em> di barisnya, lalu kirim
+       linknya japri.</p>
+  <?php endif; ?>
+
+  <?php if ($links): ?>
+    <p class="note ok"><?= h($linksLabel) ?><br>
        Kirim <strong>japri</strong>, jangan ke space — siapa pun yang bisa membaca space
-       itu bisa memakainya.<br>
-       <code><?= h($oneTime) ?></code></p>
+       itu bisa memakainya.</p>
+    <div class="card scroll" style="margin:0 0 1rem">
+      <table class="links">
+        <tr><th>Orang</th><th>Link</th><th></th></tr>
+        <?php foreach ($links as $l): ?>
+          <tr>
+            <td class="who"><strong><?= h($l['name']) ?></strong><span><?= h($l['email']) ?></span></td>
+            <td><code><?= h($l['url']) ?></code></td>
+            <td><button class="quiet" type="button" data-salin="<?= h($l['url']) ?>">Salin</button></td>
+          </tr>
+        <?php endforeach; ?>
+      </table>
+      <?php if (count($links) > 1): ?>
+        <p style="margin:1rem 0 0"><button class="quiet" type="button" id="salinSemua"
+           data-salin="<?= h(implode("\n", array_map(
+             fn($l) => $l['name'] . ' — ' . $l['url'], $links))) ?>">Salin semua
+           (<?= count($links) ?>)</button></p>
+      <?php endif; ?>
+    </div>
   <?php endif; ?>
 
   <?php
   $roleNames = ['player' => 'Pelapor', 'leader' => 'Leader', 'admin' => 'Admin', 'owner' => 'Owner'];
   ?>
 
-  <div class="card">
-  <table>
+  <div class="card scroll">
+  <table class="orang">
     <tr><th>Orang</th><th>Tim</th><th>Peran</th><th>Mulai</th><th></th></tr>
     <?php foreach ($people as $p): $mine = (int) $p['id'] === (int) $me['id'];
           $boleh = admin_may_touch($me, $p); ?>
@@ -259,6 +356,9 @@ p.why { margin:0 0 0.75rem; color:#6b6d73; font-size:0.8125rem; max-width:42rem;
       <td class="who"><strong><?= h($p['name']) ?></strong><span><?= h($p['email']) ?></span>
         <?php if ($p['accepted_at'] === null): ?>
           <span class="tag">belum terima undangan</span>
+        <?php endif; ?>
+        <?php if ($p['reset_asked_at'] !== null): ?>
+          <span class="tag minta">minta link masuk</span>
         <?php endif; ?></td>
       <td>
         <?php if (!$boleh): ?>
@@ -327,7 +427,7 @@ p.why { margin:0 0 0.75rem; color:#6b6d73; font-size:0.8125rem; max-width:42rem;
   </table>
   </div>
 
-  <h2>Tambah orang</h2>
+  <h2>Undang orang</h2>
   <p class="why">Passwordnya dibuat orangnya sendiri lewat link undangan yang muncul
      setelah ini — jadi tidak ada password yang perlu kamu ketik, kirim, atau ingat.</p>
   <div class="card">
@@ -335,7 +435,7 @@ p.why { margin:0 0 0.75rem; color:#6b6d73; font-size:0.8125rem; max-width:42rem;
       <input type="hidden" name="csrf" value="<?= h($csrf) ?>">
       <input type="hidden" name="do" value="add">
       <div class="grid">
-        <div><label for="n">Nama</label><input id="n" name="name" required></div>
+        <div><label for="n">Nama</label><input id="n" name="name" type="text" required></div>
         <div><label for="e">Email</label><input id="e" name="email" type="email" required></div>
         <div><label for="tm">Tim</label><select id="tm" name="team">
           <?php foreach ($teams as $t): ?>
@@ -348,7 +448,33 @@ p.why { margin:0 0 0.75rem; color:#6b6d73; font-size:0.8125rem; max-width:42rem;
         <div><label for="j">Mulai lapor</label>
           <input id="j" name="joined" type="date" value="<?= h(Clock::today()) ?>"></div>
       </div>
-      <p style="margin:1rem 0 0"><button type="submit">Tambah</button></p>
+      <p style="margin:1rem 0 0"><button type="submit">Undang</button></p>
+    </form>
+
+    <p class="pisah">atau tempel seluruh timnya sekaligus</p>
+
+    <form method="post">
+      <input type="hidden" name="csrf" value="<?= h($csrf) ?>">
+      <input type="hidden" name="do" value="addmany">
+      <label for="daftar">Satu orang per baris</label>
+      <textarea id="daftar" name="daftar" rows="5"
+        placeholder="budi@contoh.com&#10;Sari Wijaya &lt;sari@contoh.com&gt;"></textarea>
+      <p class="why" style="margin:0.5rem 0 0.75rem">Alamat polos saja boleh — namanya
+         ditebak dari depan tanda @. Yang satu baris salah ketik dilaporkan sendiri;
+         yang lain tetap jadi.</p>
+      <div class="grid">
+        <div><label for="tm2">Tim</label><select id="tm2" name="team">
+          <?php foreach ($teams as $t): ?>
+            <option value="<?= (int) $t['id'] ?>"><?= h($t['name']) ?></option>
+          <?php endforeach; ?></select></div>
+        <div><label for="r2">Peran</label><select id="r2" name="role">
+          <?php foreach ($canGive as $k): ?>
+            <option value="<?= $k ?>"><?= h($roleNames[$k]) ?></option>
+          <?php endforeach; ?></select></div>
+        <div><label for="j2">Mulai lapor</label>
+          <input id="j2" name="joined" type="date" value="<?= h(Clock::today()) ?>"></div>
+      </div>
+      <p style="margin:1rem 0 0"><button type="submit">Undang semuanya</button></p>
     </form>
   </div>
 
@@ -382,6 +508,28 @@ p.why { margin:0 0 0.75rem; color:#6b6d73; font-size:0.8125rem; max-width:42rem;
       <button type="submit">Tambah tim</button>
     </form>
   </div>
-</main>
-</body>
-</html>
+<script>
+/* Link sekali pakai paling sering gagal bukan karena salah dibuat, tapi karena salah
+   diseleksi — satu karakter tertinggal, dan yang menerimanya melihat halaman "link tidak
+   berlaku" tanpa tahu kenapa. */
+document.addEventListener("click", function (ev) {
+  var b = ev.target.closest && ev.target.closest("[data-salin]");
+  if (!b) return;
+  var semula = b.textContent;
+  var sudah = function () {
+    b.textContent = "Tersalin \u2713";
+    setTimeout(function () { b.textContent = semula; }, 1800);
+  };
+  // Tanpa izin papan klip: linknya diseleksi, jadi Ctrl+C masih satu ketukan.
+  var gagal = function () {
+    var kotak = b.closest("tr") ? b.closest("tr").querySelector("code") : null;
+    if (!kotak) { b.textContent = "Salin sendiri linknya"; return; }
+    var r = document.createRange(); r.selectNodeContents(kotak);
+    var s = window.getSelection(); s.removeAllRanges(); s.addRange(r);
+  };
+  try { navigator.clipboard.writeText(b.dataset.salin).then(sudah, gagal); }
+  catch (e) { gagal(); }
+});
+</script>
+<?php
+page_foot();

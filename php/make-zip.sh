@@ -17,9 +17,20 @@ OUT="$(cd .. && pwd)/messi-cpanel.zip"
 STAGE="$(mktemp -d)"
 trap 'rm -rf "$STAGE"' EXIT
 
-for f in index.php login.php setup.php admin.php soal.php upgrade.php undang.php cek.php app.html install.sql \
+for f in index.php login.php lupa.php setup.php kelola.php admin.php soal.php upgrade.php \
+         undang.php cek.php app.html install.sql \
          config.example.php .htaccess README.md PASANG.txt api lib cron; do
   cp -r "$f" "$STAGE/"
+done
+
+# Daftar di atas ditulis tangan, jadi halaman baru mudah terlupa — dan yang terlupa baru
+# ketahuan setelah di-upload, sebagai 404 di tangan orang lain.
+for f in *.php; do
+  [ "$f" = "config.php" ] && continue
+  if [ ! -e "$STAGE/$f" ]; then
+    echo "BERHENTI: $f belum masuk daftar di make-zip.sh" >&2
+    exit 1
+  fi
 done
 
 # A config.php in the zip would ship a database password to whoever receives the file.

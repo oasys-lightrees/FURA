@@ -60,9 +60,9 @@ with Host("messi_live_test") as host, sync_playwright() as p:
     guest.fill("#password", "salah-sekali")
     guest.click("button[type=submit]")
     guest.wait_for_load_state("networkidle")
-    check("password salah ditolak", guest.inner_text(".err"), lambda s: "salah" in s)
+    check("password salah ditolak", guest.inner_text(".note.bad"), lambda s: "salah" in s)
     check("pesannya tidak membocorkan siapa yang punya akun di sini",
-          guest.inner_text(".err"), lambda s: "tidak terdaftar" not in s and "tidak ada" not in s)
+          guest.inner_text(".note.bad"), lambda s: "tidak terdaftar" not in s and "tidak ada" not in s)
 
     # The classic. If quoting were wrong anywhere in the login path, this is where it shows.
     guest.fill("#email", "nicho@example.test' OR '1'='1")
@@ -77,7 +77,17 @@ with Host("messi_live_test") as host, sync_playwright() as p:
     ctx = browser.new_context(viewport={"width": 400, "height": 900})
     pg = sign_in(ctx, base, "nicho@example.test", results=results)
     check("masuk ke aplikasi", pg.inner_text("h1"), "Berapa banyak hari ini?")
-    check("namanya terbaca dari database", pg.inner_text("body"), lambda s: "Nicho" in s)
+    # Namanya tidak lagi tercetak di kaki halaman: dia ada di menu di bawah avatar, satu
+    # ketukan — bersama emailnya, supaya di komputer bersama jelas laporan ini atas nama
+    # siapa.
+    pg.click("#avatar")
+    check("namanya terbaca dari database", pg.inner_text("#usheet"),
+          lambda s: "Nicho" in s)
+    check("beserta emailnya", pg.inner_text("#usheet"),
+          lambda s: "nicho@example.test" in s)
+    check("dan pintu ke halaman kelola tidak dibukakan untuk pelapor",
+          pg.inner_text("#usheet"), lambda s: "Kelola" not in s)
+    pg.keyboard.press("Escape")
     check("cookie sesinya tidak bisa dibaca JavaScript",
           pg.evaluate("document.cookie"), lambda c: "messi_session" not in c)
 

@@ -73,8 +73,20 @@ main { padding:22px 16px 132px; }
 .mods { display:grid; gap:12px; }
 .mod { width:100%; text-align:left; display:block; background:var(--surface); color:inherit;
        border:1px solid var(--line); border-radius:14px; padding:16px; font:inherit; }
-button.mod { cursor:pointer; }
-button.mod:hover { border-color:var(--ink); }
+.mod.live:hover { border-color:var(--ink); }
+/* Badan kartu satu tombol, kakinya tombol-tombol lain, dan yang membungkus keduanya
+   cuma sebuah div. Dulu seluruh kartunya satu tombol, jadi "Apa ini?" dan "lihat rekap
+   tim" tidak punya tempat di dalamnya — tombol di dalam tombol bukan HTML yang sah,
+   dan kliknya saling menelan. */
+.modgo { display:block; width:100%; text-align:left; padding:0; border:0; background:none;
+         color:inherit; font:inherit; cursor:pointer; }
+.modfoot { display:flex; flex-wrap:wrap; gap:8px; align-items:center; margin-top:12px;
+           padding-top:11px; border-top:1px solid var(--line); }
+.modfoot button { font:inherit; font-size:12.5px; padding:4px 10px; border-radius:999px;
+                  cursor:pointer; background:none; color:var(--muted);
+                  border:1px solid var(--line); }
+.modfoot button:hover { color:var(--ink); border-color:var(--ink); }
+.modfoot .teamgo { margin-left:auto; }
 .mod .head { display:flex; align-items:baseline; gap:9px; }
 .mod .name { font-weight:700; letter-spacing:.1em; font-size:15px; }
 .mod .full { color:var(--muted); font-size:12.5px; }
@@ -102,6 +114,21 @@ button.mod:hover { border-color:var(--ink); }
 .theme:hover { color:var(--ink); border-color:var(--ink); }
 .avatar { width:30px; height:30px; border-radius:50%; background:var(--ink); color:var(--paper);
           display:grid; place-items:center; font-size:12px; font-weight:700; flex:none; }
+/* <details> supaya papan tombol dan pembaca layar dapat perilaku menunya gratis. */
+.umenu { position:relative; flex:none; }
+.umenu summary { list-style:none; cursor:pointer; }
+.umenu summary::-webkit-details-marker { display:none; }
+.umenu.flat summary { cursor:default; pointer-events:none; }   /* tanpa server: lencana saja */
+.umenu .sheet { position:absolute; right:0; top:38px; z-index:40; min-width:200px;
+                background:var(--surface); border:1px solid var(--line); border-radius:12px;
+                padding:6px; box-shadow:0 8px 24px rgba(0,0,0,.14); }
+.umenu .sheet b { display:block; padding:8px 10px 2px; font-size:13px; }
+.umenu .sheet small { display:block; padding:0 10px 8px; color:var(--muted); font-size:12px;
+                      word-break:break-all; }
+.umenu .sheet hr { border:0; border-top:1px solid var(--line); margin:6px 0; }
+.umenu .sheet a { display:block; padding:7px 10px; border-radius:8px; color:inherit;
+                  text-decoration:none; font-size:14px; }
+.umenu .sheet a:hover { background:var(--raise); }
 
 /* progress */
 .prog { display:flex; gap:6px; margin-bottom:20px; }
@@ -292,7 +319,10 @@ h2 { font-size:11.5px; font-weight:700; letter-spacing:.09em; text-transform:upp
   </button>
   <span class="when" id="whenLbl">—</span>
   <button class="theme" id="theme" type="button" aria-label="Ganti terang/gelap"></button>
-  <span class="avatar" id="avatar">·</span>
+  <details class="umenu" id="umenu">
+    <summary class="avatar" id="avatar">·</summary>
+    <div class="sheet" id="usheet"></div>
+  </details>
 </div></div>
 <div class="modbar" id="modbar" hidden><div class="modbar-in" id="modbarIn"></div></div></div>
 <nav class="tabs" id="tabs" role="tablist" hidden></nav>
@@ -384,6 +414,12 @@ const CFG = cfgOf(window.FURA_CONFIG);
 const TEAMS = (Array.isArray(window.FURA_TEAMS) ? window.FURA_TEAMS : [])
   .filter(t => t && t.id).map(t => ({ id: +t.id, name: String(t.name || "Tim") }));
 const MY_TEAM = Number.isFinite(+window.FURA_TEAM) ? +window.FURA_TEAM : null;
+/* Halaman di luar aplikasi ini — kelola, keluar. Dikirim server; di versi artifact
+   kosong, dan avatar-nya tetap sekadar lencana seperti sebelumnya. */
+const MENU = (Array.isArray(window.FURA_MENU) ? window.FURA_MENU : [])
+  .filter(m => m && m.label && m.href)
+  .map(m => ({ label: String(m.label), href: String(m.href) }));
+const WHO = window.FURA_WHO && typeof window.FURA_WHO === "object" ? window.FURA_WHO : {};
 const Q = CFG.questions;
 const CHANNELS = CFG.channels, DECLARATION = CFG.declaration;
 const OPEN_AT = CFG.open_hour, DUE_AT = CFG.due_hour, MAX_PLANS = CFG.max_plans;
@@ -520,6 +556,21 @@ const AT = "fura.at";
 const atStore = fn => { try { return fn(sessionStorage); } catch { return null; } };
 function openModule(mod) {
   S.view = mod; S.intro = !seenIntro(mod); S.error = null;
+  atStore(ss => ss.setItem(AT, mod));
+  render(); toTop();
+}
+/* "Apa ini?" dari katalog: penjelasannya terbuka tanpa harus masuk dulu, dan tidak
+   ditandai sudah dibaca — orangnya sedang menimbang, bukan sedang mulai. */
+function openIntro(mod) {
+  S.view = mod; S.intro = true; S.error = null;
+  atStore(ss => ss.setItem(AT, mod));
+  render(); toTop();
+}
+/* Rekap tim, satu ketukan dari katalog. Dulu tiga — katalog, modul, tab Tim — tiap hari,
+   untuk layar yang leader buka tiap hari. */
+function openTeam(mod) {
+  S.view = mod; S.intro = false; S.error = null;
+  S.tab = "tim"; S.day = null; S.openRow = null;
   atStore(ss => ss.setItem(AT, mod));
   render(); toTop();
 }
@@ -885,25 +936,32 @@ function screenCatalog() {
       const c = S.cycles.get(key(u, day)); return c && c.submittedAt;
     }).length;
     const label = only === null ? "Tim" : esc(teamName(only));
-    return `<div class="state"><i></i>${label}: ${done}/${people.length} sudah lapor</div>`;
+    return `${label}: ${done}/${people.length} sudah lapor`;
   };
 
   return `<h1>Modul</h1>
-    <p class="sub">Pilih yang mau kamu kerjakan.</p>
+    <p class="sub">FURA menanyakan hal yang sama tiap hari kerja, supaya tidak ada yang
+      hilang tanpa ada yang tahu. Pilih yang mau kamu kerjakan.</p>
     <div class="mods">
       ${MODULES.map(m => {
         if (!m.live) return `<div class="mod soon">
           <div class="head"><span class="name">${esc(m.name)}</span>
             <span class="full">${esc(m.full)}</span><span class="pill">segera</span></div>
           <p>${esc(m.what)}</p></div>`;
-        const st = state();
-        return `<button class="mod" type="button" data-mod="${esc(m.key)}">
-          <div class="head"><span class="name">${esc(m.name)}</span>
-            <span class="full">${esc(m.full)}</span><span class="pill">aktif</span></div>
-          <p>${esc(m.what)}</p>
-          <div class="state ${st.cls}"><i></i>${esc(st.text)}</div>
-          ${leader()}
-        </button>`;
+        const st = state(), tim = leader();
+        return `<div class="mod live" data-card="${esc(m.key)}">
+          <button class="modgo" type="button" data-mod="${esc(m.key)}">
+            <div class="head"><span class="name">${esc(m.name)}</span>
+              <span class="full">${esc(m.full)}</span><span class="pill">aktif</span></div>
+            <p>${esc(m.what)}</p>
+            <div class="state ${st.cls}"><i></i>${esc(st.text)}</div>
+          </button>
+          <div class="modfoot">
+            <button type="button" data-intro="${esc(m.key)}">Apa ini?</button>
+            ${tim ? `<button class="teamgo" type="button"
+              data-rekap="${esc(m.key)}">${tim} &rsaquo;</button>` : ""}
+          </div>
+        </div>`;
       }).join("")}
     </div>`;
 }
@@ -1111,11 +1169,33 @@ function renderBar() {
   }
 }
 
+/* Pintu ke halaman di luar aplikasi ini.
+   Dulu pintu itu ada di footer — tempat orang mencari hal yang paling tidak penting,
+   padahal yang paling dibutuhkan owner di hari pertama ada di sana. Digambar sekali:
+   isinya tidak berubah sepanjang sesi, dan menggambar ulang menu yang sedang terbuka
+   akan melempar fokus orangnya keluar. */
+let menuDrawn = false;
+function paintMenu() {
+  const box = el("umenu"), sheet = el("usheet");
+  if (!box || menuDrawn) return;
+  // Digambar sekali, jadi sekalinya itu harus setelah namanya diketahui. render() yang
+  // pertama berjalan sebelum boot() selesai, dan menggambar di situ berarti menunya
+  // selamanya berbunyi "Kamu".
+  if (!S.name && !S.ready) return;
+  box.classList.toggle("flat", MENU.length === 0);
+  if (!MENU.length) { menuDrawn = true; return; }   // tanpa server: lencana saja
+  sheet.innerHTML = `<b>${esc(S.name || "Kamu")}</b>`
+    + (WHO.email ? `<small>${esc(WHO.email)}</small>` : "")
+    + `<hr>` + MENU.map(m => `<a href="${esc(m.href)}">${esc(m.label)}</a>`).join("");
+  menuDrawn = true;
+}
+
 function render() {
   el("whenLbl").textContent = S.ready ? `${fmt(today())} · ${nowHM()}` : "…";
   const av = el("avatar");
   av.textContent = (S.name || "?").trim().charAt(0).toUpperCase() || "?";
   av.title = S.name || "";
+  paintMenu();
   if (!S.ready) { view.innerHTML = `<div class="blank">Sebentar…</div>`; return; }
 
   const inModule = S.view !== "catalog";
@@ -1222,6 +1302,16 @@ el("modbar").addEventListener("click", ev => {
   if (ev.target.id === "what") { S.intro = true; render(); toTop(); }
 });
 
+// Menu yang cuma bisa ditutup dengan tombolnya sendiri terasa macet.
+document.addEventListener("click", ev => {
+  const box = el("umenu");
+  if (box && box.open && !box.contains(ev.target)) box.open = false;
+});
+document.addEventListener("keydown", ev => {
+  const box = el("umenu");
+  if (ev.key === "Escape" && box && box.open) box.open = false;
+});
+
 el("tabs").addEventListener("click", ev => {
   const b = ev.target.closest("[data-tab]");
   if (!b) return;
@@ -1240,6 +1330,15 @@ view.addEventListener("click", ev => {
 // Selecting on focus means tapping a cell and typing replaces the number, instead of
 // dropping the caret mid-digit and turning 13 into 173.
 view.addEventListener("click", ev => {
+  // Tiga jalan masuk dari satu kartu. Yang membungkusnya memakai data-card, bukan
+  // data-mod, jadi menekan tombol di kakinya tidak ikut terbaca sebagai menekan
+  // kartunya — urutan pemeriksaan di sini tidak menanggung apa pun.
+  const ask = ev.target.closest && ev.target.closest("[data-intro]");
+  if (ask) { openIntro(ask.dataset.intro); return; }
+  // data-rekap, bukan data-team: pemilih tim di dalam rekap sudah memakai data-team,
+  // dan dua arti untuk satu nama berarti menekan "HR" di rekap membuka modul bernama "2".
+  const tim = ev.target.closest && ev.target.closest("[data-rekap]");
+  if (tim) { openTeam(tim.dataset.rekap); return; }
   const card = ev.target.closest && ev.target.closest("[data-mod]");
   if (card) { openModule(card.dataset.mod); return; }
   if (ev.target && ev.target.id === "introGo") {

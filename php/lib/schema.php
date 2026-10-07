@@ -143,6 +143,15 @@ function schema_steps(): array
             },
         ],
         [
+            'id'   => 'users.reset_asked_at',
+            'why'  => 'Mencatat siapa yang bilang lupa passwordnya, supaya permintaannya '
+                    . 'muncul di halaman Orang & tim. Tanpa ini, orang yang lupa tidak '
+                    . 'punya satu pun jalan pulang selain menelepon seseorang.',
+            'todo' => fn() => !schema_has_column('users', 'reset_asked_at'),
+            'run'  => fn() => db()->exec('ALTER TABLE users ADD COLUMN reset_asked_at
+                                  DATETIME DEFAULT NULL AFTER accepted_at'),
+        ],
+        [
             'id'   => 'login_tokens.kind',
             'why'  => 'Membedakan link masuk dari undangan. Link yang sudah ada tetap '
                     . 'berlaku sebagai link masuk.',

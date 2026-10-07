@@ -1,8 +1,8 @@
-# MESSI di cPanel
+# FURA di cPanel
 
 Versi PHP + MySQL dari aplikasi di `web/`. Halamannya **sama persis** — `app.html`
-adalah salinan `web/messi.html` tanpa satu baris pun diubah, jadi 236 pemeriksaan browser
-di `web/tests/` tetap menggambarkan apa yang dipakai squad. Yang ditulis ulang cuma
+adalah salinan `web/messi.html` tanpa satu baris pun diubah, jadi 245 pemeriksaan browser
+di `web/tests/` tetap menggambarkan apa yang dipakai tim. Yang ditulis ulang cuma
 bagian belakangnya: dulu data disimpan platform artifact, sekarang MySQL.
 
 ## Kenapa PHP
@@ -42,7 +42,7 @@ kurang, tiap halaman menampilkan penjelasan dan cara menggantinya
    berawalan nama akun cPanel, misalnya `lightree_messi`.
 
 2. **Buat tabelnya.** cPanel → *phpMyAdmin* → pilih database → tab *Import* → pilih
-   `install.sql` → *Go*. Harus muncul enam tabel.
+   `install.sql` → *Go*. Harus muncul sembilan tabel.
 
 3. **Upload.** cPanel → *File Manager* → masuk ke `public_html` → buat folder `messi` →
    upload seluruh isi folder `php/` ke situ.
@@ -54,9 +54,11 @@ kurang, tiap halaman menampilkan penjelasan dan cara menggantinya
    Lebih aman lagi: simpan `config.php` di luar `public_html`, lalu beri tahu aplikasi
    di mana file itu lewat variabel `MESSI_CONFIG_FILE`.
 
-5. **Buat akun admin pertama.** Buka `https://alamat-kamu/messi/setup.php`, isi nama,
-   email dan password. Halaman itu menolak jalan begitu sudah ada akun — tapi lebih
-   rapi kalau langsung dihapus.
+5. **Buat akun pemilik.** Buka `https://alamat-kamu/messi/setup.php`, isi nama, email
+   dan password. Setelah jadi kamu langsung masuk dan mendarat di `kelola.php`, yang
+   menuntun tiga langkah penyiapan — pertanyaan, Google Chat, undang orang — lalu
+   berhenti menuntun begitu ketiganya beres. Halaman setup menolak jalan begitu sudah
+   ada akun, tapi lebih rapi kalau langsung dihapus.
 
 6. **Pasang cron.** cPanel → *Cron Jobs* → *Once Per Hour*:
 
@@ -67,18 +69,24 @@ kurang, tiap halaman menampilkan penjelasan dan cara menggantinya
    Ganti `AKUN` dengan nama akun cPanel. Kalau hosting hanya menyediakan cron lewat URL,
    pakai `https://alamat-kamu/messi/cron/tick.php?key=CRON_KEY`.
 
-7. **Tambah orang.** Masuk sebagai admin → menu *Squad* → *Tambah orang*. Tanggal
-   *Mulai lapor* menentukan sejak kapan seseorang dihitung — orang baru tidak akan
-   pernah ditandai bolos untuk hari sebelum dia bergabung.
+7. **Undang orang.** Masuk sebagai admin → menu avatar di kanan atas → *Kelola* →
+   *Orang & tim*. Satu orang lewat formulirnya, atau seluruh tim sekaligus lewat kotak
+   tempelan (satu baris satu orang, `Nama <email>` atau alamat polos). Yang keluar link
+   undangan, bukan password. Tanggal *Mulai lapor* menentukan sejak kapan seseorang
+   dihitung — orang baru tidak akan pernah ditandai bolos untuk hari sebelum dia
+   bergabung.
 
 ## Google Chat (boleh dilewati)
 
 Tanpa ini aplikasinya tetap jalan; bedanya orang harus ingat sendiri membuka
 halamannya. Dengan ini, space squad dapat tiga pesan tiap hari kerja.
 
-1. Buka space squad → klik nama space → *Apps & integrations* → *Webhooks* →
-   *Add webhooks* → beri nama → salin URL-nya ke `chat_webhook` di `config.php`.
-2. Buka `cek.php` → *Kirim pesan uji* → pesannya harus muncul di space.
+1. Buka space tim → klik nama space → *Apps & integrations* → *Webhooks* →
+   *Add webhooks* → beri nama → salin URL-nya.
+2. Tempel di *Kelola → Pertanyaan → Space Google Chat tim ini* (atau ke `chat_webhook`
+   di `config.php` kalau cuma ada satu tim), lalu klik **Simpan lalu kirim pesan tes**.
+   Alamat yang salah tempel dikatakan gagal seketika — bukan besok jam buka, lewat
+   keluhan "botnya mati".
 
 Hanya dua pesan, dan keduanya cuma mengantar orang ke website. **Rekap tidak dikirim
 ke chat.** Atasan membacanya di tab *Squad*, yang bisa membuka hari mana saja dan
@@ -88,8 +96,12 @@ membuka laporan utuh siapa pun — dua hal yang tidak bisa dilakukan sebuah pesa
 membentuk semuanya: pesan pagi membawa alamat biasa, bukan link sekali-pakai yang
 langsung memasukkan — di space bersama, link seperti itu memasukkan *siapa pun yang
 bisa membaca space itu*. Orang login dengan password, dan sesinya 30 hari, jadi
-praktis sebulan sekali. Untuk yang terkunci, halaman Squad punya tombol *Link masuk*
-yang menghasilkan link 60 menit sekali-pakai, untuk dikirim japri.
+praktis sebulan sekali. Untuk yang terkunci, *Orang & tim* punya tombol *Link masuk*
+yang menghasilkan link 60 menit sekali-pakai, untuk dikirim japri. Dan orangnya sendiri
+bisa menitipkan pesan lewat *Lupa password?* di halaman masuk: permintaannya muncul di
+atas halaman itu dengan namanya. Tidak ada email yang dikirim sistem ini — kalimat di
+halaman itu mengatakannya terus terang, karena email yang dijanjikan lalu tidak datang
+lebih buruk daripada tidak dijanjikan.
 
 WhatsApp tetap tidak ada: WhatsApp pribadi tidak punya API resmi, dan library yang
 mengaku punya berisiko nomor perusahaan sendiri diblokir. Lihat `docs/09-integrations.md`.
@@ -113,10 +125,12 @@ ada jawabannya. URL webhook-nya membawa kunci sendiri, jadi tidak pernah ikut te
 ```
 index.php          halaman aplikasi + jembatan ke API
 app.html           salinan persis web/messi.html
-login.php          masuk: password, atau link sekali pakai dari bot
-setup.php          akun admin pertama (hapus setelah dipakai)
+login.php          masuk: password, atau link sekali pakai dari admin
+lupa.php           "saya lupa" — menitipkan pesan, karena belum ada pengiriman email
+setup.php          akun pemilik pertama (hapus setelah dipakai)
+kelola.php         satu pintu untuk yang mengelola, plus tuntunan penyiapan
 cek.php            apakah hosting ini sanggup, dan apa yang masih kurang
-admin.php          daftar squad: tambah orang, ganti password, link masuk
+admin.php          orang & tim: undang satu atau sekaligus, peran, link masuk
 api/data.php       ambil semua data
 api/save.php       simpan satu dokumen
 api/logout.php     keluar
@@ -128,14 +142,15 @@ lib/auth.php       siapa yang sedang bertanya
 lib/repo.php       baca/tulis, dengan pemeriksaan yang tidak bisa dilewati browser
 lib/chat.php       Google Chat
 lib/require-php8.php  penjaga versi PHP, dibaca paling awal
+lib/layout.php     satu kerangka halaman: satu CSS, satu kepala, satu mode gelap
 soal.php           halaman admin: pertanyaan, ambang, jam, channel — per tim
 upgrade.php        menyusulkan database lama ke bentuk versi ini
 undang.php         yang diundang membuat passwordnya sendiri
 lib/schema.php     langkah pemutakhiran, tiap langkah memeriksa dirinya sendiri
-install.sql        tujuh tabel
+install.sql        sembilan tabel
 PASANG.txt         langkah pemasangan, bahasa non-teknis
 make-zip.sh        bikin messi-cpanel.zip
-tests/             502 pemeriksaan (tidak ikut ke server)
+tests/             530 pemeriksaan (tidak ikut ke server)
 ```
 
 ## Yang diputuskan server, bukan browser
@@ -196,8 +211,8 @@ menyebutkan mana yang barusan terjadi.
 | `tests/test_engine.php` | 99 — aturan, dicocokkan dengan `tests/test_core.py` |
 | `tests/test_repo.php` | 111 — terhadap MySQL sungguhan, di database yang dia buat sendiri |
 | `tests/test_cron.php` | 66 — seminggu penuh jam demi jam, jam dibekukan, pesan bot ditangkap |
-| `tests/test_live.py` | 62 — browser terhadap aplikasi yang benar-benar jalan |
-| `tests/test_admin.py` | 98 — pemasangan pertama, tambah orang, ganti password, link sekali pakai, mengubah pertanyaan |
+| `tests/test_live.py` | 64 — browser terhadap aplikasi yang benar-benar jalan |
+| `tests/test_admin.py` | 124 — pemasangan pertama, undangan satu dan borongan, lupa password, link sekali pakai, mengubah pertanyaan, uji kirim webhook |
 | `tests/test_schema.php` | 42 — pemasangan lama di-upgrade, lalu dibandingkan kolom demi kolom dengan yang baru |
 | `tests/test_upgrade_path.py` | 24 — aplikasi sungguhan di atas database versi lama: masih bisa masuk, setiap halaman lain menyebut apa yang kurang, lalu satu tombol menghidupkannya |
 | `tests/check_sync.php` | memastikan `app.html` belum menyimpang dari `web/messi.html` |

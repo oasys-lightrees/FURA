@@ -1,6 +1,6 @@
 <?php
 /**
- * Apakah hosting ini sanggup menjalankan MESSI, dan apa yang masih kurang.
+ * Apakah hosting ini sanggup menjalankan FURA, dan apa yang masih kurang.
  *
  * Built because guessing whether a shared host can run this is slower than asking it.
  * Three things vary between hosts and all three fail quietly: the PHP version, whether
@@ -218,7 +218,7 @@ if ($installed) {
 
 if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST' && isset($_POST['uji']) && $hasConfig) {
     require_once __DIR__ . '/lib/chat.php';
-    $sent = chat_send('Tes dari MESSI. Kalau pesan ini kelihatan, webhook-nya sudah benar.');
+    $sent = chat_send('Tes dari FURA. Kalau pesan ini kelihatan, webhook-nya sudah benar.');
     array_unshift($rows, [
         'state' => $sent ? 'ok' : 'bad',
         'what'  => 'Pesan uji',
@@ -236,54 +236,37 @@ $phps = array_values(array_filter([
     '/opt/cpanel/ea-php82/root/usr/bin/php', '/opt/cpanel/ea-php81/root/usr/bin/php',
 ], 'is_file'));
 
-header('Content-Type: text/html; charset=utf-8');
-header('Cache-Control: no-store');
 $e = fn($t) => htmlspecialchars((string) $t, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
+require_once __DIR__ . '/lib/layout.php';
+page_head('Cek sistem', ['me' => $me ?? null, 'css' => <<<'CSS'
+.verdict { padding:1rem 1.25rem; border-radius:0.75rem; margin:0 0 1.5rem; font-weight:600 }
+.verdict.ok { background:var(--kept-bg); color:var(--kept) }
+.verdict.warn { background:var(--due-bg); color:var(--due) }
+.verdict.bad { background:var(--broken-bg); color:var(--broken) }
+.card { padding:0; overflow:hidden }
+.item { display:flex; gap:0.875rem; padding:0.875rem 1.125rem; border-top:1px solid var(--line) }
+.item:first-child { border-top:0 }
+.dot { flex:0 0 auto; width:1.375rem; height:1.375rem; border-radius:50%; margin-top:0.125rem;
+       display:grid; place-items:center; font-size:0.8125rem; font-weight:700; color:#fff }
+.ok .dot { background:var(--kept) } .warn .dot { background:var(--due) }
+.bad .dot { background:var(--broken) }
+.what { font-weight:600 }
+.found { color:var(--muted); font-size:0.875rem; word-break:break-word }
+.fix { font-size:0.875rem; margin:0.375rem 0 0 }
+pre { background:var(--ink); color:var(--paper); padding:1rem 1.125rem; border-radius:0.75rem;
+      overflow-x:auto; font:400 0.8125rem/1.6 var(--mono) }
+CSS]);
 ?>
-<!doctype html>
-<html lang="id">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Cek hosting · MESSI</title>
-<style>
-* { box-sizing:border-box; }
-body { margin:0; background:#f5f3ef; color:#1a1c1f; padding:2.5rem 1.25rem 4rem;
-       font:400 15px/1.6 system-ui,-apple-system,sans-serif; }
-main { max-width:44rem; margin:0 auto; }
-h1 { font-size:1.375rem; margin:0 0 .25rem; letter-spacing:-.01em; }
-p.sub { margin:0 0 1.75rem; color:#6b6d73; font-size:14px; }
-.verdict { padding:1rem 1.25rem; border-radius:.75rem; margin:0 0 1.5rem; font-weight:600; }
-.verdict.ok { background:#e8f0eb; color:#2f6248; }
-.verdict.warn { background:#f7eedd; color:#9a6410; }
-.verdict.bad { background:#f7e7e4; color:#97322a; }
-.card { background:#fff; border:1px solid #e4e1db; border-radius:.75rem; overflow:hidden; }
-.item { display:flex; gap:.875rem; padding:.875rem 1.125rem; border-top:1px solid #efece7; }
-.item:first-child { border-top:0; }
-.dot { flex:0 0 auto; width:1.375rem; height:1.375rem; border-radius:50%; margin-top:.125rem;
-       display:grid; place-items:center; font-size:13px; font-weight:700; color:#fff; }
-.ok .dot { background:#2f6248; } .warn .dot { background:#9a6410; } .bad .dot { background:#97322a; }
-.what { font-weight:600; }
-.found { color:#6b6d73; font-size:14px; word-break:break-word; }
-.fix { font-size:14px; margin:.375rem 0 0; }
-code { font:500 13.5px ui-monospace,monospace; background:#f0ede8; padding:.1rem .35rem; border-radius:.25rem; }
-h2 { font-size:1rem; margin:2rem 0 .75rem; }
-pre { background:#1a1c1f; color:#f5f3ef; padding:1rem 1.125rem; border-radius:.75rem;
-      overflow-x:auto; font:400 13px/1.6 ui-monospace,monospace; }
-a { color:#1a1c1f; }
-</style>
-</head>
-<body>
-<main>
-  <h1>Cek hosting</h1>
-  <p class="sub">Apakah tempat ini sanggup menjalankan MESSI, dan apa yang masih kurang.</p>
+  <h1>Cek sistem</h1>
+  <p class="sub"><?php if (isset($me) && $me): ?><a href="kelola.php">‹ Kelola</a> · <?php endif; ?>
+     Apakah tempat ini sanggup menjalankan FURA, dan apa yang masih kurang.</p>
 
   <?php if ($fatal): ?>
     <p class="verdict bad">Belum bisa jalan — ada <?= $fatal ?> hal yang harus dibereskan dulu.</p>
   <?php elseif ($warn): ?>
     <p class="verdict warn">Bisa jalan. <?= $warn ?> hal sebaiknya dibereskan, tapi tidak menghalangi.</p>
   <?php else: ?>
-    <p class="verdict ok">Semua beres. Hosting ini sanggup menjalankan MESSI.</p>
+    <p class="verdict ok">Semua beres. Hosting ini sanggup menjalankan FURA.</p>
   <?php endif; ?>
 
   <div class="card">
@@ -302,9 +285,7 @@ a { color:#1a1c1f; }
   <?php if ($hasConfig && trim((string) cfg('chat_webhook')) !== ''): ?>
   <h2>Uji kirim ke Google Chat</h2>
   <form method="post" style="margin:0 0 .5rem">
-    <button type="submit" name="uji" value="1" style="padding:.625rem 1rem;font:inherit;
-      font-weight:600;color:#fff;background:#1a1c1f;border:0;border-radius:.5rem;cursor:pointer">
-      Kirim pesan uji</button>
+    <button type="submit" name="uji" value="1">Kirim pesan uji</button>
   </form>
   <p class="sub" style="margin:0 0 1rem">Satu pesan pendek akan muncul di space squad.</p>
   <?php endif; ?>
@@ -319,6 +300,5 @@ a { color:#1a1c1f; }
   <p class="sub">Halaman ini aman dihapus setelah pemasangan selesai. Kalau dibiarkan, dia
      minta login admin begitu akun pertama sudah dibuat.</p>
   <p><a href="index.php">&larr; ke aplikasi</a></p>
-</main>
-</body>
-</html>
+<?php
+page_foot();

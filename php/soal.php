@@ -19,6 +19,7 @@ require __DIR__ . '/lib/require-php8.php';
 
 require_once __DIR__ . '/lib/auth.php';
 require_once __DIR__ . '/lib/repo.php';
+require_once __DIR__ . '/lib/layout.php';
 
 messi_require_current();
 
@@ -77,6 +78,21 @@ if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST' && !$noTable) {
     }
 }
 
+/* -------------------------------------------------------------- pesan tes */
+
+// Webhook yang salah tempel tidak memberi tanda apa pun sampai besok jam buka, dan yang
+// terlihat besok cuma "botnya mati". Satu tombol di sini memindahkan kabar buruk itu ke
+// detik ini, ke orang yang masih memegang alamatnya dan masih ingat dari mana dia
+// menyalinnya.
+$uji = null;
+if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST' && isset($_POST['uji'])) {
+    require_once __DIR__ . '/lib/chat.php';
+    $now = repo_config($teamId);          // sesudah disimpan, bukan sebelumnya
+    $nama = $now['team_name'] !== '' ? $now['team_name'] : ($teams[$teamId]['name'] ?? 'tim ini');
+    $uji = chat_send('Tes dari FURA. Kalau pesan ini kelihatan, pengingat harian untuk '
+                     . $nama . ' akan sampai ke space ini.', 15, $now['chat_webhook']);
+}
+
 $cfg = repo_config($teamId);
 $q = $cfg['questions'];
 $csrf = csrf_token();
@@ -94,64 +110,28 @@ $hours = function (string $name, int $now, int $from, int $to): string {
     return '<select name="' . h($name) . '">' . $out . '</select>';
 };
 
-header('Content-Type: text/html; charset=utf-8');
-header('Cache-Control: no-store');
-?>
-<!doctype html>
-<html lang="id">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Pertanyaan · FURA</title>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Public+Sans:wght@400;500;600;700&display=swap">
-<style>
-* { box-sizing:border-box; }
-body { margin:0; background:#f5f3ef; color:#1a1c1f; padding:2rem 1.25rem 4rem;
-       font:400 0.9375rem/1.55 "Public Sans", system-ui, sans-serif; }
-main { max-width:52rem; margin:0 auto; }
-h1 { font-size:1.375rem; margin:0 0 0.25rem; letter-spacing:-0.01em; }
-p.sub { margin:0 0 1.75rem; color:#6b6d73; font-size:0.875rem; }
-h2 { font-size:1rem; margin:2rem 0 0.5rem; }
-p.why { margin:0 0 0.75rem; color:#6b6d73; font-size:0.8125rem; max-width:42rem; }
-.card { background:#fff; border:1px solid #e4e1db; border-radius:0.75rem; padding:1.25rem; }
-label { display:block; font-size:0.75rem; font-weight:500; margin:0 0 0.25rem; color:#6b6d73; }
-input[type=text], textarea, select {
-  width:100%; padding:0.4375rem 0.5rem; font:inherit; font-size:0.875rem; background:#faf9f6;
-  border:1px solid #d9d5ce; border-radius:0.375rem; }
-textarea { min-height:3.25rem; resize:vertical; }
-select { width:auto; }
-.grid { display:grid; grid-template-columns:repeat(auto-fit, minmax(11rem, 1fr)); gap:0.75rem; }
-.chrow { display:grid; grid-template-columns:6rem 1fr 1.4fr; gap:0.5rem; margin:0 0 0.5rem; }
-.fields { display:grid; gap:0.625rem; }
-.qblock { border-top:1px solid #efece7; padding:0.875rem 0 0; margin:0.875rem 0 0; }
-.qblock:first-child { border-top:0; padding-top:0; margin-top:0; }
-.qname { font-weight:600; font-size:0.875rem; margin:0 0 0.5rem; }
-.qname span { font-weight:400; color:#6b6d73; font-size:0.8125rem; }
-button { padding:0.5rem 0.875rem; font:inherit; font-size:0.875rem; font-weight:500;
-         cursor:pointer; background:#1a1c1f; color:#fff; border:0; border-radius:0.375rem; }
-button.quiet { background:#faf9f6; color:#1a1c1f; border:1px solid #d9d5ce; }
-button[disabled] { opacity:0.45; cursor:not-allowed; }
-.note code { background:#f0ede8; padding:0.0625rem 0.3125rem; border-radius:0.25rem; }
-.note { padding:0.625rem 0.75rem; border-radius:0.5rem; margin:0 0 1rem; font-size:0.875rem; }
-.ok { background:#e8f0eb; color:#2f6248; }
-.warn { background:#f7eedd; color:#9a6410; }
-.check { display:flex; gap:0.5rem; align-items:flex-start; font-size:0.875rem; color:#1a1c1f; }
-.check input { margin-top:0.2rem; }
-.prev { background:#faf9f6; border:1px dashed #d9d5ce; border-radius:0.5rem; padding:0.75rem;
-        font-size:0.8125rem; color:#6b6d73; }
-.prev b { color:#1a1c1f; font-weight:600; }
+page_head('Pertanyaan', ['me' => $me, 'wide' => true, 'css' => <<<'CSS'
+select { width:auto }
+.chrow { display:grid; grid-template-columns:6rem 1fr 1.4fr; gap:0.5rem; margin:0 0 0.5rem }
+.fields { display:grid; gap:0.625rem }
+.qblock { border-top:1px solid var(--line); padding:0.875rem 0 0; margin:0.875rem 0 0 }
+.qblock:first-child { border-top:0; padding-top:0; margin-top:0 }
+.qname { font-weight:600; font-size:0.875rem; margin:0 0 0.5rem }
+.qname span { font-weight:400; color:var(--muted); font-size:0.8125rem }
+.check { display:flex; gap:0.5rem; align-items:flex-start; font-size:0.875rem; color:var(--ink) }
+.check input { margin-top:0.2rem }
+.prev { background:var(--raise); border:1px dashed var(--line); border-radius:0.5rem;
+        padding:0.75rem; font-size:0.8125rem; color:var(--muted) }
+.prev b { color:var(--ink); font-weight:600 }
 /* Sengaja tidak menempel di dasar layar: formulirnya panjang, dan batang yang menempel
    menutupi baris yang sedang dibaca orangnya. Menyimpan dilakukan sekali di akhir. */
-.bar { padding:1.25rem 0 0; margin-top:1.5rem; border-top:1px solid #e4e1db;
-       display:flex; gap:0.75rem; align-items:center; flex-wrap:wrap; }
-.bar span { color:#6b6d73; font-size:0.8125rem; }
-a { color:#1a1c1f; }
-</style>
-</head>
-<body>
-<main>
+.bar { padding:1.25rem 0 0; margin-top:1.5rem; border-top:1px solid var(--line);
+       display:flex; gap:0.75rem; align-items:center; flex-wrap:wrap }
+.bar span { color:var(--muted); font-size:0.8125rem }
+CSS]);
+?>
   <h1>Pertanyaan MESSI</h1>
-  <p class="sub"><a href="index.php">← kembali ke laporan</a> · <a href="admin.php">Orang &amp; tim</a></p>
+  <p class="sub"><a href="kelola.php">‹ Kelola</a> · <a href="admin.php">Orang &amp; tim</a></p>
 
   <?php if (count($teams) > 1): ?>
     <p class="why" style="margin:0 0 0.5rem">Pertanyaan milik tim. Yang di bawah ini
@@ -159,12 +139,21 @@ a { color:#1a1c1f; }
     <p style="margin:0 0 1.5rem">
       <?php foreach ($teams as $t): ?>
         <a href="?team=<?= (int) $t['id'] ?>" style="margin-right:0.75rem;<?=
-           $t['id'] === $teamId ? 'font-weight:600' : 'color:#6b6d73' ?>"><?= h($t['name']) ?></a>
+           $t['id'] === $teamId ? 'font-weight:600' : 'color:var(--muted)' ?>"><?= h($t['name']) ?></a>
       <?php endforeach; ?>
     </p>
   <?php endif; ?>
 
   <?php if ($notice): ?><p class="note ok"><?= h($notice) ?></p><?php endif; ?>
+  <?php if ($uji === true): ?>
+    <p class="note ok"><strong>Pesan tes terkirim.</strong> Kalau sudah kelihatan di
+       space-nya, pengingat harian juga akan sampai ke sana.</p>
+  <?php elseif ($uji === false): ?>
+    <p class="note bad"><strong>Pesan tes gagal terkirim.</strong> Alamatnya mungkin
+       salah tempel atau sudah tidak berlaku — buat ulang webhook-nya dari space itu,
+       lalu simpan di sini. Kalau tetap gagal, buka <a href="cek.php">Cek sistem</a>:
+       baris <em>Keluar jaringan</em> memberi tahu kalau hostingnya yang memblokir.</p>
+  <?php endif; ?>
   <?php if ($noTable): ?>
     <p class="note warn"><strong>Belum bisa disimpan.</strong> Tabel <code>settings</code>
        belum ada di database ini, jadi yang di bawah adalah pertanyaan bawaan dan
@@ -195,6 +184,11 @@ a { color:#1a1c1f; }
       : 'Sudah diisi. Isi kotak ini hanya kalau mau menggantinya.' ?></label>
     <input type="text" name="chat_webhook" value="" autocomplete="off"
            placeholder="https://chat.googleapis.com/v1/spaces/…">
+    <p style="margin:0.875rem 0 0"><button class="quiet" type="submit" name="uji" value="1"
+       <?= $noTable ? 'disabled' : '' ?>>Simpan lalu kirim pesan tes</button></p>
+    <p class="why" style="margin:0.5rem 0 0">Menyimpan seluruh halaman ini dulu, lalu
+       mengirim satu pesan pendek ke space-nya — supaya kamu tahu sekarang, bukan besok
+       pagi.</p>
   </div>
 
   <h2>Channel</h2>
@@ -303,6 +297,5 @@ a { color:#1a1c1f; }
       onclick="return confirm('Kembalikan semua pertanyaan ke bawaannya?')">
       Kembalikan ke bawaan</button>
   </form>
-</main>
-</body>
-</html>
+<?php
+page_foot();

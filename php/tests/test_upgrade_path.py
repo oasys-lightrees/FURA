@@ -69,7 +69,7 @@ with Host("messi_upgrade_test", seed="lama") as host, sync_playwright() as p:
     pg.goto(host.base + "/cek.php")
     pg.wait_for_load_state("networkidle")
     check("halaman cek tetap terbuka, karena gunanya memang melaporkan keadaan",
-          pg.inner_text("h1"), lambda s: "Cek hosting" in s)
+          pg.inner_text("h1"), lambda s: "Cek sistem" in s)
     check("dan menyebut bahwa bentuk databasenya tertinggal",
           pg.inner_text("body"), lambda s: "belum dikerjakan" in s)
 

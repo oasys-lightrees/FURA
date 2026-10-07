@@ -1,5 +1,6 @@
-MESSI — cara pasang di cPanel
-==============================
+FURA — cara pasang di cPanel
+=============================
+(Follow Up Report Automation. MESSI — Messenger Screening — adalah modul pertamanya.)
 
 Butuh PHP 8.0 ke atas. Kalau hostingnya masih PHP 7, halamannya akan bilang sendiri
 dan memberi tahu cara gantinya. Ganti dulu sebelum lanjut:
@@ -14,7 +15,8 @@ cPanel -> Software -> Select PHP Version (atau MultiPHP Manager) -> pilih 8.1 / 
    perintah cron yang sudah jadi untuk hosting ini.
 
    Buka lagi tiap selesai satu langkah. Kalau sudah hijau semua, selesai.
-   Setelah akun admin dibuat, halaman ini minta login admin dengan sendirinya.
+   Setelah akun pemilik dibuat, halaman ini minta login admin dengan sendirinya, dan
+   bisa dibuka lagi kapan saja dari menu kanan atas -> Kelola -> Cek sistem.
    Boleh dihapus kalau sudah tidak dipakai.
 
 
@@ -32,12 +34,12 @@ cPanel -> Software -> Select PHP Version (atau MultiPHP Manager) -> pilih 8.1 / 
 2. BUAT TABELNYA
    cPanel -> phpMyAdmin -> klik database tadi di kiri -> tab Import
    -> Choose File: install.sql -> Go
-   Harus muncul tujuh tabel: users, sessions, login_tokens, cycles, commitments,
-   job_log, settings
+   Harus muncul sembilan tabel: teams, users, sessions, login_tokens, cycles,
+   commitments, settings, login_attempts, job_log
 
    SUDAH PERNAH PASANG VERSI SEBELUMNYA?
    Upload dulu berkas barunya (langkah 3), lalu masuk sebagai admin dan buka
-   "Pemutakhiran database" dari halaman Orang & tim. Satu tombol, dan dia yang
+   "Pemutakhiran database" dari halaman Kelola. Satu tombol, dan dia yang
    mengurus tabel maupun kolom yang kurang. Data yang sudah ada tidak dihapus,
    dan menjalankannya dua kali tidak melakukan apa-apa pada kali kedua.
    (Import ulang install.sql lewat phpMyAdmin juga aman, tapi tidak cukup
@@ -70,10 +72,16 @@ cPanel -> Software -> Select PHP Version (atau MultiPHP Manager) -> pilih 8.1 / 
    Simpan.
 
 
-5. BUAT AKUN ADMIN PERTAMA
+5. BUAT AKUN PEMILIK
    Buka di browser:  https://namadomain.com/messi/setup.php
    Isi nama, email, password (minimal 10 karakter).
-   Setelah jadi, HAPUS file setup.php lewat File Manager.
+
+   Setelah jadi kamu langsung masuk, dan mendarat di halaman Kelola yang menuntun
+   tiga langkah penyiapan: pastikan pertanyaannya, hubungkan Google Chat, undang
+   orangnya. Ketiganya ada di bawah ini juga. Begitu ketiganya beres, tuntunan itu
+   hilang sendiri dan halamannya jadi beranda biasa.
+
+   Lalu HAPUS file setup.php lewat File Manager.
    (Dia menolak jalan lagi kalau sudah ada akun, tapi lebih rapi kalau dihapus.)
 
 
@@ -86,12 +94,20 @@ cPanel -> Software -> Select PHP Version (atau MultiPHP Manager) -> pilih 8.1 / 
    File Manager bagian atas — di situ tertulis path lengkapnya.
 
 
-7. TAMBAH ORANG
-   Masuk sebagai admin -> di bawah halaman klik "Orang & tim" -> Tambah orang.
+7. UNDANG ORANG
+   Masuk sebagai admin -> menu di kanan atas (avatar) -> Kelola -> Orang & tim.
    Isi nama, email, tim dan perannya. Passwordnya TIDAK kamu ketik: yang keluar
    adalah link undangan sekali pakai (berlaku 72 jam) — kirim japri, dan orangnya
    yang membuat passwordnya sendiri. Jangan tempel ke space: siapa pun yang bisa
    membaca space itu bisa memakainya.
+
+   SELURUH TIM SEKALIGUS
+   Di kotak "atau tempel seluruh timnya sekaligus", tempel satu orang per baris:
+     budi@contoh.com
+     Sari Wijaya <sari@contoh.com>
+   Alamat polos saja boleh — namanya ditebak dari depan tanda @. Yang keluar satu
+   tabel: nama, link, dan tombol salin per baris, plus satu tombol untuk menyalin
+   semuanya. Baris yang salah ketik dikutip sendiri; yang lain tetap jadi.
 
    Tanggal "Mulai lapor" menentukan sejak kapan orang itu dihitung. Orang baru tidak
    akan pernah ditandai bolos untuk hari sebelum dia bergabung, dan yang belum
@@ -99,6 +115,12 @@ cPanel -> Software -> Select PHP Version (atau MultiPHP Manager) -> pilih 8.1 / 
 
    Lupa password? Tombol "Link buat password baru" di baris orangnya. Tetap tidak
    ada password yang perlu kamu ketik atau kirim.
+
+   Dan orangnya sendiri punya jalan menitipkan pesan: di halaman masuk ada "Lupa
+   password?". Permintaannya muncul di atas halaman Orang & tim dengan namanya, dan
+   barisnya ditandai "minta link masuk" sampai kamu mengeluarkan linknya. Sistem ini
+   TIDAK mengirim email, jadi tidak ada yang menunggu di inbox siapa pun — yang
+   menolong tetap kamu.
 
    PERAN
      Owner    semua, termasuk mengangkat dan mencabut admin. Akun pertama otomatis
@@ -118,8 +140,8 @@ cPanel -> Software -> Select PHP Version (atau MultiPHP Manager) -> pilih 8.1 / 
 
 
 8. SESUAIKAN PERTANYAANNYA (boleh dilewati)
-   Masuk sebagai admin -> di bawah halaman klik "Pertanyaan". Kalau ada lebih dari
-   satu tim, pilih dulu timnya di atas — pertanyaan milik tim.
+   Menu kanan atas -> Kelola -> Pertanyaan. Kalau ada lebih dari satu tim, pilih
+   dulu timnya di atas — pertanyaan milik tim.
    Yang bisa diubah dari situ, tanpa menyentuh kode:
      - nama tim, yang dicetak di kepala laporan
      - space Google Chat tim itu (kosongkan untuk memakai yang di config.php)
@@ -150,9 +172,11 @@ Cara pasang, sekitar 2 menit:
 
  a. Buka space squad di Google Chat
  b. Klik nama space di atas -> Apps & integrations -> Webhooks -> Add webhooks
- c. Beri nama "MESSI" -> Save -> salin URL-nya
- d. Tempel ke 'chat_webhook' di config.php
- e. Buka cek.php -> klik "Kirim pesan uji" -> pesan harus muncul di space
+ c. Beri nama "FURA" -> Save -> salin URL-nya
+ d. Tempel ke halaman Kelola -> Pertanyaan -> "Space Google Chat tim ini"
+    (atau ke 'chat_webhook' di config.php kalau cuma ada satu tim)
+ e. Di halaman yang sama, klik "Simpan lalu kirim pesan tes" -> pesan harus muncul
+    di space. Kalau gagal, halamannya mengatakannya seketika — bukan besok jam buka.
 
 CATATAN PENTING: webhook Google Chat itu memposting ke SATU SPACE, bukan japri
 ke tiap orang. Karena itu pesan paginya berisi link biasa, bukan link yang
@@ -160,8 +184,33 @@ langsung memasukkan — link semacam itu di space bersama berarti siapa pun di
 space bisa masuk sebagai orang lain. Orang masuk dengan password sekali, dan
 sesinya bertahan 30 hari, jadi praktis login sebulan sekali.
 
-Ada yang lupa password? Halaman Squad -> tombol "Link masuk" -> kirim JAPRI ke
-orangnya. Berlaku 60 menit, sekali pakai.
+Ada yang lupa password? Kelola -> Orang & tim -> tombol "Link masuk" di barisnya ->
+kirim JAPRI ke orangnya. Berlaku 60 menit, sekali pakai. Kalau dia sudah menekan
+"Lupa password?" di halaman masuk, namanya sudah menunggu di atas halaman itu.
+
+
+OWNER SENDIRIAN DAN LUPA PASSWORD
+---------------------------------
+Kalau ada admin lain, minta dia menekan "Link buat password baru" di barismu. Kalau
+tidak ada siapa pun, linknya dibuat sendiri dari database — satu kali, lewat phpMyAdmin:
+
+  cPanel -> phpMyAdmin -> pilih database -> tab SQL -> tempel, ganti emailnya:
+
+    INSERT INTO login_tokens (token, user_id, kind, expires_at)
+    SELECT SHA2(CONCAT(RAND(), UUID()), 256), id, 'invite',
+           DATE_ADD(UTC_TIMESTAMP(), INTERVAL 1 HOUR)
+      FROM users WHERE email = 'email-kamu@contoh.com';
+
+    SELECT token FROM login_tokens ORDER BY id DESC LIMIT 1;
+
+  Lalu buka:  https://namadomain.com/messi/undang.php?t=TOKEN_YANG_TADI
+
+Halaman itu yang biasa dipakai orang baru membuat passwordnya, dan dia mengerjakan hal
+yang sama di sini: kamu mengetik password baru, lalu langsung masuk. Linknya berlaku
+satu jam dan hangus begitu dipakai.
+
+Setelah masuk, angkat satu admin lagi lewat Kelola -> Orang & tim. Kali berikutnya
+cukup dia yang menekan tombolnya, tanpa menyentuh database.
 
 
 KALAU ADA MASALAH
@@ -184,6 +233,8 @@ Cron tidak jalan
 
 Mau cek cron tanpa menunggu sejam
   Buka: https://namadomain.com/messi/cron/tick.php?key=CRON_KEY
+  (CRON_KEY itu rahasia seperti password. Kalau pernah tertempel di chat atau di
+  mana pun yang bisa dibaca orang lain, ganti isinya di config.php.)
   Dia akan menulis satu baris ringkasan apa yang barusan dikerjakan.
 
 Pesan otomatis tidak muncul di Google Chat
@@ -195,7 +246,7 @@ Pesan otomatis tidak muncul di Google Chat
   dimutakhirkan. Pengiriman yang gagal tidak dicatat selesai, jadi jam berikutnya
   dicoba lagi dengan sendirinya.
 
-  Buka cek.php dan klik "Kirim pesan uji". Dia menguji koneksi ke
+  Buka Kelola -> Cek sistem dan klik "Kirim pesan uji". Dia menguji koneksi ke
   chat.googleapis.com dan mencoba memposting betulan. Dua kemungkinan:
   URL webhook-nya salah salin, atau hosting memblokir koneksi keluar. Kalau
   diblokir, minta hosting membuka port 443 ke chat.googleapis.com.

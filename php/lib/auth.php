@@ -242,6 +242,45 @@ function auth_accept_invite(string $token, string $password): ?array
     return q1('SELECT * FROM users WHERE id = ?', [(int) $row['id']]);
 }
 
+/* ----------------------------------------------------------- "saya lupa" */
+
+/**
+ * Mencatat bahwa seseorang tidak bisa masuk.
+ *
+ * Pemasangan ini belum bisa mengirim email, jadi yang bisa dikerjakan bukan mengirim link
+ * tapi menitipkan pesan: admin melihat baris itu di halaman Orang & tim dan mengeluarkan
+ * linknya. Tanpa ini, orang yang lupa passwordnya menatap layar tanpa satu pun petunjuk —
+ * dan owner yang sendirian di perusahaannya tidak punya siapa pun untuk dititipi.
+ *
+ * Yang dikembalikan adalah "pesannya bisa dititipkan", bukan "emailnya ada" — baris
+ * yang cocok tidak pernah ikut dihitung. Halaman yang menjawab berbeda untuk email yang
+ * terdaftar dan yang tidak adalah daftar nama siapa saja yang bekerja di sini.
+ */
+function auth_ask_reset(string $email): bool
+{
+    $email = strtolower(trim($email));
+    if ($email === '') {
+        return false;
+    }
+    // Yang belum pernah membuat password tidak sedang lupa — dia sedang menunggu
+    // undangan, dan undangannya sudah terhitung sebagai permintaan.
+    //
+    // q_opt, bukan q: di sela antara file baru diunggah dan database dimutakhirkan,
+    // kolomnya belum ada. Yang dikembalikan null, dan halamannya mengatakan terus terang
+    // bahwa pesannya tidak bisa dititipkan — bukan menjanjikan yang tidak terjadi.
+    $ran = q_opt("UPDATE users SET reset_asked_at = ?
+                   WHERE email = ? AND active = 1 AND accepted_at IS NOT NULL
+                     AND reset_asked_at IS NULL",
+                [Clock::nowUtcSql(), $email]);
+    return $ran !== null;
+}
+
+/** Dibersihkan begitu admin benar-benar mengeluarkan linknya. */
+function auth_clear_reset(int $userId): void
+{
+    q_opt('UPDATE users SET reset_asked_at = NULL WHERE id = ?', [$userId]);
+}
+
 /* ------------------------------------------------------- one-time login links */
 
 function auth_make_login_link(int $userId, int $minutes = 720): string

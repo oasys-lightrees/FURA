@@ -33,6 +33,10 @@ CREATE TABLE IF NOT EXISTS users (
   -- membuat passwordnya sendiri. password_hash kosong sampai saat itu.
   invited_at      DATETIME DEFAULT NULL,
   accepted_at     DATETIME DEFAULT NULL,
+  -- "Saya lupa passwordnya." Selama pemasangan ini belum bisa mengirim email, satu-satunya
+  -- jalan pulang adalah admin yang mengeluarkan link — dan dia harus bisa melihat bahwa
+  -- ada yang menunggu. Dikosongkan lagi begitu linknya dikeluarkan.
+  reset_asked_at  DATETIME DEFAULT NULL,
   created_at      DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (id),
   UNIQUE KEY uq_users_email (email),
