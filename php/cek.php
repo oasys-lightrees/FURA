@@ -169,12 +169,20 @@ if ($hasConfig) {
 /* ------------------------------------------------------------------ cron */
 
 if ($installed) {
-    $last = q1('SELECT ran_at, kind FROM job_log ORDER BY id DESC LIMIT 1');
+    // Denyutnya yang ditanya, bukan baris terakhir apa pun. Hari Sabtu cron yang sehat
+    // memang tidak mengerjakan apa-apa — dan dulu itu terlihat persis seperti cron yang
+    // sudah mati sejak Jumat.
+    $last = q1("SELECT ran_at, kind FROM job_log WHERE kind = 'tick' ORDER BY id DESC LIMIT 1")
+         ?: q1('SELECT ran_at, kind FROM job_log ORDER BY id DESC LIMIT 1');
     if ($last) {
         $ago = (int) ((time() - strtotime($last['ran_at'] . ' UTC')) / 60);
         row($ago < 130 ? 'ok' : 'warn', 'Cron terakhir jalan',
             $last['ran_at'] . ' UTC (' . $ago . ' menit lalu, "' . $last['kind'] . '")',
-            $ago < 130 ? '' : 'Sudah lebih dari dua jam. Cek <em>Cron Jobs</em> di cPanel.');
+            $ago < 130 ? '' : 'Sudah lebih dari dua jam. Cek <em>Cron Jobs</em> di cPanel — '
+                . 'atau jalankan sendiri sekarang lewat <code>cron/tick.php?key=</code> '
+                . 'diikuti cron_key kamu, lalu muat ulang halaman ini. Kalau setelah itu '
+                . 'waktunya berubah, cron-nya memang tidak dipanggil cPanel; kalau tidak '
+                . 'berubah, lihat baris kesalahan di bawah.');
     } else {
         row('warn', 'Cron', 'belum pernah jalan',
             'Belum dipasang, atau baru dipasang dan belum sampai menit ke-0. '
@@ -193,7 +201,7 @@ if ($installed) {
                  . 'lihat baris kesalahan di bawah.');
 
     $salah = q1("SELECT ran_at, kind, detail FROM job_log
-                  WHERE kind IN ('chat_error', 'tick_error', 'needs_upgrade')
+                  WHERE kind IN ('chat_error', 'tick_error', 'tick_fatal', 'needs_upgrade')
                   ORDER BY id DESC LIMIT 1");
     if ($salah) {
         $jam = (int) ((time() - strtotime($salah['ran_at'] . ' UTC')) / 3600);

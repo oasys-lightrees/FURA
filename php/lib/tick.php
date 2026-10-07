@@ -53,6 +53,11 @@ function messi_tick(): array
     $swept = auth_sweep();
     if ($swept) { $did['swept'] = $swept; }
 
+    // Denyut cron menumpuk satu baris per jam. Yang berumur lebih dari dua bulan bukan
+    // lagi riwayat yang dibaca siapa pun, cuma tabel yang tumbuh selamanya.
+    q('DELETE FROM job_log WHERE ran_at < ?',
+      [Clock::utc()->modify('-60 days')->format('Y-m-d H:i:s')]);
+
     if (!messi_is_workday($today)) {
         return $did;
     }

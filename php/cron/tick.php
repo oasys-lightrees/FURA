@@ -27,7 +27,51 @@ if (PHP_SAPI !== 'cli') {
     header('Content-Type: text/plain; charset=utf-8');
 }
 
-$did = messi_tick();
+/**
+ * Catatan kematian.
+ *
+ * Fatal error tidak sempat menulis apa pun tentang dirinya sendiri, jadi yang tertinggal
+ * di job_log cuma baris terakhir dari jalannya yang berhasil — berjam-jam atau berhari-hari
+ * sebelumnya. Yang terlihat lalu cuma "cron-nya mati", tanpa satu pun petunjuk kenapa.
+ * Penutup ini yang menuliskannya.
+ */
+$selesai = false;
+register_shutdown_function(function () use (&$selesai) {
+    if ($selesai) {
+        return;
+    }
+    $e = error_get_last();
+    $pesan = $e && in_array($e['type'], [E_ERROR, E_PARSE, E_CORE_ERROR, E_COMPILE_ERROR], true)
+        ? $e['message'] . ' @ ' . basename((string) $e['file']) . ':' . $e['line']
+        : 'berhenti di tengah jalan tanpa pesan';
+    try {
+        log_job('tick_fatal', substr($pesan, 0, 400));
+    } catch (Throwable $x) {
+        // Databasenya sendiri yang tidak bisa dihubungi: tidak ada tempat mencatatnya.
+    }
+});
+
+try {
+    $did = messi_tick();
+    // Denyut: satu baris tiap kali dijalankan, berhasil atau tidak ada yang perlu
+    // dikerjakan. Tanpa ini, akhir pekan dan cron yang mati terlihat sama persis —
+    // sama-sama tidak meninggalkan baris baru.
+    log_job('tick', Clock::today() . ' ' . sprintf('%02d:00', Clock::hour()));
+    $selesai = true;
+} catch (Throwable $e) {
+    $selesai = true;
+    try {
+        log_job('tick_fatal', substr($e->getMessage(), 0, 400));
+    } catch (Throwable $x) {
+        // sama seperti di atas
+    }
+    if (PHP_SAPI !== 'cli') {
+        http_response_code(500);
+    }
+    fwrite(PHP_SAPI === 'cli' ? STDERR : STDOUT, 'GAGAL: ' . $e->getMessage() . "\n");
+    exit(1);
+}
+
 $parts = [];
 foreach ($did as $what => $n) {
     $parts[] = $what . '=' . $n;

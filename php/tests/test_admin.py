@@ -529,6 +529,46 @@ with Host("messi_admin_test", seed="empty") as host, sync_playwright() as p:
     check("dan webhook tim tidak pernah ditampilkan kembali",
           admin.input_value("input[name=chat_webhook]"), "")
 
+    print("\n=== cron meninggalkan jejak, hidup maupun mati ===")
+    # "Cron-nya mati lagi" adalah keluhan yang paling sering terdengar dan paling sulit
+    # dibuktikan, karena dua keadaan yang sangat berbeda dulu terlihat sama: hari sepi
+    # yang tidak mengerjakan apa-apa, dan proses yang mati sebelum sempat mencatat apa pun.
+    jalan = host.php("cron/tick.php")
+    check("dijalankan dari baris perintah berhasil", jalan.returncode, 0)
+    denyut = host.php("-r", """require 'lib/bootstrap.php';
+        $r = q1("SELECT COUNT(*) n FROM job_log WHERE kind = 'tick'");
+        echo (string) $r['n'];""").stdout.strip()
+    check("meninggalkan satu denyut walau tidak ada yang dikerjakan", denyut, "1")
+
+    host.php("cron/tick.php")
+    denyut2 = host.php("-r", """require 'lib/bootstrap.php';
+        $r = q1("SELECT COUNT(*) n FROM job_log WHERE kind = 'tick'");
+        echo (string) $r['n'];""").stdout.strip()
+    check("tiap kali dijalankan menambah denyutnya", denyut2, "2")
+
+    admin.goto(host.base + "/cek.php")
+    admin.wait_for_load_state("networkidle")
+    check("halaman cek membaca denyut itu, bukan baris terakhir apa pun",
+          admin.inner_text("body"), lambda s: '"tick"' in s)
+
+    # Dan kalau mati di tengah jalan, kematiannya ikut tercatat — justru itu yang selama
+    # ini hilang, karena fatal error tidak sempat menulis apa pun tentang dirinya.
+    rusak = host.php("-r", """require 'lib/bootstrap.php';
+        q('INSERT INTO job_log (kind, detail, ran_at) VALUES (?,?,?)',
+          ['tick_fatal', 'Uncaught Error: pura-pura meledak @ tick.php:1', '2026-10-07 02:00:00']);
+        echo 'ok';""").stdout.strip()
+    check("baris kematian bisa dicatat", rusak, "ok")
+    admin.goto(host.base + "/cek.php")
+    admin.wait_for_load_state("networkidle")
+    check("dan halaman cek menampilkannya sebagai kesalahan terakhir",
+          admin.inner_text("body"), lambda s: "pura-pura meledak" in s)
+    # Kesalahan itu baris terbaru di tabelnya, tapi bukan tanda cron-nya jalan. Dua
+    # pertanyaan yang berbeda — "kapan terakhir jalan" dan "apa yang terakhir salah" —
+    # harus dijawab oleh dua baris yang berbeda.
+    check("tapi 'cron terakhir jalan' tetap membaca denyutnya",
+          admin.inner_text("body"),
+          lambda s: s.split("Cron terakhir jalan")[1].split("Pengingat")[0].count('"tick"') == 1)
+
     print("\n=== pemasangan lama yang kurang satu tabel ===")
     # Gejala yang benar-benar dilihat orangnya: halaman 500 kosong. Diuji dari sisi
     # browser, bukan cuma dari fungsinya, karena yang kosong itulah yang tidak bisa

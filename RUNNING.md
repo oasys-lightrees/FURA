@@ -28,6 +28,7 @@ Sign in as `nicho@lightrees.com` (player) or `chief@lightrees.com` (leader), pas
 | Login throttling | Counted per (email, device), so nobody can lock somebody else out |
 | In-place schema upgrade | An older install catches up from a page, not from phpMyAdmin |
 | Reminder retries | A send that fails is not recorded as done, so the next hour tries again |
+| Cron leaves a trail | A heartbeat every run and a record when it dies, so a quiet day and a dead cron no longer look alike |
 | Answering, "no change", validation | Working |
 | Reaper | Records missed cycles and broken promises |
 | Leader dashboard | Exceptions only: what was missed, what was promised and not done |
@@ -64,7 +65,7 @@ PY
 web/               THE PAGE PEOPLE USE — messi.html, plus the flow spec and the demo
 web/tests/         236 browser checks (player, manager, edge cases, keyboard, catalogue)
 php/               the same page, deployable: PHP + MySQL, cPanel, Google Chat, hourly cron
-php/tests/         495 checks — rules, a real MySQL, a simulated week, the running app
+php/tests/         502 checks — rules, a real MySQL, a simulated week, the running app
 core/messi_core/   pure rules: cadence, period keys, state machines. No web, no ORM.
 app/               FastAPI app, schema.sql, templates, seed, CLI
 tests/             pytest over core/ — runs without a database

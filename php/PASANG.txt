@@ -187,8 +187,10 @@ Mau cek cron tanpa menunggu sejam
   Dia akan menulis satu baris ringkasan apa yang barusan dikerjakan.
 
 Pesan otomatis tidak muncul di Google Chat
-  Cek dulu dua baris di cek.php: "Pengingat terakhir terkirim" dan "Kesalahan
-  terakhir". Kalau pengingatnya berhenti, biasanya dua baris itu sudah menjawab
+  Cek dulu tiga baris di cek.php: "Cron terakhir jalan", "Pengingat terakhir
+  terkirim", dan "Kesalahan terakhir". Cron meninggalkan satu baris tiap kali
+  dijalankan, berhasil maupun tidak ada yang perlu dikerjakan — jadi kalau waktunya
+  tidak berubah-ubah, yang bermasalah cron-nya di cPanel, bukan aplikasinya. Kalau pengingatnya berhenti, biasanya dua baris itu sudah menjawab
   kenapa — webhook yang sudah tidak berlaku, atau database yang belum
   dimutakhirkan. Pengiriman yang gagal tidak dicatat selesai, jadi jam berikutnya
   dicoba lagi dengan sendirinya.
