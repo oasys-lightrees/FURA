@@ -113,6 +113,13 @@ $hours = function (string $name, int $now, int $from, int $to): string {
 page_head('Pertanyaan', ['me' => $me, 'wide' => true, 'css' => <<<'CSS'
 select { width:auto }
 .chrow { display:grid; grid-template-columns:6rem 1fr 1.4fr; gap:0.5rem; margin:0 0 0.5rem }
+/* Di layar sempit tiga kotak sebaris berarti ketiganya terlalu sempit untuk dibaca,
+   apalagi diisi. Ditumpuk, dan judul kolomnya diganti tulisan di dalam kotaknya. */
+@media (max-width: 34rem) {
+  .chrow { grid-template-columns:1fr; gap:0.375rem; margin:0 0 0.875rem;
+           padding:0 0 0.875rem; border-bottom:1px solid var(--line) }
+  .chrow.judul { display:none }
+}
 .fields { display:grid; gap:0.625rem }
 .qblock { border-top:1px solid var(--line); padding:0.875rem 0 0; margin:0.875rem 0 0 }
 .qblock:first-child { border-top:0; padding-top:0; margin-top:0 }
@@ -199,19 +206,22 @@ CSS]);
      berubah — tapi channel yang dihapus tidak lagi dihitung mulai laporan berikutnya.
      <?php endif; ?></p>
   <div class="card">
-    <div class="chrow"><label>Kode</label><label>Nama pendek</label><label>Nama panjang</label></div>
+    <div class="chrow judul"><label>Kode</label><label>Nama pendek</label><label>Nama panjang</label></div>
     <?php $i = 0; foreach ($cfg['channels'] as $c): ?>
       <div class="chrow">
-        <input type="text" name="ch[<?= $i ?>][key]" value="<?= h($c['key']) ?>" maxlength="12">
-        <input type="text" name="ch[<?= $i ?>][label]" value="<?= h($c['label']) ?>" maxlength="24">
-        <input type="text" name="ch[<?= $i ?>][full]" value="<?= h($c['full']) ?>" maxlength="60">
+        <input type="text" name="ch[<?= $i ?>][key]" value="<?= h($c['key']) ?>"
+               maxlength="12" placeholder="Kode">
+        <input type="text" name="ch[<?= $i ?>][label]" value="<?= h($c['label']) ?>"
+               maxlength="24" placeholder="Nama pendek">
+        <input type="text" name="ch[<?= $i ?>][full]" value="<?= h($c['full']) ?>"
+               maxlength="60" placeholder="Nama panjang">
       </div>
     <?php $i++; endforeach; ?>
     <?php for ($n = 0; $n < 3; $n++, $i++): ?>
       <div class="chrow">
-        <input type="text" name="ch[<?= $i ?>][key]" maxlength="12" placeholder="baru">
-        <input type="text" name="ch[<?= $i ?>][label]" maxlength="24">
-        <input type="text" name="ch[<?= $i ?>][full]" maxlength="60">
+        <input type="text" name="ch[<?= $i ?>][key]" maxlength="12" placeholder="Kode baru">
+        <input type="text" name="ch[<?= $i ?>][label]" maxlength="24" placeholder="Nama pendek">
+        <input type="text" name="ch[<?= $i ?>][full]" maxlength="60" placeholder="Nama panjang">
       </div>
     <?php endfor; ?>
   </div>

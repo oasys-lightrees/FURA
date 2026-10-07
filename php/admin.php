@@ -295,7 +295,12 @@ td.who span { color:var(--muted); font-size:0.8125rem }
 .off td { opacity:0.5 }
 .tag.minta { background:var(--due-bg); border-color:var(--due-bg); color:var(--due) }
 .links td { border-top:1px solid var(--line) }
-.links code { display:block }
+.links code { display:block; word-break:break-all }   /* link panjang, boleh dipenggal */
+/* Tombol yang paling sering dipakai ada di kolom paling kanan, dan di layar sempit
+   kolom itu di luar layar. Tabelnya memang bisa digeser — yang kurang cuma orang tahu
+   bahwa ada yang bisa digeser. */
+.geser { display:none; color:var(--muted); font-size:0.8125rem; margin:0 0 0.5rem }
+@media (max-width: 46rem) { .geser { display:block } }
 .pisah { display:flex; align-items:center; gap:0.75rem; margin:1.5rem 0 1rem;
          color:var(--muted); font-size:0.8125rem }
 .pisah::before, .pisah::after { content:""; flex:1; border-top:1px solid var(--line) }
@@ -347,6 +352,8 @@ CSS]);
   $roleNames = ['player' => 'Pelapor', 'leader' => 'Leader', 'admin' => 'Admin', 'owner' => 'Owner'];
   ?>
 
+  <p class="geser">Tabelnya lebih lebar dari layar ini — geser ke samping untuk
+     tombol-tombolnya.</p>
   <div class="card scroll">
   <table class="orang">
     <tr><th>Orang</th><th>Tim</th><th>Peran</th><th>Mulai</th><th></th></tr>

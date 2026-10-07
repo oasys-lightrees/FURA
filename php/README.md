@@ -150,7 +150,7 @@ lib/schema.php     langkah pemutakhiran, tiap langkah memeriksa dirinya sendiri
 install.sql        sembilan tabel
 PASANG.txt         langkah pemasangan, bahasa non-teknis
 make-zip.sh        bikin messi-cpanel.zip
-tests/             530 pemeriksaan (tidak ikut ke server)
+tests/             531 pemeriksaan (tidak ikut ke server)
 ```
 
 ## Yang diputuskan server, bukan browser
@@ -212,7 +212,7 @@ menyebutkan mana yang barusan terjadi.
 | `tests/test_repo.php` | 111 — terhadap MySQL sungguhan, di database yang dia buat sendiri |
 | `tests/test_cron.php` | 66 — seminggu penuh jam demi jam, jam dibekukan, pesan bot ditangkap |
 | `tests/test_live.py` | 64 — browser terhadap aplikasi yang benar-benar jalan |
-| `tests/test_admin.py` | 124 — pemasangan pertama, undangan satu dan borongan, lupa password, link sekali pakai, mengubah pertanyaan, uji kirim webhook |
+| `tests/test_admin.py` | 125 — pemasangan pertama, undangan satu dan borongan, lupa password, link sekali pakai, mengubah pertanyaan, uji kirim webhook |
 | `tests/test_schema.php` | 42 — pemasangan lama di-upgrade, lalu dibandingkan kolom demi kolom dengan yang baru |
 | `tests/test_upgrade_path.py` | 24 — aplikasi sungguhan di atas database versi lama: masih bisa masuk, setiap halaman lain menyebut apa yang kurang, lalu satu tombol menghidupkannya |
 | `tests/check_sync.php` | memastikan `app.html` belum menyimpang dari `web/messi.html` |

@@ -139,8 +139,11 @@ a { color:var(--ink) }
 .note a { color:inherit }
 .tag { font-size:0.75rem; padding:0.125rem 0.4375rem; border-radius:0.25rem;
        background:var(--raise); border:1px solid var(--line); color:var(--muted); }
+/* break-word, bukan break-all: yang terakhir memenggal "config.php" jadi "c onfig.php"
+   di tengah kalimat. Yang benar-benar perlu dipenggal di mana saja cuma link panjang,
+   dan itu diminta sendiri di tempatnya. */
 code { font:500 0.9375rem var(--mono); background:var(--raise); border:1px solid var(--line);
-       padding:0.0625rem 0.3125rem; border-radius:0.25rem; word-break:break-all; }
+       padding:0.0625rem 0.3125rem; border-radius:0.25rem; overflow-wrap:break-word; }
 
 /* isian */
 label { display:block; font-size:0.75rem; font-weight:500; margin:0 0 0.25rem;

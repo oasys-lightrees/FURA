@@ -298,7 +298,10 @@ with Host("messi_admin_test", seed="empty") as host, sync_playwright() as p:
     body = admin.inner_text("body")
     check("admin melihat hasilnya", body, lambda s: "Cek sistem" in s)
     check("versi PHP diperiksa", body, lambda s: "Versi PHP" in s)
-    check("tabelnya diperiksa", body, lambda s: "lengkap, 7 tabel" in s)
+    # Angkanya harus sama dengan yang disuruh dihitung PASANG.txt di phpMyAdmin —
+    # dua angka yang berbeda untuk hal yang sama membuat orang mengira ada yang kurang.
+    check("tabelnya diperiksa, sebanyak yang dibuat install.sql",
+          body, lambda s: "lengkap, 9 tabel" in s)
     check("base_url dicocokkan dengan alamat yang sedang dibuka",
           body, lambda s: "base_url" in s)
     check("perintah cron dibuatkan lengkap dengan path-nya",
@@ -689,7 +692,14 @@ with Host("messi_admin_test", seed="empty") as host, sync_playwright() as p:
     check("tuntunan tiga langkahnya hilang sendiri", kelola,
           lambda s: "Penyiapan" not in s)
     check("yang tinggal adalah rangkuman keadaannya", kelola,
-          lambda s: "orang aktif" in s and "Cron" in s and "Pengingat terakhir" in s)
+          lambda s: "orang aktif" in s and "Cron" in s and "pengingat" in s.lower())
+    # Diukur, bukan dilihat. Lampunya sempat selebar nol karena aturan yang lebih spesifik
+    # mengalahkan display:flex-nya — di layar itu terbaca sebagai "lampunya tidak ada
+    # warnanya", padahal warnanya benar sejak awal.
+    check("dan lampu keadaannya benar-benar tergambar",
+          admin.eval_on_selector_all(".sehat i",
+              "e=>e.map(x=>Math.round(x.getBoundingClientRect().width))"),
+          lambda w: len(w) >= 2 and all(n >= 6 for n in w))
 
     print("\n=== cron meninggalkan jejak, hidup maupun mati ===")
     # "Cron-nya mati lagi" adalah keluhan yang paling sering terdengar dan paling sulit

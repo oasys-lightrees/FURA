@@ -134,8 +134,11 @@ function db(): PDO
  */
 const MESSI_TABLES_CORE = ['users', 'sessions', 'login_tokens', 'cycles', 'commitments',
                            'job_log'];
-const MESSI_TABLES = ['users', 'sessions', 'login_tokens', 'cycles', 'commitments',
-                      'job_log', 'settings'];
+// Semua yang dibuat install.sql. Sempat cuma tujuh, sehingga halaman cek berkata
+// "lengkap, 7 tabel" sementara panduannya menyuruh menghitung sembilan di phpMyAdmin —
+// dua angka benar untuk dua pertanyaan berbeda, dan tidak ada yang tahu itu.
+const MESSI_TABLES = ['teams', 'users', 'sessions', 'login_tokens', 'cycles',
+                      'commitments', 'settings', 'login_attempts', 'job_log'];
 
 /** Tabel mana saja yang belum ada. Dipakai halaman cek dan halaman setelan. */
 function messi_missing_tables(): array

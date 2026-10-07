@@ -123,12 +123,16 @@ page_head('Kelola', ['me' => $me, 'css' => <<<'CSS'
                    text-decoration:none }
 .langkah .aksi a:hover { border-color:var(--ink) }
 .langkah .sudah p, .langkah .sudah .aksi { display:none }
-.sehat { display:flex; align-items:center; gap:0.5rem; font-size:0.875rem;
-         margin:0 0 0.375rem }
-.sehat i { width:0.5rem; height:0.5rem; border-radius:50%; flex:none;
-           background:var(--muted) }
-.sehat.ya i { background:var(--kept) }
-.sehat.tidak i { background:var(--due) }
+/* ".kartu span" di atas juga mengenai baris ini dan lebih spesifik daripada ".sehat"
+   sendirian, jadi display:flex-nya kalah — dan titiknya, yang lebarnya cuma berlaku
+   untuk elemen blok, jadi selebar nol. Terlihat seperti titiknya "tidak ada warnanya",
+   padahal warnanya benar sejak awal. */
+.kartu .sehat { display:flex; align-items:center; gap:0.5rem; font-size:0.8125rem;
+                margin:0 0 0.25rem }
+.kartu .sehat i { width:0.5rem; height:0.5rem; border-radius:50%; flex:none;
+                  background:var(--muted) }
+.kartu .sehat.ya i { background:var(--kept) }
+.kartu .sehat.tidak i { background:var(--due) }
 CSS]);
 ?>
   <h1>Kelola</h1>
@@ -188,10 +192,12 @@ CSS]);
       <b>Cek sistem</b>
       <span>Apakah pengingatnya benar-benar terkirim, dan kalau tidak, kenapa.</span>
       <em>
-        <span class="sehat <?= $cronSehat ? 'ya' : 'tidak' ?>"><i></i>Cron
-          <?= h($umur($tickAge)) ?></span>
-        <span class="sehat <?= $kirim ? 'ya' : 'tidak' ?>"><i></i>Pengingat terakhir
-          <?= h($umur($menitLalu($kirim['ran_at'] ?? null))) ?></span>
+        <span class="sehat <?= $cronSehat ? 'ya' : 'tidak' ?>"><i></i><?= $tickAge === null
+          ? 'Cron belum pernah jalan'
+          : 'Cron terakhir jalan ' . h($umur($tickAge)) ?></span>
+        <span class="sehat <?= $kirim ? 'ya' : 'tidak' ?>"><i></i><?= $kirim
+          ? 'Pengingat terakhir terkirim ' . h($umur($menitLalu($kirim['ran_at'])))
+          : 'Belum ada pengingat yang terkirim' ?></span>
         <?php if ($salah): ?>
           <span class="sehat tidak"><i></i>Kesalahan terakhir
             <?= h($umur($menitLalu($salah['ran_at']))) ?> (<?= h($salah['kind']) ?>)</span>
