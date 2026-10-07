@@ -259,6 +259,10 @@ with Host("messi_admin_test", seed="empty") as host, sync_playwright() as p:
           body, lambda s: "base_url" in s)
     check("perintah cron dibuatkan lengkap dengan path-nya",
           body, lambda s: "cron/tick.php" in s)
+    # Yang paling sering ditanyakan saat pengingat tidak sampai: kapan terakhir benar-benar
+    # terkirim, dan apa kesalahan terakhirnya. Dua-duanya harus ada di satu halaman.
+    check("menyebut kapan pengingat terakhir benar-benar terkirim",
+          body, lambda s: "Pengingat terakhir terkirim" in s)
     check("tidak pernah menampilkan password database",
           "ganti-ini" not in body and "kata-sandi" not in body)
 

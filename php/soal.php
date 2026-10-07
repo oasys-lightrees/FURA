@@ -20,7 +20,7 @@ require __DIR__ . '/lib/require-php8.php';
 require_once __DIR__ . '/lib/auth.php';
 require_once __DIR__ . '/lib/repo.php';
 
-messi_require_ready();
+messi_require_current();
 
 $me = auth_user();
 if (!$me) { header('Location: login.php'); exit; }

@@ -265,11 +265,99 @@ eq('giliran Sales di jamnya sendiri',
 ok('menyebut orang Sales', said($ingat2, 'Nicho'));
 ok('dan tidak menyebut orang HR', !said($ingat2, 'Ani'));
 
+/* -------------------------------------------- pengiriman yang gagal dicoba lagi */
+
+/**
+ * Satu menit buruk di jam 9 tidak boleh berarti tidak ada pengingat seharian.
+ *
+ * Dulu hasil kirim dicatat apa pun hasilnya, jadi Google yang sedang lambat, webhook
+ * yang sedang disegarkan, atau jaringan hosting yang tersendat sama saja dengan "sudah
+ * dikirim" — dan tidak ada yang mencoba lagi sampai besok. Inilah bentuk "botnya suka
+ * mati" yang tidak meninggalkan jejak apa pun.
+ */
+$gagal = true;
+Chat::$send = function (string $text, string $webhook = '') use (&$sent, &$gagal): bool {
+    if ($gagal) { return false; }
+    $sent[] = ['text' => $text, 'webhook' => $webhook];
+    return true;
+};
+
+q('DELETE FROM job_log WHERE kind IN (?,?)', ['notify_open', 'notify_due']);
+repo_save_config($owner, $sales, ['chat_webhook' => 'https://chat.example/sales']);
+repo_save_config($owner, $hr, ['chat_webhook' => 'https://chat.example/hr']);
+
+$r1 = tick_at('2026-10-06T02:30:00Z');          // 09:30, Google sedang bermasalah
+eq('yang gagal tidak menghasilkan pesan', $r1, []);
+eq('dan tidak dicatat sebagai selesai',
+   (int) q1("SELECT COUNT(*) AS n FROM job_log WHERE kind = 'notify_open'")['n'], 0);
+
+$gagal = false;
+$r2 = tick_at('2026-10-06T03:30:00Z');          // 10:30, jam berikutnya
+ok('jam berikutnya mencobanya lagi, dan kali ini berhasil', count($r2) > 0);
+eq('baru sekarang dicatat selesai',
+   (int) q1("SELECT COUNT(*) AS n FROM job_log WHERE kind = 'notify_open'")['n'], 2);
+
+$r3 = tick_at('2026-10-06T04:30:00Z');
+eq('dan sesudah berhasil tidak dikirim dua kali', $r3, []);
+
+// Tim tanpa space bukan tim yang gagal: tidak ada yang bisa disapa, jadi jangan dicoba
+// tiap jam sampai malam.
+q('DELETE FROM job_log WHERE kind IN (?,?)', ['notify_open', 'notify_due']);
+repo_save_config($owner, $hr, ['chat_webhook' => '']);
+Chat::$send = null;                               // tidak ada seam, dan webhook kosong
+tick_at('2026-10-06T02:30:00Z');
+eq('tim tanpa space ditandai selesai, bukan diulang terus',
+   (int) q1("SELECT COUNT(*) AS n FROM job_log WHERE kind = 'notify_open' AND detail LIKE ?",
+            ['%t=' . $hr . '%'])['n'], 1);
+ok('dan catatannya menyebutkan alasannya',
+   str_contains((string) q1("SELECT detail FROM job_log WHERE kind = 'notify_open'
+                              AND detail LIKE ? LIMIT 1", ['%t=' . $hr . '%'])['detail'],
+                'kosong'));
+
+Chat::$send = function (string $text, string $webhook = '') use (&$sent): bool {
+    $sent[] = ['text' => $text, 'webhook' => $webhook];
+    return true;
+};
+
+/* ------------------------------------- satu tim rusak tidak menelan tim lain */
+
+q('DELETE FROM job_log WHERE kind IN (?,?)', ['notify_open', 'notify_due']);
+// Tim yang dihapus di tengah jalan: barisnya masih terbaca, setelannya tidak.
+$rusak = repo_add_team($owner, 'Rusak');
+q('UPDATE teams SET name = ? WHERE id = ?', [str_repeat('x', 60), $rusak]);
+$pecah = null;
+Chat::$send = function (string $text, string $webhook = '') use (&$sent, &$pecah): bool {
+    if ($webhook === $pecah) { throw new RuntimeException('space ini meledak'); }
+    $sent[] = ['text' => $text, 'webhook' => $webhook];
+    return true;
+};
+$pecah = 'https://chat.example/sales';
+// Ditangkap: tanpa penjaga di dalam, yang terlihat cuma suite yang mati — bukan dua
+// pemeriksaan yang menyebutkan apa yang hilang.
+try {
+    $hasil = tick_at('2026-10-06T02:30:00Z');
+} catch (Throwable $e) {
+    $hasil = [];
+}
+ok('tim yang meledak dicatat', (int) q1("SELECT COUNT(*) AS n FROM job_log
+                                          WHERE kind = 'tick_error'")['n'] > 0);
+ok('dan tim lain tetap dapat pesannya',
+   count(array_filter($hasil, fn($m) => $m['webhook'] !== 'https://chat.example/sales')) > 0);
+$pecah = null;
+Chat::$send = function (string $text, string $webhook = '') use (&$sent): bool {
+    $sent[] = ['text' => $text, 'webhook' => $webhook];
+    return true;
+};
+q('DELETE FROM teams WHERE id = ?', [$rusak]);
+
 /* ------------------------------------------------------- catatan yang tertinggal */
 
 $kinds = q('SELECT DISTINCT kind FROM job_log ORDER BY kind')->fetchAll(PDO::FETCH_COLUMN);
+// chat_error ikut di sini karena suite ini memang membuat satu pengiriman gagal, dan
+// kegagalan yang tidak meninggalkan jejak adalah kegagalan yang tidak bisa ditelusuri.
 eq('setiap pekerjaan meninggalkan catatan',
-   $kinds, ['break_overdue', 'generate', 'notify_due', 'notify_open', 'reap']);
+   $kinds, ['break_overdue', 'chat_error', 'generate', 'notify_open', 'reap',
+            'tick_error']);
 
 Clock::unfreeze();
 Chat::$send = null;

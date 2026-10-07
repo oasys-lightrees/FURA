@@ -187,6 +187,12 @@ Mau cek cron tanpa menunggu sejam
   Dia akan menulis satu baris ringkasan apa yang barusan dikerjakan.
 
 Pesan otomatis tidak muncul di Google Chat
+  Cek dulu dua baris di cek.php: "Pengingat terakhir terkirim" dan "Kesalahan
+  terakhir". Kalau pengingatnya berhenti, biasanya dua baris itu sudah menjawab
+  kenapa — webhook yang sudah tidak berlaku, atau database yang belum
+  dimutakhirkan. Pengiriman yang gagal tidak dicatat selesai, jadi jam berikutnya
+  dicoba lagi dengan sendirinya.
+
   Buka cek.php dan klik "Kirim pesan uji". Dia menguji koneksi ke
   chat.googleapis.com dan mencoba memposting betulan. Dua kemungkinan:
   URL webhook-nya salah salin, atau hosting memblokir koneksi keluar. Kalau

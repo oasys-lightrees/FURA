@@ -4,7 +4,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from harness import (SHOTS, check, context, launch, new_page, report, results,
-                     stored, store_of, txt, sync_playwright)
+                     stored, stored_until, store_of, txt, sync_playwright)
 
 with sync_playwright() as p:
     b = launch(p)
@@ -102,6 +102,10 @@ with sync_playwright() as p:
 
     # Besoknya janji-janji itu ditagih satu-satu, dan hanya yang sudah jatuh tempo —
     # inti dari memisah rencana: tiap baris berbunyi di tanggalnya sendiri.
+    # Layar berikutnya bergantung pada kiriman barusan, jadi ditunggu sampai kirimannya
+    # benar-benar tersimpan — bukan sampai sekian milidetik lewat.
+    stored(pgM, "cycles", 1)
+    stored_until(pgM, "Object.values(s.commitments || {}).length === 4")
     pgM2 = new_page(many, "u_nicho", at="2026-10-01T04:00:00Z", reset=False)
     for r, o in [("WAG", 8), ("TGG", 3), ("GCG", 2)]: g(pgM2, r, "open", o)
     pgM2.wait_for_timeout(200); pgM2.click("#next"); pgM2.wait_for_timeout(300)
@@ -121,6 +125,11 @@ with sync_playwright() as p:
 
     # Seminggu kemudian: yang kelewat dan yang jatuh tempo hari itu ditagih bersama,
     # yang masih di depan tetap diam.
+    stored(pgM2, "cycles", 2)
+    # Yang menentukan layar berikutnya bukan jumlah janjinya, tapi satu di antaranya
+    # sudah ditutup — jadi itu yang ditunggu.
+    stored_until(pgM2,
+                 "Object.values(s.commitments || {}).filter(c => c.status === 'kept').length === 1")
     pgM3 = new_page(many, "u_nicho", at="2026-10-06T04:00:00Z", reset=False)   # Selasa 11:00
     for r, o in [("WAG", 7), ("TGG", 3), ("GCG", 2)]: g(pgM3, r, "open", o)
     pgM3.wait_for_timeout(200); pgM3.click("#next"); pgM3.wait_for_timeout(300)
@@ -206,7 +215,12 @@ with sync_playwright() as p:
 
     # Kirimannya ditulis tanpa ditunggu, jadi layar kedua bisa mendahului tulisannya.
     stored(pgN, "cycles", 1)
+    stored_until(pgN, "Object.keys(s.roster || {}).length >= 1")
     pgC = new_page(shared, "u_lead", at="2026-09-30T04:05:00Z", reset=False)   # store yang sama
+    # Dipisah dari pemeriksaan di bawah: kalau yang gagal adalah ini, yang salah
+    # penyimpanannya; kalau yang gagal yang di bawah, yang salah penggambarannya.
+    check("layar kedua benar-benar membaca simpanan yang sama",
+          len(store_of(pgC).get("cycles", {})), 1)
     pgC.click('[data-tab="tim"]'); pgC.wait_for_timeout(400)
     body = pgC.inner_text("body")
     check("leader melihat kiriman Nicho yang baru", "Minta bantuan atasan soal Klien C" in body)

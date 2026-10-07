@@ -160,6 +160,33 @@ function messi_import_again(): string
  * lolos di sini lalu mati dengan halaman 500 kosong beberapa baris kemudian — persis
  * kegagalan yang halaman ini ada untuk mencegahnya. Yang kurang disebutkan namanya.
  */
+/**
+ * Selain tabelnya ada, bentuknya juga harus sudah sesuai versi kode ini.
+ *
+ * Dipakai halaman yang memang membutuhkan yang baru. Yang tidak memakainya cuma tiga:
+ * login — karena orang harus bisa masuk untuk menjalankan pemutakhirannya; halaman
+ * pemutakhiran itu sendiri; dan halaman cek, yang gunanya memang melaporkan keadaan.
+ * Kalau login ikut dijaga di sini, pemasangan yang tertinggal akan terkunci dari luar
+ * oleh pintu yang cuma bisa dibuka dari dalam.
+ */
+function messi_require_current(): void
+{
+    messi_require_ready();
+    require_once __DIR__ . '/schema.php';
+    $pending = schema_pending();
+    if (!$pending) {
+        return;
+    }
+    messi_stop(
+        'Database perlu dimutakhirkan',
+        count($pending) . ' hal belum dikerjakan: ' . implode(', ', array_column($pending, 'id')),
+        'Berkas aplikasinya sudah versi baru, databasenya belum. Buka '
+        . '<a href="upgrade.php"><strong>Pemutakhiran database</strong></a> lalu tekan '
+        . 'Jalankan — sekali tekan, data yang ada tidak dihapus. Kalau belum masuk, '
+        . '<a href="login.php">masuk dulu sebagai admin</a>.'
+    );
+}
+
 function messi_require_ready(): void
 {
     $have = db()->query('SHOW TABLES')->fetchAll(PDO::FETCH_COLUMN);
@@ -169,6 +196,28 @@ function messi_require_ready(): void
     }
     messi_stop('Tabelnya belum dibuat', 'Yang kurang: ' . implode(', ', $missing),
                messi_import_again());
+}
+
+/**
+ * Query yang boleh gagal karena tabel atau kolomnya belum dibuat.
+ *
+ * Fitur baru datang dengan tabel baru, dan pemasangan yang sudah jalan selalu punya
+ * database yang lebih tua daripada kodenya — di antara upload dan pemutakhiran, selalu,
+ * walau cuma semenit. Jalur yang sudah ada sebelum fitur itu tidak boleh ikut mati di
+ * jendela itu. Mengembalikan null, bukan melempar, supaya pemanggilnya memilih sendiri
+ * apa artinya "belum ada".
+ */
+function q_opt(string $sql, array $args = []): ?PDOStatement
+{
+    try {
+        return q($sql, $args);
+    } catch (PDOException $e) {
+        // 42S02 tabelnya belum ada, 42S22 kolomnya belum ada.
+        if (in_array($e->getCode(), ['42S02', '42S22'], true)) {
+            return null;
+        }
+        throw $e;
+    }
 }
 
 function q(string $sql, array $args = []): PDOStatement

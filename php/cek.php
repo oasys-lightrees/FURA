@@ -180,6 +180,30 @@ if ($installed) {
             'Belum dipasang, atau baru dipasang dan belum sampai menit ke-0. '
             . 'Mau langsung coba? Buka <code>cron/tick.php?key=</code> diikuti cron_key kamu.');
     }
+
+    // Pengingat yang tidak sampai adalah keluhan yang paling sering terdengar dan paling
+    // sulit ditelusuri, karena yang terlihat cuma "botnya mati". Jadi dua hal disebutkan
+    // di sini: kapan terakhir benar-benar terkirim, dan apa kesalahan terakhirnya.
+    $kirim = q1("SELECT ran_at, detail FROM job_log
+                  WHERE kind = 'notify_open' AND detail LIKE '%sent=1%'
+                  ORDER BY id DESC LIMIT 1");
+    row($kirim ? 'ok' : 'warn', 'Pengingat terakhir terkirim',
+        $kirim ? $kirim['ran_at'] . ' UTC' : 'belum pernah',
+        $kirim ? '' : 'Belum ada pengingat yang benar-benar sampai. Kalau cron sudah jalan, '
+                 . 'lihat baris kesalahan di bawah.');
+
+    $salah = q1("SELECT ran_at, kind, detail FROM job_log
+                  WHERE kind IN ('chat_error', 'tick_error', 'needs_upgrade')
+                  ORDER BY id DESC LIMIT 1");
+    if ($salah) {
+        $jam = (int) ((time() - strtotime($salah['ran_at'] . ' UTC')) / 3600);
+        row($jam < 48 ? 'bad' : 'warn', 'Kesalahan terakhir',
+            $salah['ran_at'] . ' UTC — ' . h($salah['kind']) . ': ' . h($salah['detail']),
+            $salah['kind'] === 'needs_upgrade'
+                ? 'Buka <a href="upgrade.php">Pemutakhiran database</a>.'
+                : 'Kalau ini berulang tiap jam, webhook-nya kemungkinan sudah tidak berlaku '
+                  . '— buat ulang dari space-nya lalu simpan di halaman Pertanyaan tim itu.');
+    }
 }
 
 /* ------------------------------------------------------------ uji kirim */

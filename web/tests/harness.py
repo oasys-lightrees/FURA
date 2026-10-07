@@ -100,11 +100,41 @@ def new_page(ctx, who, store=None, reset=True, at=None, enter="messi", config=No
             f'try {{ localStorage.setItem("fura.seen.{seen}", "1"); }} catch (e) {{}}')
     pg.add_init_script(STUB)
     pg.goto(preview_url())
-    pg.wait_for_timeout(900)
+    # Ditunggu sampai aplikasinya benar-benar menggambar sesuatu, bukan sampai sekian
+    # milidetik lewat. boot() membaca simpanan bersama dulu, dan lamanya tidak tetap —
+    # jeda yang dipatok membuat suite ini rewel persis ketika mesinnya sedang sibuk.
+    ready(pg)
     if enter:
         pg.click(f"[data-mod={enter}]")
         pg.wait_for_timeout(250)
     return pg
+
+
+def ready(pg, timeout=15_000):
+    """Menunggu aplikasinya menggambar sesuatu.
+
+    boot() membaca simpanan bersama dulu, dan lamanya tidak tetap. Jeda yang dipatok
+    membuat suite rewel persis ketika mesinnya sedang sibuk — dan rewel yang sesekali
+    lebih buruk daripada gagal yang jujur, karena orang berhenti mempercayai keduanya.
+    """
+    try:
+        pg.wait_for_selector("#view *", timeout=timeout)
+    except Exception:
+        pass
+    pg.wait_for_timeout(120)
+    return pg
+
+
+def stored_until(pg, body, timeout=10_000):
+    """Menunggu sampai simpanan bersama memenuhi syaratnya; `body` membaca `s`.
+
+    Yang ditunggu bukan "sudah ada isinya" tapi "sudah ada isi yang ini" — layar
+    berikutnya sering bergantung pada perubahan status, bukan pada jumlah baris.
+    """
+    pg.wait_for_function(
+        "() => { try { const s = JSON.parse(localStorage.getItem('__fake_db__') || 'null');"
+        f"        return !!s && ({body}); }} catch (e) {{ return false; }} }}",
+        timeout=timeout)
 
 
 def stored(pg, collection="cycles", n=1, timeout=10_000):

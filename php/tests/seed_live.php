@@ -14,11 +14,40 @@ $root->exec('DROP DATABASE IF EXISTS `' . $c['name'] . '`');
 $root->exec('CREATE DATABASE `' . $c['name'] . '` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci');
 $root->exec('USE `' . $c['name'] . '`');
 
-$sql = preg_replace('/^\s*--.*$/m', '', (string) file_get_contents(__DIR__ . '/../install.sql'));
+// `php tests/seed_live.php lama` membangun database dalam bentuk versi sebelumnya —
+// keadaan tiap pemasangan yang sudah jalan tepat setelah berkas barunya di-upload dan
+// sebelum pemutakhirannya dijalankan. Satu-satunya cara menguji jendela itu.
+$lama = ($argv[1] ?? '') === 'lama';
+$skema = $lama ? __DIR__ . '/fixtures/skema-lama-dengan-settings.sql'
+               : __DIR__ . '/../install.sql';
+$sql = preg_replace('/^\s*--.*$/m', '', (string) file_get_contents($skema));
 foreach (explode(';', $sql) as $stmt) {
     if (trim($stmt) !== '') {
         $root->exec($stmt);
     }
+}
+
+if ($lama) {
+    // Orang dan laporan yang sudah ada, dalam bentuk lama: tanpa tim, tanpa jejak
+    // undangan, dan dengan peran admin — belum ada owner.
+    $now = Clock::nowUtcSql();
+    $kemarin = messi_add_days(Clock::today(), -2);
+    foreach ([['lead@example.test', 'Lia', 'admin'],
+              ['nicho@example.test', 'Nicho', 'player']] as [$email, $name, $role]) {
+        $root->exec("INSERT INTO users (email, name, password_hash, role, joined_on, created_at)
+                     VALUES (" . $root->quote($email) . ", " . $root->quote($name) . ", "
+                     . $root->quote(password_hash('kata-sandi-panjang', PASSWORD_DEFAULT))
+                     . ", " . $root->quote($role) . ", " . $root->quote($kemarin) . ", "
+                     . $root->quote($now) . ")");
+    }
+    $root->exec("INSERT INTO cycles (user_id, day, status, answers, submitted_at, created_at)
+                 VALUES (2, " . $root->quote($kemarin) . ", 'submitted',
+                         '{\"detail\":\"WAG Klien A\"}', " . $root->quote($now) . ", "
+                 . $root->quote($now) . ")");
+    $root->exec("INSERT INTO settings (name, value, updated_at)
+                 VALUES ('messi', '{\"threshold_days\":3}', " . $root->quote($now) . ")");
+    echo "seeded lama, today=" . Clock::today() . "\n";
+    exit(0);
 }
 
 // `php tests/seed_live.php empty` leaves the database bare, which is what the setup

@@ -1,7 +1,7 @@
 # MESSI di cPanel
 
 Versi PHP + MySQL dari aplikasi di `web/`. Halamannya **sama persis** — `app.html`
-adalah salinan `web/messi.html` tanpa satu baris pun diubah, jadi 235 pemeriksaan browser
+adalah salinan `web/messi.html` tanpa satu baris pun diubah, jadi 236 pemeriksaan browser
 di `web/tests/` tetap menggambarkan apa yang dipakai squad. Yang ditulis ulang cuma
 bagian belakangnya: dulu data disimpan platform artifact, sekarang MySQL.
 
@@ -135,7 +135,7 @@ lib/schema.php     langkah pemutakhiran, tiap langkah memeriksa dirinya sendiri
 install.sql        tujuh tabel
 PASANG.txt         langkah pemasangan, bahasa non-teknis
 make-zip.sh        bikin messi-cpanel.zip
-tests/             461 pemeriksaan (tidak ikut ke server)
+tests/             495 pemeriksaan (tidak ikut ke server)
 ```
 
 ## Yang diputuskan server, bukan browser
@@ -195,10 +195,11 @@ menyebutkan mana yang barusan terjadi.
 |--------|--------|
 | `tests/test_engine.php` | 99 — aturan, dicocokkan dengan `tests/test_core.py` |
 | `tests/test_repo.php` | 111 — terhadap MySQL sungguhan, di database yang dia buat sendiri |
-| `tests/test_cron.php` | 57 — seminggu penuh jam demi jam, jam dibekukan, pesan bot ditangkap |
+| `tests/test_cron.php` | 66 — seminggu penuh jam demi jam, jam dibekukan, pesan bot ditangkap |
 | `tests/test_live.py` | 62 — browser terhadap aplikasi yang benar-benar jalan |
-| `tests/test_admin.py` | 90 — pemasangan pertama, tambah orang, ganti password, link sekali pakai, mengubah pertanyaan |
+| `tests/test_admin.py` | 91 — pemasangan pertama, tambah orang, ganti password, link sekali pakai, mengubah pertanyaan |
 | `tests/test_schema.php` | 42 — pemasangan lama di-upgrade, lalu dibandingkan kolom demi kolom dengan yang baru |
+| `tests/test_upgrade_path.py` | 24 — aplikasi sungguhan di atas database versi lama: masih bisa masuk, setiap halaman lain menyebut apa yang kurang, lalu satu tombol menghidupkannya |
 | `tests/check_sync.php` | memastikan `app.html` belum menyimpang dari `web/messi.html` |
 
 Yang dicoba juga: laporan atas nama orang lain, permintaan tanpa token, cron tanpa kunci,

@@ -3,7 +3,7 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from harness import (SHOTS, check, context, launch, new_page, report, results,
+from harness import (SHOTS, check, context, launch, new_page, ready, report, results,
                      store_of, txt, sync_playwright)
 
 # Rabu 30 Sep, 11:00 WIB — sebelum tenggat. Dibekukan supaya tanggal-tanggal di bawah
@@ -38,7 +38,7 @@ with sync_playwright() as p:
     check("hari bersih lewati langkah gantung", txt(pg,".stepno"), "LANGKAH 2 DARI 2")
 
     # draft survives a reload mid-fill
-    pg.reload(); pg.wait_for_timeout(900)
+    pg.reload(); ready(pg)
     check("draft bertahan setelah halaman ditutup",
           pg.input_value('[data-row=WAG][data-col=open]'), "13")
 
@@ -88,7 +88,7 @@ with sync_playwright() as p:
     pg.click("#toggle"); pg.wait_for_timeout(150)
     check("laporan bisa ditutup lagi", pg.query_selector("#reportText") is None)
 
-    pg.reload(); pg.wait_for_timeout(900)
+    pg.reload(); ready(pg)
     check("setelah refresh tetap 'sudah terkirim'", txt(pg,"h1"), "Sudah terkirim")
     check("janji tampil di layar selesai", "Balas setelah harga" in pg.inner_text("body"))
 
@@ -148,7 +148,7 @@ with sync_playwright() as p:
     pg.click("#theme"); pg.wait_for_timeout(250)
     first = get()
     check("sekali ditekan, temanya terkunci", first in ("light", "dark"))
-    pg.reload(); pg.wait_for_timeout(900)
+    pg.reload(); ready(pg)
     check("pilihannya bertahan setelah halaman ditutup", get(), first)
     pg.click("#theme"); pg.wait_for_timeout(250)
     check("bisa dibalik lagi", get(), lambda t: t in ("light", "dark") and t != first)

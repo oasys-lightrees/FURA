@@ -14,7 +14,7 @@ require __DIR__ . '/lib/require-php8.php';
 
 require_once __DIR__ . '/lib/auth.php';
 
-messi_require_ready();
+messi_require_current();
 
 $token = (string) ($_GET['t'] ?? $_POST['t'] ?? '');
 $who = auth_peek_invite($token);

@@ -26,7 +26,7 @@ pip install playwright && playwright install chromium
 python3 web/tests/run_all.py
 ```
 
-235 checks across five suites. They drive a real browser against `messi.html` with
+236 checks across five suites. They drive a real browser against `messi.html` with
 `window.claude` faked (`tests/stub.js`): an in-memory store held in localStorage plus a
 switchable identity, so a submission made as one person can be read as another.
 
@@ -34,7 +34,7 @@ switchable identity, so a submission made as one person can be read as another.
 |---|---|
 | `test_player.py` (48) | Login, the 2-vs-3 step flow, every rejection, live totals, draft survival across a reload, promise capture, the generated report, and correcting a report already sent |
 | `test_manager.py` (59) | The recap screen: every person with their figures, any past workday, a drill-down into one person's full report; escalations by name, overdue promises, repeat absentees; and that a player sees nobody else's data |
-| `test_edge.py` (46) | Weekend, before opening, after the deadline, one person's submission reaching another's screen, and the plan list: adding and dropping rows, the five-row cap, one promise per row, and corrections that keep each promise on its own date |
+| `test_edge.py` (47) | Weekend, before opening, after the deadline, one person's submission reaching another's screen, and the plan list: adding and dropping rows, the five-row cap, one promise per row, and corrections that keep each promise on its own date |
 | `test_keyboard.py` (16) | Grid navigation: Enter and arrows move between cells and never change a number; the wheel cannot either |
 | `test_catalog.py` (66) | The module catalogue and what each card says today, the MESSI explainer on a first visit, the sticky header measured at three widths, and a settings document changing every question, threshold, hour and channel the page asks about |
 

@@ -8,7 +8,7 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from harness import (SHOTS, check, context, launch, new_page, results, store_of,
+from harness import (SHOTS, check, context, launch, new_page, ready, results, store_of,
                      stored, sync_playwright, txt)
 
 AT = "2026-09-30T04:00:00Z"          # Rabu 11:00 WIB
@@ -87,15 +87,13 @@ with sync_playwright() as p:
         """() => { try { return (JSON.parse(
              localStorage.getItem("messi.draft.2026-09-30") || "{}").grid || {}).WAG.open; }
            catch (e) { return "tidak tersimpan"; } }"""), 7)
-    pgR.reload()
-    pgR.wait_for_selector("[data-row=WAG][data-col=open]", timeout=10_000)
-    pgR.wait_for_timeout(300)
+    pgR.reload(); ready(pgR)
     check("muat ulang di tengah pengisian tetap di dalam modul",
           txt(pgR, "h1"), "Berapa banyak hari ini?")
     check("dan angkanya masih ada",
           pgR.input_value("[data-row=WAG][data-col=open]"), "7")
     pgR.click("#home"); pgR.wait_for_timeout(250)
-    pgR.reload(); pgR.wait_for_timeout(900)
+    pgR.reload(); ready(pgR)
     check("keluar dari modul lalu muat ulang tetap di katalog", txt(pgR, "h1"), "Modul")
 
     print("\n--- kepala dan baris modul sebagai satu blok ---")

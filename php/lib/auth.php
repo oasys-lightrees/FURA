@@ -100,7 +100,9 @@ function auth_login(string $email, string $password): ?array
     // Yang diundang tapi belum membuat password belum punya akun yang bisa dipakai.
     // Hash kosong tidak akan cocok dengan apa pun, tapi dikatakan di sini supaya alasannya
     // terbaca dan tidak bergantung pada perilaku password_verify terhadap hash tak sah.
-    if ($user && $user['accepted_at'] === null) {
+    // accepted_at baru ada setelah pemutakhiran; sebelum itu semua akun memang sudah
+    // punya password, jadi tidak ada yang perlu ditahan di sini.
+    if ($user && array_key_exists('accepted_at', $user) && $user['accepted_at'] === null) {
         auth_note_failure($email);
         return null;
     }
@@ -148,27 +150,33 @@ function auth_throttled(string $email, ?string $ip = null): bool
     $since = Clock::utc()->modify('-' . MESSI_TRY_WINDOW . ' minutes')->format('Y-m-d H:i:s');
     $email = strtolower(trim($email));
 
-    $pair = (int) q1('SELECT COUNT(*) AS n FROM login_attempts
-                       WHERE email = ? AND ip = ? AND at > ?', [$email, $ip, $since])['n'];
-    if ($pair >= MESSI_TRY_PAIR) {
+    // Tabelnya dibuat oleh pemutakhiran, dan pemutakhiran cuma bisa dijalankan setelah
+    // masuk. Jadi tanpa tabel itu pintunya tidak boleh ikut terkunci: belum ada catatan
+    // berarti belum ada yang perlu ditahan.
+    $pair = q_opt('SELECT COUNT(*) AS n FROM login_attempts
+                    WHERE email = ? AND ip = ? AND at > ?', [$email, $ip, $since]);
+    if ($pair === null) {
+        return false;
+    }
+    if ((int) $pair->fetch()['n'] >= MESSI_TRY_PAIR) {
         return true;
     }
-    $all = (int) q1('SELECT COUNT(*) AS n FROM login_attempts WHERE ip = ? AND at > ?',
-                    [$ip, $since])['n'];
-    return $all >= MESSI_TRY_IP;
+    $all = q_opt('SELECT COUNT(*) AS n FROM login_attempts WHERE ip = ? AND at > ?',
+                 [$ip, $since]);
+    return $all !== null && (int) $all->fetch()['n'] >= MESSI_TRY_IP;
 }
 
 function auth_note_failure(string $email, ?string $ip = null): void
 {
-    q('INSERT INTO login_attempts (at, email, ip) VALUES (?,?,?)',
-      [Clock::nowUtcSql(), substr(strtolower(trim($email)), 0, 190), $ip ?? auth_ip()]);
+    q_opt('INSERT INTO login_attempts (at, email, ip) VALUES (?,?,?)',
+          [Clock::nowUtcSql(), substr(strtolower(trim($email)), 0, 190), $ip ?? auth_ip()]);
 }
 
 /** Berhasil masuk menghapus jejak gagalnya: yang ingat password tidak sedang menebak. */
 function auth_clear_failures(string $email, ?string $ip = null): void
 {
-    q('DELETE FROM login_attempts WHERE email = ? AND ip = ?',
-      [strtolower(trim($email)), $ip ?? auth_ip()]);
+    q_opt('DELETE FROM login_attempts WHERE email = ? AND ip = ?',
+          [strtolower(trim($email)), $ip ?? auth_ip()]);
 }
 
 /* ------------------------------------------------------------------ undangan */
@@ -282,8 +290,9 @@ function auth_sweep(): int
     $n += q('DELETE FROM login_tokens WHERE expires_at < ? OR used_at IS NOT NULL', [$now])->rowCount();
     // Percobaan yang gagal cuma berguna selama jendelanya; sesudah itu ia catatan tentang
     // orang yang salah ketik sebulan lalu, dan itu bukan sesuatu yang perlu disimpan.
-    $n += q('DELETE FROM login_attempts WHERE at < ?',
-            [Clock::utc()->modify('-1 day')->format('Y-m-d H:i:s')])->rowCount();
+    $basi = q_opt('DELETE FROM login_attempts WHERE at < ?',
+                  [Clock::utc()->modify('-1 day')->format('Y-m-d H:i:s')]);
+    $n += $basi ? $basi->rowCount() : 0;
     return $n;
 }
 

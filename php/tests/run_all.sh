@@ -40,6 +40,10 @@ echo "== pemasangan & admin =="
 MESSI_TEST_DB=messi_admin_test python3 tests/test_admin.py
 
 echo
+echo "== berkas baru di atas database lama =="
+MESSI_TEST_DB=messi_upgrade_test python3 tests/test_upgrade_path.py
+
+echo
 if [ -n "$MESSI_TEST_SOCKET" ] || [ -n "$MESSI_TEST_HOST" ]; then
   echo "SEMUA LOLOS — termasuk yang pakai database sungguhan."
 else

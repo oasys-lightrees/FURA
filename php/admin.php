@@ -16,7 +16,7 @@ require_once __DIR__ . '/lib/repo.php';
 require_once __DIR__ . '/lib/schema.php';
 
 // Says what is missing on the first screen, not on the first click.
-messi_require_ready();
+messi_require_current();
 
 $me = auth_user();
 if (!$me) { header('Location: login.php'); exit; }

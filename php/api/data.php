@@ -9,6 +9,10 @@ require dirname(__DIR__) . '/lib/require-php8.php';
 require_once __DIR__ . '/../lib/auth.php';
 require_once __DIR__ . '/../lib/repo.php';
 
+// Berkas aplikasi bisa lebih baru daripada databasenya; jawabannya satu kalimat yang
+// bisa ditindaklanjuti, bukan 500 kosong yang terbaca sebagai "laporan saya hilang".
+messi_require_current();
+
 $user = require_login_json();
 
 // Only a leader has a screen that shows other people's reports.
