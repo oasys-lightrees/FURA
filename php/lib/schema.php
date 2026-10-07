@@ -65,6 +65,21 @@ function schema_has_key(string $table, string $key): bool
  * `why` ditulis untuk admin yang membaca halaman upgrade, bukan untuk programer: dia
  * yang menekan tombolnya, dan dia berhak tahu apa yang akan berubah di datanya.
  */
+/**
+ * Apakah indeks unik ini persis berisi kolom-kolom itu, dalam urutan itu.
+ *
+ * Bukan cuma "ada indeks bernama begitu": yang diubah langkah di bawah adalah isinya,
+ * dan indeks lama yang namanya kebetulan sama akan terbaca sebagai sudah selesai.
+ */
+function schema_unique_is(string $table, string $key, array $columns): bool
+{
+    $rows = q('SELECT column_name FROM information_schema.statistics
+                WHERE table_schema = DATABASE() AND table_name = ? AND index_name = ?
+                  AND non_unique = 0
+                ORDER BY seq_in_index', [$table, $key])->fetchAll(PDO::FETCH_COLUMN);
+    return array_map('strtolower', $rows) === array_map('strtolower', $columns);
+}
+
 function schema_steps(): array
 {
     return [
@@ -215,6 +230,76 @@ function schema_steps(): array
                 if (!schema_has_fk('settings', 'fk_settings_team')) {
                     db()->exec('ALTER TABLE settings ADD CONSTRAINT fk_settings_team
                                   FOREIGN KEY (team_id) REFERENCES teams(id) ON DELETE CASCADE');
+                }
+            },
+        ],
+        [
+            'id'   => 'modules',
+            'why'  => 'Membuat tabel modul, lalu menuliskan MESSI yang sekarang berjalan ke '
+                    . 'dalamnya — lengkap dengan channel, ambang dan kalimat yang sudah kamu '
+                    . 'ubah. Setelah ini modul bisa ditambah sendiri dari halaman Kelola, dan '
+                    . 'MESSI jadi salah satunya, bukan satu-satunya.',
+            'todo' => fn() => !schema_has_table('modules')
+                           || !schema_has_column('cycles', 'module_id')
+                           || !schema_has_fk('cycles', 'fk_cycles_module')
+                           || !schema_unique_is('cycles', 'uq_cycle_day',
+                                                ['user_id', 'day', 'module_id'])
+                           // Laporan lama yang belum menunjuk ke modulnya. Sengaja tidak
+                           // ikut memeriksa "tiap tim punya modul": tim lahir setelah
+                           // pemasangan, dan pemasangan yang baru saja jadi akan terbaca
+                           // sebagai tertunda padahal belum ada apa-apa untuk dikerjakan.
+                           // Penyemaiannya ditangani halaman yang membutuhkannya.
+                           || (int) q1('SELECT COUNT(*) AS n FROM cycles
+                                         WHERE module_id IS NULL AND team_id IS NOT NULL')['n'] > 0,
+            'run'  => function (): void {
+                if (!schema_has_table('modules')) {
+                    db()->exec("CREATE TABLE modules (
+                        id         INT UNSIGNED NOT NULL AUTO_INCREMENT,
+                        team_id    INT UNSIGNED NOT NULL,
+                        code       VARCHAR(12) NOT NULL,
+                        spec       LONGTEXT NOT NULL CHECK (JSON_VALID(spec)),
+                        active     TINYINT(1) NOT NULL DEFAULT 1,
+                        sort_order SMALLINT UNSIGNED NOT NULL DEFAULT 0,
+                        created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                        updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                        updated_by INT UNSIGNED DEFAULT NULL,
+                        PRIMARY KEY (id),
+                        UNIQUE KEY uq_module_code (team_id, code),
+                        KEY ix_modules_team (team_id, sort_order),
+                        CONSTRAINT fk_modules_team FOREIGN KEY (team_id)
+                            REFERENCES teams(id) ON DELETE CASCADE,
+                        CONSTRAINT fk_modules_user FOREIGN KEY (updated_by)
+                            REFERENCES users(id) ON DELETE SET NULL
+                      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
+                }
+
+                // Tiap tim mendapat MESSI-nya sendiri, dibangun dari setelan tim itu.
+                require_once __DIR__ . '/katalog.php';
+                foreach (q('SELECT id FROM teams') as $t) {
+                    katalog_seed((int) $t['id']);
+                }
+
+                if (!schema_has_column('cycles', 'module_id')) {
+                    db()->exec('ALTER TABLE cycles ADD COLUMN module_id INT UNSIGNED DEFAULT NULL
+                                  AFTER team_id');
+                }
+                // Laporan yang sudah ada semuanya laporan MESSI — waktu itu tidak ada
+                // modul lain untuk dilaporkan.
+                q("UPDATE cycles c JOIN modules m ON m.team_id = c.team_id AND m.code = 'MESSI'
+                      SET c.module_id = m.id WHERE c.module_id IS NULL");
+
+                if (!schema_unique_is('cycles', 'uq_cycle_day',
+                                      ['user_id', 'day', 'module_id'])) {
+                    // Satu orang satu hari satu laporan — per modul, bukan lagi seluruhnya.
+                    db()->exec('ALTER TABLE cycles DROP INDEX uq_cycle_day,
+                                  ADD UNIQUE KEY uq_cycle_day (user_id, day, module_id)');
+                }
+                if (!schema_has_key('cycles', 'ix_cycles_module')) {
+                    db()->exec('ALTER TABLE cycles ADD KEY ix_cycles_module (module_id)');
+                }
+                if (!schema_has_fk('cycles', 'fk_cycles_module')) {
+                    db()->exec('ALTER TABLE cycles ADD CONSTRAINT fk_cycles_module
+                                  FOREIGN KEY (module_id) REFERENCES modules(id) ON DELETE RESTRICT');
                 }
             },
         ],

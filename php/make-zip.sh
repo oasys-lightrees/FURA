@@ -17,7 +17,7 @@ OUT="$(cd .. && pwd)/messi-cpanel.zip"
 STAGE="$(mktemp -d)"
 trap 'rm -rf "$STAGE"' EXIT
 
-for f in index.php login.php lupa.php setup.php kelola.php admin.php soal.php upgrade.php \
+for f in index.php login.php lupa.php setup.php kelola.php admin.php soal.php modul.php upgrade.php \
          undang.php cek.php app.html install.sql \
          config.example.php .htaccess README.md PASANG.txt api lib cron; do
   cp -r "$f" "$STAGE/"

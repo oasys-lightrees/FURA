@@ -38,9 +38,13 @@ q('INSERT INTO users (email, name, password_hash, role, team_id, joined_on, acce
   ['ani@example.test', 'Ani', password_hash('kata-sandi-panjang', PASSWORD_DEFAULT),
    'player', $hr, '2026-09-28', $now, $now]);
 $ani = (int) db()->lastInsertId();
-q('INSERT INTO cycles (user_id, day, team_id, status, answers, submitted_at, created_at)
-   VALUES (?,?,?,?,?,?,?)',
-  [$ani, date('Y-m-d'), $hr, 'submitted', '{\"detail\":\"DM HR\"}', $now, $now]);
+// Lewat jalur yang sama dengan aplikasinya: laporan tanpa modul adalah laporan yang
+// masih menunggu dimutakhirkan, dan seluruh aplikasi memang berhenti sampai itu beres.
+$modul = repo_module_id($hr);
+q('INSERT INTO cycles (user_id, day, team_id, module_id, status, answers, submitted_at,
+                       created_at)
+   VALUES (?,?,?,?,?,?,?,?)',
+  [$ani, date('Y-m-d'), $hr, $modul, 'submitted', '{\"detail\":\"DM HR\"}', $now, $now]);
 q('INSERT INTO users (email, name, password_hash, role, team_id, joined_on, accepted_at, created_at)
    VALUES (?,?,?,?,?,?,?,?)',
   ['owi@example.test', 'Owi', password_hash('kata-sandi-panjang', PASSWORD_DEFAULT),

@@ -39,6 +39,11 @@ if (!isset($teams[$teamId])) {
 }
 $cfg = repo_config($teamId);
 
+require_once __DIR__ . '/lib/katalog.php';
+$semuaModul = katalog_list($teamId, true);
+$modulN     = count(array_filter($semuaModul, fn($m) => $m['active']));
+$modulMati  = count($semuaModul) - $modulN;
+
 /* ------------------------------------------------------------------ orang */
 
 $people = q('SELECT role, active, accepted_at, reset_asked_at FROM users')->fetchAll();
@@ -179,6 +184,11 @@ CSS]);
       <span>Undang orang, atur peran, buat tim.</span>
       <em><?= $aktif ?> orang aktif<?= $belum ? ' · ' . $belum . ' belum terima undangan' : '' ?><?=
           $minta ? ' · ' . $minta . ' minta link masuk' : '' ?></em>
+    </a>
+    <a href="modul.php?team=<?= $teamId ?>">
+      <b>Modul</b>
+      <span>Susun modul sendiri: pertanyaannya, jamnya, dan apa yang jadi janji.</span>
+      <em><?= $modulN ?> modul<?= $modulMati ? ' · ' . $modulMati . ' dimatikan' : '' ?></em>
     </a>
     <a href="soal.php?team=<?= $teamId ?>">
       <b>Pertanyaan</b>

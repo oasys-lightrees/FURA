@@ -73,6 +73,29 @@ CREATE TABLE IF NOT EXISTS login_tokens (
 
 -- One report per person per Jakarta working day. The unique key is the whole
 -- idempotency story: the cron may run every hour and still create exactly one.
+-- Modul: bentuk sebuah laporan, disimpan sebagai dokumen dan bukan ditulis di dalam
+-- program. Milik tim, bukan milik perusahaan — HR dan sales tidak melaporkan hal yang
+-- sama, dan memaksa keduanya memakai satu modul berarti salah satunya mengisi kolom yang
+-- tidak berarti apa-apa baginya.
+CREATE TABLE IF NOT EXISTS modules (
+  id              INT UNSIGNED NOT NULL AUTO_INCREMENT,
+  team_id         INT UNSIGNED NOT NULL,
+  -- Kode modul, dipakai jawaban yang tersimpan untuk menunjuk balik ke sini. Tidak
+  -- pernah berubah setelah dibuat.
+  code            VARCHAR(12) NOT NULL,
+  spec            LONGTEXT NOT NULL CHECK (JSON_VALID(spec)),
+  active          TINYINT(1) NOT NULL DEFAULT 1,
+  sort_order      SMALLINT UNSIGNED NOT NULL DEFAULT 0,
+  created_at      DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at      DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_by      INT UNSIGNED DEFAULT NULL,
+  PRIMARY KEY (id),
+  UNIQUE KEY uq_module_code (team_id, code),
+  KEY ix_modules_team (team_id, sort_order),
+  CONSTRAINT fk_modules_team FOREIGN KEY (team_id) REFERENCES teams(id) ON DELETE CASCADE,
+  CONSTRAINT fk_modules_user FOREIGN KEY (updated_by) REFERENCES users(id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 CREATE TABLE IF NOT EXISTS cycles (
   id              INT UNSIGNED NOT NULL AUTO_INCREMENT,
   user_id         INT UNSIGNED NOT NULL,
@@ -80,15 +103,23 @@ CREATE TABLE IF NOT EXISTS cycles (
   -- Tim yang berlaku saat laporan ini dikirim. Dicatat, bukan dibaca dari orangnya:
   -- kalau tidak, memindahkan seseorang ke tim lain akan menulis ulang rekap bulan lalu.
   team_id         INT UNSIGNED DEFAULT NULL,
+  -- Modul yang dilaporkan. Satu orang bisa punya beberapa laporan di hari yang sama,
+  -- satu untuk tiap modul yang dia pegang.
+  module_id       INT UNSIGNED DEFAULT NULL,
   status          ENUM('pending','submitted','late','missed') NOT NULL DEFAULT 'pending',
   answers         LONGTEXT DEFAULT NULL CHECK (answers IS NULL OR JSON_VALID(answers)),
   submitted_at    DATETIME DEFAULT NULL,
   created_at      DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (id),
-  UNIQUE KEY uq_cycle_day (user_id, day),
+  UNIQUE KEY uq_cycle_day (user_id, day, module_id),
   KEY ix_cycles_day (day, status),
+  KEY ix_cycles_module (module_id),
   CONSTRAINT fk_cycles_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
-  CONSTRAINT fk_cycles_team FOREIGN KEY (team_id) REFERENCES teams(id) ON DELETE SET NULL
+  CONSTRAINT fk_cycles_team FOREIGN KEY (team_id) REFERENCES teams(id) ON DELETE SET NULL,
+  -- RESTRICT, bukan CASCADE: modul yang sudah punya laporan tidak boleh hilang begitu
+  -- saja, karena laporannya ikut hilang bersamanya. Aturan yang sama dijaga aplikasi;
+  -- ini yang menjaganya kalau suatu hari ada jalan lain menuju ke sini.
+  CONSTRAINT fk_cycles_module FOREIGN KEY (module_id) REFERENCES modules(id) ON DELETE RESTRICT
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS commitments (

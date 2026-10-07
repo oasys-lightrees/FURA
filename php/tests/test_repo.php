@@ -34,6 +34,17 @@ eq('opening it again creates nothing — the unique key holds',
 eq('and there is still exactly one row each',
    (int) q1('SELECT COUNT(*) n FROM cycles WHERE day = ?', ['2026-09-30'])['n'], 3);
 
+// Kunci uniknya sekarang (user_id, day, module_id), dan MySQL menganggap dua NULL
+// sebagai dua nilai berbeda — laporan tanpa modul membuat ON DUPLICATE KEY tidak pernah
+// menyala, dan satu orang bisa punya dua laporan untuk hari yang sama tanpa satu pun
+// pesan kesalahan.
+eq('tiap laporan menunjuk modul yang dilaporkannya',
+   (int) q1('SELECT COUNT(*) n FROM cycles WHERE day = ? AND module_id IS NULL',
+            ['2026-09-30'])['n'], 0);
+eq('membuat laporan hari yang sama dua kali tetap satu baris',
+   repo_ensure_cycle((int) $nicho['id'], '2026-09-30'),
+   repo_ensure_cycle((int) $nicho['id'], '2026-09-30'));
+
 eq('a weekend opens nothing at all', count(repo_generate('2026-10-03')), 0);
 
 eq('someone who has not started yet gets no cycle',
@@ -525,7 +536,7 @@ ok('jalan keluarnya satu kalimat yang sama di mana pun',
      && str_contains(messi_import_again(), 'Aman diulang'));
 
 // Tables missing: the database is reachable but install.sql was never imported.
-$root->exec('DROP TABLE IF EXISTS commitments, cycles, login_tokens, sessions, job_log, settings, users');
+$root->exec('DROP TABLE IF EXISTS commitments, cycles, modules, login_tokens, sessions, job_log, settings, users');
 $out = shell_exec('cd ' . escapeshellarg(dirname(__DIR__)) . ' && MESSI_TEST_DB='
     . escapeshellarg($GLOBALS['MESSI_TEST_DBNAME'])
     . ' php tests/probe_unready.php 2>&1');

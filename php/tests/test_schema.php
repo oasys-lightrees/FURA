@@ -112,6 +112,24 @@ foreach (['skema-lama-tanpa-settings.sql' => 'sebelum ada halaman pertanyaan',
        (int) q1('SELECT COUNT(*) AS n FROM cycles')['n'], 1);
     eq("$sebutan: janjinya tidak hilang",
        (int) q1('SELECT COUNT(*) AS n FROM commitments')['n'], 1);
+
+    // Modul: MESSI yang selama ini berjalan harus ketemu lagi di katalog, bukan modul
+    // contoh yang kosong — kalau tidak, pemutakhiran ini terasa seperti kehilangan.
+    eq("$sebutan: tiap tim dapat satu modul MESSI",
+       (int) q1("SELECT COUNT(*) AS n FROM modules WHERE code = 'MESSI'")['n'],
+       (int) q1('SELECT COUNT(*) AS n FROM teams')['n']);
+    eq("$sebutan: laporan lama ikut ditunjuk ke modul itu",
+       (int) q1('SELECT COUNT(*) AS n FROM cycles WHERE module_id IS NULL')['n'], 0);
+
+    $spec = modul_normalize(json_decode(
+        (string) q1("SELECT spec FROM modules WHERE code = 'MESSI'")['spec'], true));
+    eq("$sebutan: modulnya berisi pertanyaan MESSI, bukan modul kosong",
+       $spec['fields'][0]['type'], 'grid');
+    if (str_contains($fixture, 'dengan-settings')) {
+        // Ambang yang sudah diubah admin ikut terbawa, bukan kembali ke bawaan.
+        eq("$sebutan: ambang yang sudah disetel ikut terbawa",
+           $spec['fields'][0]['cols'][1]['label'], 'Gantung >1 hari');
+    }
     eq("$sebutan: semua orang punya tim",
        (int) q1('SELECT COUNT(*) AS n FROM users WHERE team_id IS NULL')['n'], 0);
     eq("$sebutan: dan semuanya tim yang sama, karena dulu memang satu tim",

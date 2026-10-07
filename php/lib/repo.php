@@ -255,11 +255,57 @@ class RepoError extends RuntimeException {}
 
 /** Today's cycle row for this person, created if the cron has not run yet. Returns the
  *  row id. The unique key on (user_id, day) is what makes this safe to call twice. */
-function repo_ensure_cycle(int $userId, string $day, ?int $teamId = null): int
+/**
+ * Modul yang dilaporkan sebuah laporan harian.
+ *
+ * Untuk sekarang selalu MESSI: dialah satu-satunya modul yang punya layar pengisian.
+ * Yang disusun sendiri sudah bisa dibuat dan disimpan, tapi belum punya layarnya — jadi
+ * belum ada laporan yang menunjuk ke sana.
+ *
+ * Mengembalikan null kalau tabel modulnya belum ada, yaitu di sela antara berkas baru
+ * diunggah dan database dimutakhirkan. Di keadaan itu kunci unik cycles juga masih yang
+ * lama, jadi menyimpan tanpa modul tetap aman.
+ */
+function repo_module_id(?int $teamId): ?int
 {
-    q('INSERT INTO cycles (user_id, day, team_id, status, created_at) VALUES (?,?,?,?,?)
+    if ($teamId === null) {
+        return null;
+    }
+    // Sengaja tidak disimpan di memori: satu pencarian berindeks tiap kali jauh lebih
+    // murah daripada satu lagi tempat yang harus dibersihkan saat tes berpindah database.
+    require_once __DIR__ . '/katalog.php';
+    $row = q_opt('SELECT id FROM modules WHERE team_id = ? AND code = ? LIMIT 1',
+                 [$teamId, 'MESSI'])?->fetch();
+    if (!$row) {
+        katalog_seed($teamId);
+        $row = q_opt('SELECT id FROM modules WHERE team_id = ? AND code = ? LIMIT 1',
+                     [$teamId, 'MESSI'])?->fetch();
+    }
+    return $row ? (int) $row['id'] : null;
+}
+
+/**
+ * Satu laporan per orang per hari per modul.
+ *
+ * module_id wajib ikut. Kunci uniknya sekarang (user_id, day, module_id), dan MySQL
+ * menganggap dua NULL sebagai dua nilai yang berbeda — menyimpan tanpa modul membuat
+ * ON DUPLICATE KEY tidak pernah menyala, dan satu orang bisa punya dua laporan untuk
+ * hari yang sama tanpa satu pun pesan kesalahan.
+ */
+function repo_ensure_cycle(int $userId, string $day, ?int $teamId = null,
+                           ?int $moduleId = null): int
+{
+    if ($moduleId === null) {
+        if ($teamId === null) {
+            $u = q1('SELECT team_id FROM users WHERE id = ?', [$userId]);
+            $teamId = $u && $u['team_id'] !== null ? (int) $u['team_id'] : null;
+        }
+        $moduleId = repo_module_id($teamId);
+    }
+    q('INSERT INTO cycles (user_id, day, team_id, module_id, status, created_at)
+       VALUES (?,?,?,?,?,?)
         ON DUPLICATE KEY UPDATE id = LAST_INSERT_ID(id)',
-      [$userId, $day, $teamId, 'pending', Clock::nowUtcSql()]);
+      [$userId, $day, $teamId, $moduleId, 'pending', Clock::nowUtcSql()]);
     return (int) db()->lastInsertId();
 }
 

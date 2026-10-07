@@ -139,6 +139,32 @@ cPanel -> Software -> Select PHP Version (atau MultiPHP Manager) -> pilih 8.1 / 
    sudah lewat: tiap laporan membawa timnya sendiri.
 
 
+7c. MODUL SENDIRI (boleh dilewati)
+   Kelola -> Modul. MESSI sudah ada di situ sejak awal, lengkap dengan channel dan
+   ambang yang berlaku di timmu — dan sekarang dia salah satu modul, bukan
+   satu-satunya.
+
+   Modul baru: beri kode pendek (huruf dan angka, misalnya PRISTA), lalu susun
+   pertanyaannya. Enam jenis yang bisa dipakai:
+
+     Angka             tabel baris x kolom. Kolom yang ditandai MERAH adalah yang
+                       menyalakan lampu laporan.
+     Isian pendek      satu baris.
+     Isian panjang     beberapa baris. Bisa diatur supaya langsung diumumkan ke
+                       Google Chat begitu diisi.
+     Satu angka        tanpa tabel.
+     Pilihan           pilih satu dari daftar yang kamu tulis.
+     Rencana+tanggal   tiap baris jadi JANJI: di tanggalnya orangnya ditanya "sudah
+                       beres?", dan yang lewat tanpa dijawab ditandai tidak ditepati.
+
+   Tiap pertanyaan bisa disetel "ditanyakan selalu" atau "hanya kalau lampunya merah" —
+   itulah cara MESSI menanyakan rencana cuma saat ada yang gantung.
+
+   Kode modul tidak bisa diganti setelah dibuat: laporan yang sudah tersimpan menunjuk
+   ke kode itu. Modul yang sudah pernah dilaporkan tidak bisa dihapus, hanya dimatikan
+   dari katalog — laporan lamanya tetap bisa dibaca.
+
+
 8. SESUAIKAN PERTANYAANNYA (boleh dilewati)
    Menu kanan atas -> Kelola -> Pertanyaan. Kalau ada lebih dari satu tim, pilih
    dulu timnya di atas — pertanyaan milik tim.

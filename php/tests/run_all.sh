@@ -16,6 +16,10 @@ echo "== aturan mesin =="
 MESSI_TEST_DB= php tests/test_engine.php
 
 echo
+echo "== modul sebagai data =="
+MESSI_TEST_DB= php tests/test_modul.php
+
+echo
 echo "== halaman sama dengan yang sudah diuji =="
 php tests/check_sync.php
 
@@ -38,6 +42,10 @@ MESSI_TEST_DB=messi_live_test python3 tests/test_live.py
 echo
 echo "== pemasangan & admin =="
 MESSI_TEST_DB=messi_admin_test python3 tests/test_admin.py
+
+echo
+echo "== modul yang disusun sendiri =="
+MESSI_TEST_DB=messi_modulpage_test python3 tests/test_modul_page.py
 
 echo
 echo "== berkas baru di atas database lama =="
