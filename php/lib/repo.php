@@ -493,10 +493,11 @@ const MESSI_IZIN_MAX_DAYS = 62;
  * tidak ada satu pun tombol untuk membetulkannya — dan rekap yang menyimpan tuduhan yang
  * semua orang tahu salah adalah rekap yang berhenti dibaca.
  *
- * Tiga hal yang dijaga di sini:
- *   - Yang menandai leader atau admin, bukan orangnya sendiri. Izin yang bisa diberikan
- *     sendiri bukan izin, cuma tombol "hapus tanda merah".
- *   - Leader hanya boleh menandai orang di timnya. Nama orang di tim lain bukan miliknya.
+ * Dua hal yang dijaga di sini:
+ *   - Yang menandai admin atau owner, bukan orangnya sendiri, dan bukan juga leadernya.
+ *     Izin yang bisa diberikan sendiri bukan izin, cuma tombol "hapus tanda merah" — dan
+ *     begitu satu baris merahnya tidak berarti apa-apa, tidak ada baris merah lain yang
+ *     berarti apa-apa.
  *   - Hari yang laporannya sudah masuk tidak disentuh. Menimpanya dengan izin berarti
  *     laporan yang sungguhan hilang dari rekap, dan tidak ada yang akan tahu kenapa.
  *
@@ -506,15 +507,12 @@ function repo_set_excused(array $actor, int $userId, string $from, string $to, b
                           string $note = ''): int
 {
     require_once __DIR__ . '/auth.php';
-    if (!is_leader($actor)) {
-        throw new RepoError('Yang bisa menandai izin cuma leader dan admin.');
+    if (!is_manager($actor)) {
+        throw new RepoError('Yang bisa menandai izin cuma admin dan owner.');
     }
     $target = q1('SELECT id, name, team_id, joined_on FROM users WHERE id = ?', [$userId]);
     if (!$target) {
         throw new RepoError('Orang itu tidak ada.');
-    }
-    if (!is_manager($actor) && (int) $target['team_id'] !== repo_team_of($actor)) {
-        throw new RepoError('Orang itu bukan di timmu.');
     }
     if (!messi_is_day($from) || !messi_is_day($to)) {
         throw new RepoError('Tanggalnya belum lengkap.');

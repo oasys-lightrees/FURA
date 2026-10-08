@@ -570,7 +570,13 @@ $cuti = make_user('cuti@example.test', 'Cuti', 'player', '2026-09-01');
 
 throws('pemain tidak bisa menandai dirinya sendiri izin',
        fn() => repo_set_excused($nicho, (int) $cuti['id'], '2026-09-29', '2026-09-29', true),
-       'leader dan admin');
+       'admin dan owner');
+// Untuk sekarang leader pun tidak: satu pintu yang jelas lebih mudah dipercaya daripada
+// dua yang batasnya kabur, dan izin yang bisa diberikan atasan langsung paling cepat
+// berubah jadi "tolong hapus merah saya".
+throws('dan leader pun belum bisa',
+       fn() => repo_set_excused($lead, (int) $cuti['id'], '2026-09-29', '2026-09-29', true),
+       'admin dan owner');
 throws('tanggal yang tidak ada ditolak',
        fn() => repo_set_excused($admin, (int) $cuti['id'], '2026-02-31', '2026-02-31', true),
        'Tanggalnya belum lengkap');
@@ -583,13 +589,13 @@ throws('rentang yang kelewat panjang ditolak',
 
 // Sen 28 Sep sampai Jum 2 Okt: lima hari kerja, dua hari akhir pekan di luarnya.
 eq('seminggu cuti jadi lima hari kerja, bukan tujuh',
-   repo_set_excused($lead, (int) $cuti['id'], '2026-09-28', '2026-10-04', true, 'cuti tahunan'),
+   repo_set_excused($admin, (int) $cuti['id'], '2026-09-28', '2026-10-04', true, 'cuti tahunan'),
    5);
 eq('akhir pekan tidak ikut ditandai',
    (int) q1("SELECT COUNT(*) AS n FROM cycles WHERE user_id = ? AND status = 'excused'
               AND day IN ('2026-10-03','2026-10-04')", [$cuti['id']])['n'], 0);
 eq('menandainya lagi tidak menandai apa pun dua kali',
-   repo_set_excused($lead, (int) $cuti['id'], '2026-09-28', '2026-10-02', true), 0);
+   repo_set_excused($admin, (int) $cuti['id'], '2026-09-28', '2026-10-02', true), 0);
 
 // Inilah seluruh gunanya: hari yang lewat tanpa laporan tidak lagi jadi tuduhan.
 repo_reap('2026-09-30');
@@ -606,7 +612,7 @@ $daftar = repo_excused(null, 365, 365);
 eq('daftarnya menyebut lima harinya', count(array_filter($daftar,
    fn($r) => $r['user_id'] === (int) $cuti['id'])), 5);
 eq('beserta siapa yang menandainya',
-   $daftar[0]['by'] ?? 0, (int) $lead['id']);
+   $daftar[0]['by'] ?? 0, (int) $admin['id']);
 
 // Laporan yang sungguhan selalu menang: menimpanya dengan izin berarti laporan itu
 // hilang dari rekap, dan tidak ada yang akan tahu kenapa.
@@ -619,7 +625,7 @@ eq('dan statusnya tidak tersentuh',
 // Dibatalkan: hari yang sudah lewat kembali jadi tidak lapor, bukan "belum lapor
 // selamanya" — penyapu cuma menyentuh hari sebelum hari ini, dan hari itu sudah lewat.
 eq('dibatalkan mengembalikan tiga harinya',
-   repo_set_excused($lead, (int) $cuti['id'], '2026-09-28', '2026-09-30', false), 3);
+   repo_set_excused($admin, (int) $cuti['id'], '2026-09-28', '2026-09-30', false), 3);
 eq('hari yang sudah lewat kembali tercatat tidak lapor',
    q1("SELECT status FROM cycles WHERE user_id = ? AND day = '2026-09-28'",
       [$cuti['id']])['status'], 'missed');
@@ -630,14 +636,14 @@ eq('dan yang di luar rentang pembatalan tetap izin',
    q1("SELECT status FROM cycles WHERE user_id = ? AND day = '2026-10-01'",
       [$cuti['id']])['status'], 'excused');
 
-// Leader membaca dan menandai timnya sendiri. Nama orang di tim lain bukan miliknya.
+// Admin menandai tim mana pun, termasuk tim yang bukan timnya sendiri.
 $timLain = repo_add_team($admin, 'Tim Lain');
 q('UPDATE users SET team_id = ? WHERE id = ?', [$timLain, $cuti['id']]);
-throws('leader tidak bisa menandai orang di tim lain',
-       fn() => repo_set_excused($lead, (int) $cuti['id'], '2026-10-05', '2026-10-05', true),
-       'bukan di timmu');
-eq('tapi admin bisa',
+eq('admin bisa menandai orang di tim mana pun',
    repo_set_excused($admin, (int) $cuti['id'], '2026-10-05', '2026-10-05', true), 1);
+throws('orang yang tidak ada ditolak, bukan diam-diam tidak mengerjakan apa-apa',
+       fn() => repo_set_excused($admin, 999999, '2026-10-05', '2026-10-05', true),
+       'tidak ada');
 
 /* ------------------------------------------------------------------- email */
 

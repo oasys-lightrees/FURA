@@ -197,7 +197,7 @@ cPanel -> Software -> Select PHP Version (atau MultiPHP Manager) -> pilih 8.1 / 
 
 
 8. IZIN, CUTI, SAKIT
-   Menu kanan atas -> Izin. Bisa dibuka leader maupun admin.
+   Menu kanan atas -> Izin. Untuk sekarang hanya admin dan owner.
    Pilih orangnya, isi tanggal mulai dan selesai, boleh ditambah keterangan
    ("cuti tahunan", "sakit", "dinas luar"). Satu hari saja: isi dua tanggal yang sama.
 
@@ -209,7 +209,10 @@ cPanel -> Software -> Select PHP Version (atau MultiPHP Manager) -> pilih 8.1 / 
    Bisa untuk hari yang sudah lewat, jadi tanda merah yang tidak adil bisa dibereskan
    belakangan — dan bisa dibatalkan lagi, yang mengembalikan tanda merahnya.
 
-   Leader hanya bisa menandai orang di timnya sendiri; admin dan owner semua tim.
+   Leader belum bisa menandai timnya sendiri — kalau ada yang cuti, dia menitipkannya
+   ke admin. Izin yang bisa diberikan atasan langsung paling cepat berubah jadi "tolong
+   hapus tanda merah saya", dan satu pintu yang jelas lebih mudah dipercaya daripada dua
+   yang batasnya kabur.
 
 
 9. GANTI PASSWORD SENDIRI

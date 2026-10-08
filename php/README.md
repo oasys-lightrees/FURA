@@ -144,7 +144,7 @@ daftar kembar — halaman baru ditambahkan ke salah satunya saja. Sekarang semua
 | Peran | Yang terbaca di kepala |
 |-------|------------------------|
 | Pemain | tidak ada baris menu — satu-satunya pintunya adalah halaman yang sedang dia buka |
-| Leader | Laporan · Izin |
+| Leader | sama, karena di luar aplikasinya dia memang belum punya halaman; yang membedakannya ada di dalam, tab **Tim** |
 | Admin / Owner | Laporan · Izin · Kelola |
 
 Akun dan Keluar tidak ikut ke baris itu: keduanya dicari orang di bawah avatarnya, dan
@@ -162,7 +162,7 @@ app.html           salinan persis web/messi.html
 login.php          masuk: password, atau link sekali pakai dari admin
 lupa.php           "saya lupa" — mengirim link masuk, atau menitipkannya ke admin
 akun.php           nama dan password sendiri; sesi di perangkat lain
-izin.php           cuti, sakit, dinas luar — supaya harinya tidak jadi "tidak lapor"
+izin.php           cuti, sakit, dinas luar (admin) — supaya harinya tidak jadi "tidak lapor"
 setup.php          akun pemilik pertama (hapus setelah dipakai)
 kelola.php         satu pintu untuk yang mengelola, plus tuntunan penyiapan
 cek.php            apakah hosting ini sanggup, dan apa yang masih kurang
@@ -190,7 +190,7 @@ lib/schema.php     langkah pemutakhiran, tiap langkah memeriksa dirinya sendiri
 install.sql        sepuluh tabel
 PASANG.txt         langkah pemasangan, bahasa non-teknis
 make-zip.sh        bikin messi-cpanel.zip
-tests/             768 pemeriksaan (tidak ikut ke server)
+tests/             771 pemeriksaan (tidak ikut ke server)
 ```
 
 ## Yang diputuskan server, bukan browser
@@ -250,12 +250,12 @@ menyebutkan mana yang barusan terjadi.
 |--------|--------|
 | `tests/test_engine.php` | 99 — aturan, dicocokkan dengan `tests/test_core.py` |
 | `tests/test_modul.php` | 63 — modul sebagai dokumen; ujian terberatnya MESSI sendiri ditulis ulang sebagai modul dan harus berperilaku sama persis |
-| `tests/test_repo.php` | 172 — terhadap MySQL sungguhan, di database yang dia buat sendiri |
+| `tests/test_repo.php` | 173 — terhadap MySQL sungguhan, di database yang dia buat sendiri |
 | `tests/test_cron.php` | 78 — seminggu penuh jam demi jam, jam dibekukan, pesan bot ditangkap |
 | `tests/test_live.py` | 68 — browser terhadap aplikasi yang benar-benar jalan |
 | `tests/test_admin.py` | 125 — pemasangan pertama, undangan satu dan borongan, lupa password, link sekali pakai, mengubah pertanyaan, uji kirim webhook |
 | `tests/test_modul_page.py` | 41 — menyusun modul lewat halamannya: menambah, menggeser, menghapus, dan yang sudah diketik tidak hilang saat menekan tombol |
-| `tests/test_akun.py` | 47 — ganti nama dan password sendiri, sesi perangkat lain mati, izin menghapus tanda "tidak lapor", "lupa password" yang menjawab sama untuk alamat terdaftar dan tidak, dan baris menu di kepala yang isinya berbeda untuk tiap peran (tingginya diukur, bukan atributnya) |
+| `tests/test_akun.py` | 49 — ganti nama dan password sendiri, sesi perangkat lain mati, izin menghapus tanda "tidak lapor", "lupa password" yang menjawab sama untuk alamat terdaftar dan tidak, dan baris menu di kepala yang isinya berbeda untuk tiap peran (tingginya diukur, bukan atributnya) |
 | `tests/test_schema.php` | 49 — pemasangan lama di-upgrade, lalu dibandingkan kolom demi kolom dengan yang baru |
 | `tests/test_upgrade_path.py` | 26 — aplikasi sungguhan di atas database versi lama: masih bisa masuk, setiap halaman lain menyebut apa yang kurang, lalu satu tombol menghidupkannya |
 | `tests/check_sync.php` | memastikan `app.html` belum menyimpang dari `web/messi.html` |

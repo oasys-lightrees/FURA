@@ -57,7 +57,7 @@ $minta  = count(array_filter($people, fn($p) => ($p['reset_asked_at'] ?? null) !
 
 // Hari izin yang tercatat dari bulan lalu sampai tiga bulan ke depan. Angka, bukan daftar:
 // yang dibutuhkan di halaman ini cuma "ada atau belum", sisanya di halamannya sendiri.
-$izinN = count(repo_excused(is_manager($me) ? null : repo_team_of($me)));
+$izinN = count(repo_excused());
 
 /* -------------------------------------------------------------- penyiapan */
 

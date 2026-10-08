@@ -9,8 +9,9 @@
  * apa-apa, tidak ada baris merah lain yang berarti apa-apa.
  *
  * Dibuat per rentang tanggal, bukan per hari, karena cuti memang datang per rentang.
- * Yang ditandai leader atau admin, bukan orangnya sendiri: izin yang bisa diberikan
- * sendiri bukan izin, cuma tombol "hapus tanda merah".
+ * Yang menandai admin atau owner — bukan orangnya sendiri, dan untuk sekarang bukan juga
+ * leadernya: izin yang bisa diberikan sendiri bukan izin, cuma tombol "hapus tanda merah",
+ * dan satu pintu yang jelas lebih mudah dipercaya daripada dua yang batasnya kabur.
  */
 
 declare(strict_types=1);
@@ -26,12 +27,12 @@ messi_require_current();
 
 $me = auth_user();
 if (!$me) { header('Location: login.php'); exit; }
-if (!is_leader($me)) { http_response_code(403); exit('Halaman ini untuk leader dan admin.'); }
+if (!is_manager($me)) { http_response_code(403); exit('Halaman ini untuk admin.'); }
 
-// Leader membaca dan menandai timnya sendiri; admin dan owner semua tim. Dibatasi di sini
-// *dan* di repo_set_excused: yang ini supaya daftarnya benar, yang itu supaya kiriman
-// mentah tidak bisa melewatinya.
-$onlyTeam = is_manager($me) ? null : repo_team_of($me);
+// Admin membaca semua tim. Tetap ditulis sebagai satu variabel, bukan dihapus: kalau suatu
+// hari leader boleh menandai timnya sendiri lagi, yang berubah satu baris di sini dan satu
+// di repo_set_excused — bukan seluruh halaman.
+$onlyTeam = null;
 
 $notice = null;
 $error  = null;
@@ -130,8 +131,7 @@ page_head('Izin', ['me' => $me, 'wide' => true, 'css' => <<<'CSS'
 CSS]);
 ?>
   <h1>Izin</h1>
-  <p class="sub"><?= is_manager($me) ? '<a href="kelola.php">‹ Kelola</a> · ' : '' ?><a
-     href="index.php">Laporan</a></p>
+  <p class="sub"><a href="kelola.php">‹ Kelola</a> · <a href="index.php">Laporan</a></p>
 
   <?php if ($notice): ?><p class="note ok"><?= h($notice) ?></p><?php endif; ?>
   <?php if ($error): ?><p class="note bad"><?= h($error) ?></p><?php endif; ?>
@@ -140,10 +140,11 @@ CSS]);
      di <em>Perlu perhatian</em>, dan tidak ditagih bot di pengingat jam tutup. Akhir pekan
      tidak perlu ditandai — memang tidak pernah dihitung. Hari yang laporannya sudah masuk
      tidak ikut ditandai: laporan yang sungguhan selalu menang.</p>
+  <p class="why">Halaman ini untuk admin dan owner. Leader belum bisa menandai timnya
+     sendiri — kalau ada yang cuti, dia menitipkannya ke admin.</p>
 
   <?php if (!$orang): ?>
-    <p class="note warn">Belum ada orang di <?= $onlyTeam === null ? 'perusahaan ini'
-       : 'timmu' ?> yang bisa ditandai.</p>
+    <p class="note warn">Belum ada orang yang bisa ditandai.</p>
   <?php else: ?>
   <h2>Tandai izin</h2>
   <div class="card">

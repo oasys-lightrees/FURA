@@ -118,12 +118,19 @@ with Host("messi_akun", extra={"mail_from": "fura@example.test"}) as host, sync_
     masuk.close()
     lagi.close()
 
-    print("\n=== izin: leader menandai, dan rekapnya berubah ===")
+    print("\n=== izin: admin menandai, dan rekapnya berubah ===")
     bos = browser.new_context(viewport={"width": 1100, "height": 900})
     lia = sign_in(bos, host.base, "lead@example.test", PASSWORD, results=results, enter=None)
+    # Untuk sekarang leader belum boleh menandai izin: izin yang bisa diberikan atasan
+    # langsung paling cepat berubah jadi "tolong hapus merah saya", dan satu pintu yang
+    # jelas lebih mudah dipercaya daripada dua yang batasnya kabur.
+    check("leader belum boleh membukanya",
+          lia.evaluate("""async () => (await fetch("izin.php")).status"""), 403)
+
+    db("q(\"UPDATE users SET role='owner' WHERE email='lead@example.test'\");")
     lia.goto(host.base + "/izin.php")
     lia.wait_for_load_state("networkidle")
-    check("leader boleh membukanya", lia.inner_text("h1"), "Izin")
+    check("admin boleh", lia.inner_text("h1"), "Izin")
 
     # Hari kerja terakhir yang sudah lewat — bukan "kemarin", yang di hari Senin adalah
     # hari Minggu dan tidak pernah ditandai apa pun. Tes yang pemeriksaannya berbeda
@@ -141,6 +148,8 @@ with Host("messi_akun", extra={"mail_from": "fura@example.test"}) as host, sync_
           lia.inner_text("table.izin"), lambda s: "Rio" in s and "sakit" in s)
     check("beserta siapa yang menandainya",
           lia.inner_text("table.izin"), lambda s: "ditandai Lia" in s)
+    check("dan halamannya mengatakan leader harus menitipkannya ke admin",
+          lia.inner_text("body"), lambda s: "Leader belum bisa menandai" in s)
 
     # Akhir pekan memang tidak pernah dihitung tidak lapor, jadi menandainya cuma menambah
     # baris yang tidak berarti apa-apa — dan itu dikatakan, bukan dianggap berhasil.
@@ -261,22 +270,34 @@ with Host("messi_akun", extra={"mail_from": "fura@example.test"}) as host, sync_
     check("peranmu disebutkan, karena \"kenapa saya tidak punya tombol itu\" adalah "
           "pertanyaan tentang peran", lembar(pg), lambda s: "Pemain" in s)
 
-    # Leader: Izin terbaca di kepala tanpa menekan apa pun, Kelola tidak — dia bukan admin.
+    # Leader: peranya terbaca, tapi pintunya memang belum ada di luar aplikasi — izin
+    # sekarang milik admin. Jadi kepalanya sama bersihnya dengan kepala pemain, dan yang
+    # membedakannya ada di dalam aplikasinya: tab Tim.
+    db("q(\"UPDATE users SET role='leader' WHERE email='rio@example.test'\");")
+    ctxRio = browser.new_context(viewport={"width": 1100, "height": 900})
+    pgRio = sign_in(ctxRio, host.base, "rio@example.test", PASSWORD, results=results, enter=None)
+    pgRio.wait_for_timeout(500)
+    check("leader belum punya pintu di luar aplikasinya", kepala(pgRio)["tinggi"], 0)
+    check("tapi peranmu tetap terbaca di bawah avatar",
+          lembar(pgRio), lambda s: "Leader" in s)
+    check("dan Izin memang tidak ditawarkan kepadanya",
+          lembar(pgRio), lambda s: "Izin" not in s)
+    ctxRio.close()
+
+    # Owner: tiga pintu, dan di halaman PHP pun kepalanya sama bentuknya.
     ctxLead = browser.new_context(viewport={"width": 1100, "height": 900})
     pgLead = sign_in(ctxLead, host.base, "lead@example.test", PASSWORD, results=results,
                      enter=None)
     pgLead.wait_for_timeout(500)
-    bosHead = kepala(pgLead)
-    check("leader dapat barisnya, dan barisnya benar-benar terlihat",
-          bosHead["tinggi"], lambda t: t > 10)
-    check("isinya Laporan dan Izin", bosHead["isi"], ["Laporan", "Izin"])
-    check("Kelola tidak ikut — leader bukan admin",
-          lembar(pgLead), lambda s: "Kelola" not in s)
-    check("dan peranmu terbaca Leader", lembar(pgLead), lambda s: "Leader" in s)
-    check("halaman yang sedang dibuka ditandai", bosHead["kini"], ["Laporan"])
+    ownerHead = kepala(pgLead)
+    check("owner dapat barisnya, dan barisnya benar-benar terlihat",
+          ownerHead["tinggi"], lambda t: t > 10)
+    check("isinya Laporan, Izin dan Kelola", ownerHead["isi"], ["Laporan", "Izin", "Kelola"])
+    check("halaman yang sedang dibuka ditandai", ownerHead["kini"], ["Laporan"])
+    check("dan peranmu terbaca Owner", lembar(pgLead), lambda s: "Owner" in s)
 
     # Di telepon barisnya tidak muat. Disembunyikan — dan isinya yang sama tetap ada di
-    # bawah avatar, kalau tidak, leader di telepon kehilangan halaman Izin sama sekali.
+    # bawah avatar, kalau tidak, admin yang memakai telepon kehilangan halaman Izin.
     hpLead = browser.new_context(viewport={"width": 420, "height": 900})
     pgHp = sign_in(hpLead, host.base, "lead@example.test", PASSWORD, results=results, enter=None)
     pgHp.wait_for_timeout(500)
@@ -284,15 +305,6 @@ with Host("messi_akun", extra={"mail_from": "fura@example.test"}) as host, sync_
     check("tapi Izin tetap bisa dicapai dari bawah avatarnya",
           lembar(pgHp), lambda s: "Izin" in s)
     hpLead.close()
-
-    # Owner: tiga pintu, dan di halaman PHP pun kepalanya sama bentuknya.
-    db("q(\"UPDATE users SET role='owner' WHERE email='lead@example.test'\");")
-    pgLead.reload()
-    pgLead.wait_for_load_state("networkidle")
-    pgLead.wait_for_timeout(500)
-    ownerHead = kepala(pgLead)
-    check("owner dapat Kelola juga", ownerHead["isi"], ["Laporan", "Izin", "Kelola"])
-    check("dan peranmu terbaca Owner", lembar(pgLead), lambda s: "Owner" in s)
 
     pgLead.goto(host.base + "/kelola.php")
     pgLead.wait_for_load_state("networkidle")

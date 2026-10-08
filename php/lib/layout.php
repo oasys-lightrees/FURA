@@ -48,10 +48,8 @@ function page_links(array $me): array
 {
     require_once __DIR__ . '/auth.php';
     $out = [['label' => 'Laporan', 'href' => 'index.php', 'nav' => true]];
-    if (is_leader($me)) {
-        $out[] = ['label' => 'Izin', 'href' => 'izin.php', 'nav' => true];
-    }
     if (is_manager($me)) {
+        $out[] = ['label' => 'Izin', 'href' => 'izin.php', 'nav' => true];
         $out[] = ['label' => 'Kelola', 'href' => 'kelola.php', 'nav' => true];
     }
     $out[] = ['label' => 'Akun', 'href' => 'akun.php'];
