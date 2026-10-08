@@ -15,6 +15,9 @@ require __DIR__ . '/lib/require-php8.php';
 
 require_once __DIR__ . '/lib/auth.php';
 require_once __DIR__ . '/lib/repo.php';
+// Bukan untuk menggambar apa pun di sini — halaman ini punya kepalanya sendiri — tapi
+// untuk satu daftar pintu yang sama dengan yang dipakai halaman-halaman PHP lainnya.
+require_once __DIR__ . '/lib/layout.php';
 
 // Says what is missing on the first screen, not on the first click.
 messi_require_current();
@@ -47,14 +50,12 @@ $boot = [
     'commitments' => repo_commitments(90, $mine, $team),
     'roster'      => repo_roster($team),
     // Pintu ke halaman di luar aplikasi ini. Dikirim sebagai data, bukan ditulis di
-    // dalam app.html, karena versi artifact-nya tidak punya satu pun halaman ini.
-    'menu' => array_values(array_filter([
-        is_leader($user) ? ['label' => 'Izin', 'href' => 'izin.php'] : null,
-        is_manager($user) ? ['label' => 'Kelola', 'href' => 'kelola.php'] : null,
-        ['label' => 'Akun', 'href' => 'akun.php'],
-        ['label' => 'Keluar', 'href' => 'api/logout.php'],
-    ])),
-    'who' => ['email' => (string) $user['email']],
+    // dalam app.html, karena versi artifact-nya tidak punya satu pun halaman ini — dan
+    // diambil dari daftar yang sama dengan kepala halaman PHP, supaya keduanya tidak
+    // pelan-pelan berbeda isinya.
+    'menu' => page_links($user),
+    'who' => ['email' => (string) $user['email'],
+              'role'  => page_role_label($user)],
 ];
 
 $app = (string) file_get_contents(__DIR__ . '/app.html');

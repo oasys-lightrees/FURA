@@ -223,6 +223,95 @@ with Host("messi_akun", extra={"mail_from": "fura@example.test"}) as host, sync_
     check("halaman cek menyebut emailnya menyala",
           db("echo cfg('mail_from');"), "fura@example.test")
 
+    print("\n=== kepala halaman: beda untuk tiap peran ===")
+
+    def kepala(pgx):
+        """Baris menu di kepala, dan TINGGINYA — bukan cuma atributnya.
+
+        Pernah terjadi: atribut `hidden` kalah dari `display:flex` di host PHP, dan yang
+        terlihat orangnya adalah baris yang menurut tesnya tersembunyi. Jadi yang diukur
+        tinggi sungguhan, bukan niat.
+        """
+        return pgx.evaluate("""() => {
+              const n = document.querySelector(".hnav");
+              if (!n) return { tinggi: 0, isi: [], kini: [] };
+              return { tinggi: n.getBoundingClientRect().height,
+                       isi: [...n.querySelectorAll("a")].map(a => a.textContent.trim()),
+                       kini: [...n.querySelectorAll("a.on")].map(a => a.textContent.trim()) };
+            }""")
+
+    def lembar(pgx):
+        """Isi lembar di bawah avatar — dibaca dari DOM, bukan dari layar, karena
+        <details> yang tertutup tidak punya teks yang terlihat."""
+        return pgx.evaluate("""() => {
+              const s = document.querySelector("#usheet, .menu .sheet");
+              return s ? s.textContent.replace(/\s+/g, " ").trim() : "";
+            }""")
+
+    # Pemain: satu pintu saja, jadi barisnya tidak digambar sama sekali.
+    pg.goto(host.base + "/index.php")
+    pg.wait_for_load_state("networkidle")
+    pg.wait_for_timeout(500)
+    pemain = kepala(pg)
+    check("pemain tidak dapat baris menu di kepala", pemain["tinggi"], 0)
+    check("tapi tetap punya Akun dan Keluar di bawah avatarnya",
+          lembar(pg), lambda s: "Akun" in s and "Keluar" in s)
+    check("dan tidak punya Kelola maupun Izin di situ",
+          lembar(pg), lambda s: "Kelola" not in s and "Izin" not in s)
+    check("peranmu disebutkan, karena \"kenapa saya tidak punya tombol itu\" adalah "
+          "pertanyaan tentang peran", lembar(pg), lambda s: "Pemain" in s)
+
+    # Leader: Izin terbaca di kepala tanpa menekan apa pun, Kelola tidak — dia bukan admin.
+    ctxLead = browser.new_context(viewport={"width": 1100, "height": 900})
+    pgLead = sign_in(ctxLead, host.base, "lead@example.test", PASSWORD, results=results,
+                     enter=None)
+    pgLead.wait_for_timeout(500)
+    bosHead = kepala(pgLead)
+    check("leader dapat barisnya, dan barisnya benar-benar terlihat",
+          bosHead["tinggi"], lambda t: t > 10)
+    check("isinya Laporan dan Izin", bosHead["isi"], ["Laporan", "Izin"])
+    check("Kelola tidak ikut — leader bukan admin",
+          lembar(pgLead), lambda s: "Kelola" not in s)
+    check("dan peranmu terbaca Leader", lembar(pgLead), lambda s: "Leader" in s)
+    check("halaman yang sedang dibuka ditandai", bosHead["kini"], ["Laporan"])
+
+    # Di telepon barisnya tidak muat. Disembunyikan — dan isinya yang sama tetap ada di
+    # bawah avatar, kalau tidak, leader di telepon kehilangan halaman Izin sama sekali.
+    hpLead = browser.new_context(viewport={"width": 420, "height": 900})
+    pgHp = sign_in(hpLead, host.base, "lead@example.test", PASSWORD, results=results, enter=None)
+    pgHp.wait_for_timeout(500)
+    check("di telepon barisnya disembunyikan", kepala(pgHp)["tinggi"], 0)
+    check("tapi Izin tetap bisa dicapai dari bawah avatarnya",
+          lembar(pgHp), lambda s: "Izin" in s)
+    hpLead.close()
+
+    # Owner: tiga pintu, dan di halaman PHP pun kepalanya sama bentuknya.
+    db("q(\"UPDATE users SET role='owner' WHERE email='lead@example.test'\");")
+    pgLead.reload()
+    pgLead.wait_for_load_state("networkidle")
+    pgLead.wait_for_timeout(500)
+    ownerHead = kepala(pgLead)
+    check("owner dapat Kelola juga", ownerHead["isi"], ["Laporan", "Izin", "Kelola"])
+    check("dan peranmu terbaca Owner", lembar(pgLead), lambda s: "Owner" in s)
+
+    pgLead.goto(host.base + "/kelola.php")
+    pgLead.wait_for_load_state("networkidle")
+    phpHead = kepala(pgLead)
+    check("halaman PHP memakai kepala yang sama, dan barisnya terlihat",
+          phpHead["tinggi"], lambda t: t > 10)
+    check("isinya sama persis dengan yang di aplikasinya", phpHead["isi"], ownerHead["isi"])
+    check("dan yang ditandai halaman yang sedang dibuka", phpHead["kini"], ["Kelola"])
+
+    pgLead.goto(host.base + "/izin.php")
+    pgLead.wait_for_load_state("networkidle")
+    check("pindah halaman memindahkan tandanya", kepala(pgLead)["kini"], ["Izin"])
+    ctxLead.close()
+
+    # Halaman PHP milik pemain pun tidak boleh menumbuhkan baris yang tidak dia punya.
+    pg.goto(host.base + "/akun.php")
+    pg.wait_for_load_state("networkidle")
+    check("di halaman PHP pemain tetap tanpa baris menu", kepala(pg)["tinggi"], 0)
+
     ctx.close()
 
 sys.exit(report("akun, izin, dan jalan pulang"))

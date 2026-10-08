@@ -133,6 +133,27 @@ Dijalankan tiap jam, dan aman kalau jalan dua kali atau terlewat satu jam:
 Setiap pengiriman dicatat di tabel `job_log`, jadi "kenapa tidak ada pesan?" selalu
 ada jawabannya. URL webhook-nya membawa kunci sendiri, jadi tidak pernah ikut tercatat.
 
+## Kepala halaman
+
+Satu daftar pintu, dipakai tiga tempat: baris menu di kepala halaman PHP, lembar di
+bawah avatar, dan kepala aplikasinya sendiri lewat `window.FURA_MENU`. Dulu dua di
+antaranya ditulis terpisah, dan yang terjadi persis seperti yang selalu terjadi dengan
+daftar kembar — halaman baru ditambahkan ke salah satunya saja. Sekarang semuanya dari
+`page_links()` di `lib/layout.php`.
+
+| Peran | Yang terbaca di kepala |
+|-------|------------------------|
+| Pemain | tidak ada baris menu — satu-satunya pintunya adalah halaman yang sedang dia buka |
+| Leader | Laporan · Izin |
+| Admin / Owner | Laporan · Izin · Kelola |
+
+Akun dan Keluar tidak ikut ke baris itu: keduanya dicari orang di bawah avatarnya, dan
+tempat di kepala terlalu mahal untuk pintu yang sudah punya tempatnya sendiri. Di bawah
+46rem barisnya disembunyikan dan isinya yang sama persis tetap ada di lembar avatar —
+kalau tidak, leader yang memakai telepon kehilangan halaman Izin sama sekali. Lembar itu
+juga menyebut peran orangnya, karena "kenapa saya tidak punya tombol itu" hampir selalu
+pertanyaan tentang peran.
+
 ## Susunan file
 
 ```
@@ -169,7 +190,7 @@ lib/schema.php     langkah pemutakhiran, tiap langkah memeriksa dirinya sendiri
 install.sql        sepuluh tabel
 PASANG.txt         langkah pemasangan, bahasa non-teknis
 make-zip.sh        bikin messi-cpanel.zip
-tests/             750 pemeriksaan (tidak ikut ke server)
+tests/             768 pemeriksaan (tidak ikut ke server)
 ```
 
 ## Yang diputuskan server, bukan browser
@@ -234,7 +255,7 @@ menyebutkan mana yang barusan terjadi.
 | `tests/test_live.py` | 68 — browser terhadap aplikasi yang benar-benar jalan |
 | `tests/test_admin.py` | 125 — pemasangan pertama, undangan satu dan borongan, lupa password, link sekali pakai, mengubah pertanyaan, uji kirim webhook |
 | `tests/test_modul_page.py` | 41 — menyusun modul lewat halamannya: menambah, menggeser, menghapus, dan yang sudah diketik tidak hilang saat menekan tombol |
-| `tests/test_akun.py` | 29 — ganti nama dan password sendiri, sesi perangkat lain mati, izin menghapus tanda "tidak lapor", dan "lupa password" yang menjawab sama untuk alamat terdaftar dan tidak |
+| `tests/test_akun.py` | 47 — ganti nama dan password sendiri, sesi perangkat lain mati, izin menghapus tanda "tidak lapor", "lupa password" yang menjawab sama untuk alamat terdaftar dan tidak, dan baris menu di kepala yang isinya berbeda untuk tiap peran (tingginya diukur, bukan atributnya) |
 | `tests/test_schema.php` | 49 — pemasangan lama di-upgrade, lalu dibandingkan kolom demi kolom dengan yang baru |
 | `tests/test_upgrade_path.py` | 26 — aplikasi sungguhan di atas database versi lama: masih bisa masuk, setiap halaman lain menyebut apa yang kurang, lalu satu tombol menghidupkannya |
 | `tests/check_sync.php` | memastikan `app.html` belum menyimpang dari `web/messi.html` |

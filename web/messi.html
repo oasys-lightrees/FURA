@@ -121,6 +121,25 @@ main { padding:22px 16px 132px; }
 .theme:hover { color:var(--ink); border-color:var(--ink); }
 .avatar { width:30px; height:30px; border-radius:50%; background:var(--ink); color:var(--paper);
           display:grid; place-items:center; font-size:12px; font-weight:700; flex:none; }
+/* Baris menu di kepala: apa yang boleh dikerjakan orang ini, terbaca tanpa menekan apa
+   pun. Pemain tidak punya pintu kedua, jadi barisnya tidak digambar untuknya sama sekali —
+   satu kata yang menyala tanpa guna lebih buruk daripada kepala yang bersih. */
+.hnav { display:flex; gap:2px; margin-left:10px; }
+.hnav a { display:block; padding:5px 10px; border-radius:7px; text-decoration:none;
+          color:var(--muted); font-size:13.5px; font-weight:500; white-space:nowrap; }
+.hnav a:hover { color:var(--ink); background:var(--raise); }
+/* Yang sedang dibuka ditandai tebal dan ber-tinta penuh, bukan cuma berlatar lain:
+   --raise dan --paper hampir tidak bisa dibedakan di layar terang, jadi penanda yang
+   cuma mengandalkan latar praktis tidak menandai apa pun. */
+.hnav a.on { color:var(--ink); font-weight:600; background:var(--surface);
+             box-shadow:inset 0 0 0 1px var(--line); }
+/* Di telepon tidak muat bersama logo, jam, dan avatarnya. Disembunyikan, bukan dipaksa
+   mengecil — isinya yang sama persis tetap ada di bawah avatarnya. */
+@media (max-width:620px) { .hnav { display:none; } }
+.umenu .sheet .peran { display:block; padding:0 10px 8px; }
+.umenu .sheet .peran span { font-size:11px; letter-spacing:.04em; text-transform:uppercase;
+          padding:1px 6px; border-radius:4px; background:var(--raise);
+          border:1px solid var(--line); color:var(--muted); }
 /* <details> supaya papan tombol dan pembaca layar dapat perilaku menunya gratis. */
 .umenu { position:relative; flex:none; }
 .umenu summary { list-style:none; cursor:pointer; }
@@ -326,6 +345,7 @@ h2 { font-size:11.5px; font-weight:700; letter-spacing:.09em; text-transform:upp
     <span class="brand">FURA</span>
     <span class="tagline">Follow Up Report Automation</span>
   </button>
+  <nav class="hnav" id="hnav" hidden></nav>
   <span class="when" id="whenLbl">—</span>
   <button class="theme" id="theme" type="button" aria-label="Ganti terang/gelap"></button>
   <details class="umenu" id="umenu">
@@ -423,11 +443,13 @@ const CFG = cfgOf(window.FURA_CONFIG);
 const TEAMS = (Array.isArray(window.FURA_TEAMS) ? window.FURA_TEAMS : [])
   .filter(t => t && t.id).map(t => ({ id: +t.id, name: String(t.name || "Tim") }));
 const MY_TEAM = Number.isFinite(+window.FURA_TEAM) ? +window.FURA_TEAM : null;
-/* Halaman di luar aplikasi ini — kelola, keluar. Dikirim server; di versi artifact
-   kosong, dan avatar-nya tetap sekadar lencana seperti sebelumnya. */
+/* Halaman di luar aplikasi ini — izin, kelola, akun, keluar. Dikirim server; di versi
+   artifact kosong, dan avatar-nya tetap sekadar lencana seperti sebelumnya.
+   `nav` menandai yang dapat tempat di baris kepala; sisanya cuma di bawah avatar. */
 const MENU = (Array.isArray(window.FURA_MENU) ? window.FURA_MENU : [])
   .filter(m => m && m.label && m.href)
-  .map(m => ({ label: String(m.label), href: String(m.href) }));
+  .map(m => ({ label: String(m.label), href: String(m.href), nav: !!m.nav }));
+const NAV = MENU.filter(m => m.nav);
 const WHO = window.FURA_WHO && typeof window.FURA_WHO === "object" ? window.FURA_WHO : {};
 const Q = CFG.questions;
 const CHANNELS = CFG.channels, DECLARATION = CFG.declaration;
@@ -1208,7 +1230,23 @@ function paintMenu() {
   if (!MENU.length) { menuDrawn = true; return; }   // tanpa server: lencana saja
   sheet.innerHTML = `<b>${esc(S.name || "Kamu")}</b>`
     + (WHO.email ? `<small>${esc(WHO.email)}</small>` : "")
-    + `<hr>` + MENU.map(m => `<a href="${esc(m.href)}">${esc(m.label)}</a>`).join("");
+    + (WHO.role ? `<span class="peran"><span>${esc(WHO.role)}</span></span>` : "")
+    + `<hr>` + MENU.map(m =>
+        // Keluar dipisahkan dari yang lain: dia satu-satunya yang membatalkan sesi, dan
+        // tombol itu tidak boleh bersebelahan rapat dengan pintu biasa.
+        (m.href === "api/logout.php" ? `<hr>` : "")
+        + `<a href="${esc(m.href)}">${esc(m.label)}</a>`).join("");
+
+  // Di bawah dua pintu, baris kepalanya tidak digambar: pintu menuju halaman yang sedang
+  // dibuka bukan pintu. Halaman aplikasi ini sendiri selalu yang sedang dibuka, jadi
+  // itulah yang ditandai.
+  const nav = el("hnav");
+  if (nav) {
+    nav.hidden = NAV.length < 2;
+    nav.innerHTML = NAV.map(m =>
+      `<a href="${esc(m.href)}"${m.href === "index.php" ? ' class="on"' : ""}>${
+        esc(m.label)}</a>`).join("");
+  }
   menuDrawn = true;
 }
 

@@ -20,6 +20,58 @@ require_once __DIR__ . '/bootstrap.php';
 /** Kunci localStorage yang sama dengan yang dipakai app.html. Satu pilihan, bukan dua. */
 const MESSI_THEME_KEY = 'messi.theme';
 
+/** Nama peran, sependek mungkin — ini lencana di kepala halaman, bukan penjelasan. */
+const MESSI_ROLE_LABEL = ['player' => 'Pemain', 'leader' => 'Leader',
+                          'admin' => 'Admin', 'owner' => 'Owner'];
+
+function page_role_label(array $me): string
+{
+    return MESSI_ROLE_LABEL[(string) ($me['role'] ?? '')] ?? 'Pemain';
+}
+
+/**
+ * Pintu-pintu yang terbuka untuk orang ini.
+ *
+ * Satu daftar, dipakai tiga tempat: baris menu di kepala halaman PHP, lembar di bawah
+ * avatarnya, dan kepala aplikasinya sendiri lewat window.FURA_MENU. Dulu dua di antaranya
+ * ditulis terpisah, dan yang terjadi persis seperti yang selalu terjadi dengan daftar
+ * kembar: halaman baru ditambahkan ke salah satunya saja, lalu ada orang yang tidak pernah
+ * menemukannya.
+ *
+ * `nav` menandai yang pantas dapat tempat di baris kepala — tempat yang mahal, dan yang
+ * isinya memberi tahu orang apa yang boleh dia kerjakan di sini. Akun dan Keluar tidak
+ * ditandai: keduanya dicari orang di bawah avatarnya, bukan di baris menu.
+ *
+ * @return array<int, array{label:string, href:string, nav?:bool}>
+ */
+function page_links(array $me): array
+{
+    require_once __DIR__ . '/auth.php';
+    $out = [['label' => 'Laporan', 'href' => 'index.php', 'nav' => true]];
+    if (is_leader($me)) {
+        $out[] = ['label' => 'Izin', 'href' => 'izin.php', 'nav' => true];
+    }
+    if (is_manager($me)) {
+        $out[] = ['label' => 'Kelola', 'href' => 'kelola.php', 'nav' => true];
+    }
+    $out[] = ['label' => 'Akun', 'href' => 'akun.php'];
+    $out[] = ['label' => 'Keluar', 'href' => 'api/logout.php'];
+    return $out;
+}
+
+/**
+ * Yang benar-benar digambar di baris kepala.
+ *
+ * Pemain cuma punya satu pintu, dan pintu menuju halaman yang sedang dia buka bukan pintu
+ * — cuma satu kata yang menyala tanpa guna. Jadi di bawah dua, barisnya tidak digambar
+ * sama sekali dan kepalanya tetap sebersih sebelumnya.
+ */
+function page_nav_links(array $me): array
+{
+    $nav = array_values(array_filter(page_links($me), fn($l) => !empty($l['nav'])));
+    return count($nav) >= 2 ? $nav : [];
+}
+
 /**
  * Kepala halaman.
  *
@@ -101,6 +153,25 @@ body { margin:0; background:var(--paper); color:var(--ink); font-family:var(--ui
 .theme { background:none; border:0; color:var(--muted); font-size:0.9375rem; padding:0.25rem;
          cursor:pointer; line-height:1; }
 .theme:hover { color:var(--ink) }
+
+/* baris menu: apa yang boleh dikerjakan orang ini, terbaca tanpa menekan apa pun */
+.hnav { display:flex; gap:0.125rem; margin-left:0.75rem; }
+.hnav a { display:block; padding:0.3125rem 0.625rem; border-radius:0.375rem;
+          text-decoration:none; color:var(--muted); font-size:0.875rem; font-weight:500;
+          white-space:nowrap; }
+.hnav a:hover { color:var(--ink); background:var(--raise) }
+/* Yang sedang dibuka ditandai tebal dan ber-tinta penuh, bukan cuma berlatar lain:
+   --raise dan --paper hampir tidak bisa dibedakan di layar terang. */
+.hnav a.on { color:var(--ink); font-weight:600; background:var(--surface);
+             box-shadow:inset 0 0 0 1px var(--line) }
+/* Di layar telepon baris ini tidak muat bersama logo, jam, dan avatarnya. Disembunyikan,
+   bukan dipaksa mengecil — isinya yang sama persis tetap ada di bawah avatarnya, dan itu
+   memang tempat orang mencarinya di telepon. */
+@media (max-width: 34rem) { .hnav { display:none } }
+.menu .sheet .peran { display:block; padding:0 0.625rem 0.5rem }
+.menu .sheet .peran span { font-size:0.6875rem; letter-spacing:0.04em; text-transform:uppercase;
+          padding:0.0625rem 0.375rem; border-radius:0.25rem; background:var(--raise);
+          border:1px solid var(--line); color:var(--muted) }
 
 /* menu: <details> supaya papan tombol dan pembaca layar dapat perilakunya gratis */
 .menu { position:relative }
@@ -187,6 +258,7 @@ main { padding:0; width:min(24rem,100%) }
     <span class="brand">FURA</span>
     <span class="tagline">Follow Up Report Automation</span>
   </a>
+  <?php if ($me): page_nav($me); endif; ?>
   <span class="spacer"></span>
   <button class="theme" type="button" id="themeBtn" aria-label="Ganti terang/gelap">☾</button>
   <?php if ($me): page_menu($me); endif; ?>
@@ -203,6 +275,34 @@ main { padding:0; width:min(24rem,100%) }
  * tidak penting. Yang paling dibutuhkan owner di hari pertama justru yang paling
  * tersembunyi.
  */
+function page_nav(array $me): void
+{
+    $links = page_nav_links($me);
+    if (!$links) {
+        return;
+    }
+    // Halaman yang sedang dibuka ditandai, bukan dibiarkan terlihat sama seperti yang
+    // lain: baris menu yang tidak memberi tahu kamu sedang di mana cuma menambah pilihan.
+    $now = basename((string) ($_SERVER['SCRIPT_NAME'] ?? ''));
+    ?>
+  <nav class="hnav">
+    <?php foreach ($links as $l): ?>
+      <a href="<?= h($l['href']) ?>"<?= $l['href'] === $now ? ' class="on"' : '' ?>><?=
+         h($l['label']) ?></a>
+    <?php endforeach; ?>
+  </nav>
+<?php
+}
+
+/**
+ * Menu di bawah avatar.
+ *
+ * Dulu pintu ke halaman pengelolaan ada di footer — tempat orang mencari hal yang paling
+ * tidak penting. Yang paling dibutuhkan owner di hari pertama justru yang paling
+ * tersembunyi. Sekarang yang penting ada di baris kepala; yang di sini daftar lengkapnya,
+ * plus nama, email, dan peran — karena "kenapa saya tidak punya tombol itu" hampir selalu
+ * pertanyaan tentang peran.
+ */
 function page_menu(array $me): void
 {
     require_once __DIR__ . '/auth.php';
@@ -213,17 +313,12 @@ function page_menu(array $me): void
     <div class="sheet">
       <b><?= h((string) $me['name']) ?></b>
       <small><?= h((string) $me['email']) ?></small>
+      <span class="peran"><span><?= h(page_role_label($me)) ?></span></span>
       <hr>
-      <a href="index.php">Laporan</a>
-      <?php if (is_leader($me)): ?>
-        <a href="izin.php">Izin</a>
-      <?php endif; ?>
-      <?php if (is_manager($me)): ?>
-        <a href="kelola.php">Kelola</a>
-      <?php endif; ?>
-      <a href="akun.php">Akun</a>
-      <hr>
-      <a href="api/logout.php">Keluar</a>
+      <?php foreach (page_links($me) as $l): ?>
+        <?php if ($l['href'] === 'api/logout.php'): ?><hr><?php endif; ?>
+        <a href="<?= h($l['href']) ?>"><?= h($l['label']) ?></a>
+      <?php endforeach; ?>
     </div>
   </details>
 <?php
