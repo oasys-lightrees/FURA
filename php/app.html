@@ -1080,8 +1080,14 @@ function screenCatalog() {
     const done = people.filter(u => {
       const c = S.cycles.get(key(u, day)); return c && c.submittedAt;
     }).length;
+    // Aturan yang sama dengan kotak di rekap: yang izin bukan yang belum lapor, dan bukan
+    // bagian dari penyebutnya. Dua tempat yang menghitung hal yang sama dengan cara yang
+    // berbeda akan berbeda angkanya, dan yang membacanya tidak tahu yang mana yang benar.
+    const izin = people.filter(u => {
+      const c = S.cycles.get(key(u, day)); return c && c.excused && !c.submittedAt;
+    }).length;
     const label = only === null ? "Tim" : esc(teamName(only));
-    return `${label}: ${done}/${people.length} sudah lapor`;
+    return `${label}: ${done}/${people.length - izin} sudah lapor`;
   };
 
   return `<h1>Modul</h1>

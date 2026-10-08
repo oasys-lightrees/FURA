@@ -217,6 +217,15 @@ with Host("messi_akun", extra={"mail_from": "fura@example.test"}) as host, sync_
                   .find(d => d.textContent.includes("belum lapor"));
                 return t ? parseInt(t.textContent, 10) : -1;
               }"""), lambda n: 0 <= n <= 2)
+    # Kartu di katalog menghitung dengan aturan yang sama: dua tempat yang menghitung hal
+    # yang sama dengan cara berbeda akan berbeda angkanya, dan yang membacanya tidak tahu
+    # yang mana yang benar.
+    # Aplikasinya mengingat modul terakhir, jadi memuat ulang mendarat di dalam MESSI —
+    # bukan di katalognya. Logo adalah jalan pulangnya, sama seperti untuk orangnya.
+    pgRekap.click("#home")
+    pgRekap.wait_for_selector("[data-rekap]", timeout=15000)
+    check("kartu di katalog memakai penyebut yang sama",
+          pgRekap.inner_text("[data-rekap]"), lambda s: "/2" in s)
     ctxRekap.close()
     izinkan(False)
     lia.goto(host.base + "/izin.php")
