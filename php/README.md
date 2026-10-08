@@ -98,10 +98,22 @@ langsung memasukkan — di space bersama, link seperti itu memasukkan *siapa pun
 bisa membaca space itu*. Orang login dengan password, dan sesinya 30 hari, jadi
 praktis sebulan sekali. Untuk yang terkunci, *Orang & tim* punya tombol *Link masuk*
 yang menghasilkan link 60 menit sekali-pakai, untuk dikirim japri. Dan orangnya sendiri
-bisa menitipkan pesan lewat *Lupa password?* di halaman masuk: permintaannya muncul di
-atas halaman itu dengan namanya. Tidak ada email yang dikirim sistem ini — kalimat di
-halaman itu mengatakannya terus terang, karena email yang dijanjikan lalu tidak datang
-lebih buruk daripada tidak dijanjikan.
+bisa menekan *Lupa password?* di halaman masuk.
+
+**Email dikirim lewat `mail()` PHP, kalau `mail_from` diisi.** Dengan itu undangan dan
+link masuk sampai sendiri ke inbox orangnya, dan yang lupa passwordnya pada hari Sabtu
+tidak perlu menunggu sampai Senin. Tanpa itu semuanya kembali seperti sebelumnya:
+linknya ditampilkan untuk disalin admin, dan halaman *Lupa password?* mengatakan terus
+terang bahwa tidak ada email yang akan datang — email yang dijanjikan lalu tidak datang
+lebih buruk daripada tidak dijanjikan. Jawaban halaman itu selalu sama untuk alamat yang
+terdaftar dan yang tidak: halaman yang menjawab berbeda adalah daftar nama siapa saja
+yang bekerja di sini. Pengiriman yang gagal dicatat di `job_log` dan disebutkan di *Cek
+sistem*, dan permintaannya tetap dititipkan ke admin sebagai cadangan.
+
+**Passwordnya bisa diganti sendiri** di *Akun*, dengan password sekarang sebagai
+penjaga — sesi 30 hari berarti laptop yang ditinggal terbuka adalah jalan mengambil alih
+akun. Begitu password berganti, sesi di perangkat lain dihentikan: password baru yang
+tidak menutup pintu lama bukan password baru.
 
 WhatsApp tetap tidak ada: WhatsApp pribadi tidak punya API resmi, dan library yang
 mengaku punya berisiko nomor perusahaan sendiri diblokir. Lihat `docs/09-integrations.md`.
@@ -114,7 +126,8 @@ Dijalankan tiap jam, dan aman kalau jalan dua kali atau terlewat satu jam:
 |-----|--------------|
 | tiap jam | hari yang lewat tanpa laporan ditandai *tidak lapor*; janji yang lewat tanggal ditandai *tidak ditepati*; token kedaluwarsa dibuang |
 | 09:00 | laporan dibuka; satu pesan ke space, menyebut janji yang jatuh tempo hari ini |
-| 17:00 | pengingat, menyebut siapa yang belum lapor — tidak dikirim kalau semua sudah |
+| 17:00 | pengingat, menyebut siapa yang belum lapor — tidak dikirim kalau semua sudah, dan tidak menyebut yang sedang izin |
+| sesudah 17:00 | kalau jam 17 terlewat (cron mati, hosting tersendat), pengingatnya menyusul di jam berikutnya — dengan kalimat yang mengakui jam tutupnya sudah lewat |
 | *seketika* | ada yang menulis permintaan bantuan — tidak menunggu cron |
 
 Setiap pengiriman dicatat di tabel `job_log`, jadi "kenapa tidak ada pesan?" selalu
@@ -126,7 +139,9 @@ ada jawabannya. URL webhook-nya membawa kunci sendiri, jadi tidak pernah ikut te
 index.php          halaman aplikasi + jembatan ke API
 app.html           salinan persis web/messi.html
 login.php          masuk: password, atau link sekali pakai dari admin
-lupa.php           "saya lupa" — menitipkan pesan, karena belum ada pengiriman email
+lupa.php           "saya lupa" — mengirim link masuk, atau menitipkannya ke admin
+akun.php           nama dan password sendiri; sesi di perangkat lain
+izin.php           cuti, sakit, dinas luar — supaya harinya tidak jadi "tidak lapor"
 setup.php          akun pemilik pertama (hapus setelah dipakai)
 kelola.php         satu pintu untuk yang mengelola, plus tuntunan penyiapan
 cek.php            apakah hosting ini sanggup, dan apa yang masih kurang
@@ -141,6 +156,7 @@ lib/bootstrap.php  konfigurasi + koneksi database
 lib/auth.php       siapa yang sedang bertanya
 lib/repo.php       baca/tulis, dengan pemeriksaan yang tidak bisa dilewati browser
 lib/chat.php       Google Chat
+lib/mail.php       email keluar: undangan dan link masuk, lewat mail() PHP
 lib/require-php8.php  penjaga versi PHP, dibaca paling awal
 lib/layout.php     satu kerangka halaman: satu CSS, satu kepala, satu mode gelap
 soal.php           halaman admin: pertanyaan, ambang, jam, channel — per tim
@@ -153,7 +169,7 @@ lib/schema.php     langkah pemutakhiran, tiap langkah memeriksa dirinya sendiri
 install.sql        sepuluh tabel
 PASANG.txt         langkah pemasangan, bahasa non-teknis
 make-zip.sh        bikin messi-cpanel.zip
-tests/             644 pemeriksaan (tidak ikut ke server)
+tests/             750 pemeriksaan (tidak ikut ke server)
 ```
 
 ## Yang diputuskan server, bukan browser
@@ -213,11 +229,12 @@ menyebutkan mana yang barusan terjadi.
 |--------|--------|
 | `tests/test_engine.php` | 99 — aturan, dicocokkan dengan `tests/test_core.py` |
 | `tests/test_modul.php` | 63 — modul sebagai dokumen; ujian terberatnya MESSI sendiri ditulis ulang sebagai modul dan harus berperilaku sama persis |
-| `tests/test_repo.php` | 113 — terhadap MySQL sungguhan, di database yang dia buat sendiri |
-| `tests/test_cron.php` | 66 — seminggu penuh jam demi jam, jam dibekukan, pesan bot ditangkap |
+| `tests/test_repo.php` | 172 — terhadap MySQL sungguhan, di database yang dia buat sendiri |
+| `tests/test_cron.php` | 78 — seminggu penuh jam demi jam, jam dibekukan, pesan bot ditangkap |
 | `tests/test_live.py` | 68 — browser terhadap aplikasi yang benar-benar jalan |
 | `tests/test_admin.py` | 125 — pemasangan pertama, undangan satu dan borongan, lupa password, link sekali pakai, mengubah pertanyaan, uji kirim webhook |
-| `tests/test_modul_page.py` | 35 — menyusun modul lewat halamannya: menambah, menggeser, menghapus, dan yang sudah diketik tidak hilang saat menekan tombol |
+| `tests/test_modul_page.py` | 41 — menyusun modul lewat halamannya: menambah, menggeser, menghapus, dan yang sudah diketik tidak hilang saat menekan tombol |
+| `tests/test_akun.py` | 29 — ganti nama dan password sendiri, sesi perangkat lain mati, izin menghapus tanda "tidak lapor", dan "lupa password" yang menjawab sama untuk alamat terdaftar dan tidak |
 | `tests/test_schema.php` | 49 — pemasangan lama di-upgrade, lalu dibandingkan kolom demi kolom dengan yang baru |
 | `tests/test_upgrade_path.py` | 26 — aplikasi sungguhan di atas database versi lama: masih bisa masuk, setiap halaman lain menyebut apa yang kurang, lalu satu tombol menghidupkannya |
 | `tests/check_sync.php` | memastikan `app.html` belum menyimpang dari `web/messi.html` |

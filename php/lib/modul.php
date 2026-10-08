@@ -32,6 +32,15 @@ require_once __DIR__ . '/engine.php';
 /** Jenis pertanyaan yang dikenali. Urutannya ikut jadi urutan pilihan di layar admin. */
 const MODUL_FIELD_TYPES = ['grid', 'text', 'textarea', 'number', 'choice', 'plans'];
 
+/**
+ * Kode modul yang punya layar pengisiannya sendiri di dalam program.
+ *
+ * Dipakai di beberapa tempat untuk mengenali satu-satunya modul yang istimewa, jadi
+ * ditulis sekali di sini: kode yang ditulis ulang di lima tempat adalah kode yang suatu
+ * hari berbeda di salah satunya.
+ */
+const MODUL_MESSI = 'MESSI';
+
 /** Kapan sebuah pertanyaan ditanyakan. */
 const MODUL_WHEN = ['selalu', 'merah'];
 
@@ -134,10 +143,16 @@ function modul_default(string $key = '', string $name = ''): array
 /**
  * MESSI, ditulis sebagai dokumen.
  *
- * Ada dua gunanya. Yang pertama: membuktikan kosakata di berkas ini cukup — modul yang
+ * Ada tiga gunanya. Yang pertama: membuktikan kosakata di berkas ini cukup — modul yang
  * sudah dipakai sehari-hari harus muat tanpa satu pun pengecualian, kalau tidak yang
  * salah kosakatanya. Yang kedua: jadi titik awal yang bisa disalin perusahaan lain,
  * karena menyalin sesuatu yang sudah jalan jauh lebih mudah daripada memulai dari kosong.
+ *
+ * Yang ketiga yang paling penting sehari-hari: inilah satu-satunya sumber bentuk MESSI.
+ * Barisnya di tabel `modules` adalah hasil fungsi ini, ditulis ulang tiap kali setelan
+ * timnya disimpan — bukan dokumen kedua yang bisa diubah sendiri. Sebelum itu berlaku,
+ * mengubah ambang gantung di halaman Pertanyaan meninggalkan modulnya tetap berbunyi
+ * "Gantung >3 hari", dan dua tempat menyimpan satu kebenaran berarti salah satunya bohong.
  */
 function modul_messi(array $cfg): array
 {
@@ -179,8 +194,8 @@ function modul_messi(array $cfg): array
     }
 
     return modul_normalize([
-        'key'  => 'MESSI',
-        'name' => 'MESSI',
+        'key'  => MODUL_MESSI,
+        'name' => MODUL_MESSI,
         'full' => 'Messenger Screening',
         'what' => 'Sapuan harian semua channel chat: berapa yang aktif, berapa yang '
                 . 'gantung, dan apa rencana untuk yang gantung.',

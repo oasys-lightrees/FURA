@@ -141,13 +141,23 @@ function chat_escalation(string $name, string $text): string
     ]);
 }
 
-/** One hour before closing — named, because a reminder addressed to nobody is read by
- *  nobody. */
-function chat_reminder(array $names, int $dueHour = MESSI_DUE_HOUR): string
+/**
+ * One hour before closing — named, because a reminder addressed to nobody is read by
+ * nobody.
+ *
+ * $lewat berarti pesannya menyusul: cron-nya tidak jalan di jam yang seharusnya, dan yang
+ * dikirim sekarang sudah sesudah jam tutup. Kalimatnya harus berbeda, kalau tidak "satu
+ * jam lagi tutup" dikirim jam sembilan malam — dan pengingat yang jelas-jelas salah
+ * tentang jam berapa sekarang adalah pengingat yang berhenti dipercaya.
+ */
+function chat_reminder(array $names, int $dueHour = MESSI_DUE_HOUR, bool $lewat = false): string
 {
+    $jam = sprintf('%02d:00', $dueHour);
     return implode("\n", [
-        'Satu jam lagi tutup (' . sprintf('%02d:00', $dueHour) . '). Belum lapor: '
-            . implode(', ', $names) . '.',
+        $lewat
+            ? 'Sudah lewat jam tutup (' . $jam . ') dan belum lapor: '
+                . implode(', ', $names) . '. Masih bisa diisi, tercatat telat.'
+            : 'Satu jam lagi tutup (' . $jam . '). Belum lapor: ' . implode(', ', $names) . '.',
         '',
         chat_link('Isi sekarang'),
     ]);

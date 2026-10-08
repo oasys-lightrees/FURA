@@ -23,6 +23,14 @@ return [
     // Kosongkan dan aplikasinya tetap jalan penuh — cuma tidak ada pesan otomatis.
     'chat_webhook' => '',
 
+    // Email keluar: undangan dan link masuk dikirim sendiri, bukan disalin admin.
+    // Di cPanel, buat dulu satu akun email di domain ini (Email Accounts), misalnya
+    // fura@contoh.com, lalu tulis alamatnya di sini — alamat di domain lain (gmail.com)
+    // hampir selalu masuk spam. Kosongkan dan semuanya kembali seperti sebelumnya:
+    // linknya ditampilkan di halaman Orang & tim untuk disalin dan dikirim japri.
+    'mail_from' => '',
+    'mail_name' => 'FURA',
+
     // The cron URL carries this. Without it anyone could trigger the morning messages.
     // Make a long random one: openssl rand -hex 24
     'cron_key' => 'ganti-ini-jadi-acak-panjang',

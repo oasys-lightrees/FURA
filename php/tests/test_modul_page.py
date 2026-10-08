@@ -59,6 +59,43 @@ with Host("messi_modulpage") as host, sync_playwright() as p:
     check("dan lima pertanyaannya ikut terbaca", tabel, lambda s: "5 pertanyaan" in s)
     check("beserta jamnya", tabel, lambda s: "09:00–18:00" in s)
 
+    print("\n=== MESSI diubah di Pertanyaan, dan hanya di sana ===")
+    # Dua tempat yang menyimpan satu bentuk akan berbeda, dan yang berbeda tidak kelihatan
+    # berbeda. Jadi barisnya mengantar ke halaman Pertanyaan, bukan ke formulir yang
+    # tulisannya akan ditimpa begitu setelan timnya disimpan.
+    baris = pg.locator("table.mods tr", has_text="MESSI")
+    check("barisnya menunjuk ke Pertanyaan, bukan ke penyusun",
+          baris.inner_text(), lambda s: "Ubah di Pertanyaan" in s and "Susun" not in s)
+    check("dan tidak menawarkan mematikan atau menghapusnya",
+          baris.inner_text(), lambda s: "Matikan" not in s and "Hapus" not in s)
+
+    # Yang tetap mengetikkan ?id= miliknya diantar, bukan dibiarkan mengetik sia-sia.
+    mid = pg.get_attribute("table.mods tr:has-text('MESSI') input[name=id]", "value")
+    pg.goto(host.base + "/modul.php?id=" + str(mid))
+    pg.wait_for_load_state("networkidle")
+    check("membuka penyusunnya langsung pun diantar ke Pertanyaan",
+          pg.inner_text(".note.warn"), lambda s: "halaman Pertanyaan" in s)
+    check("dan formulir penyusunnya tidak digambar",
+          pg.locator(".fld").count(), 0)
+
+    # Tanpa MESSI, repo_module_id() tidak menemukan apa pun, laporan tersimpan tanpa modul,
+    # dan kunci unik (user_id, day, module_id) berhenti menahan apa pun — MySQL menganggap
+    # dua NULL sebagai dua nilai berbeda.
+    dipaksa = pg.evaluate(
+        """async ([url, csrf, id, team]) => {
+             const out = [];
+             for (const act of ["hapus", "nonaktif"]) {
+               const body = new URLSearchParams({ do: act, csrf, id, team });
+               const r = await fetch(url, { method: "POST", body });
+               out.push((await r.text()).includes("tidak bisa dimatikan atau dihapus"));
+             }
+             return out;
+           }""",
+        [host.base + "/modul.php", pg.get_attribute("input[name=csrf]", "value"), mid,
+         pg.get_attribute("table.mods tr:has-text('MESSI') input[name=team]", "value")])
+    check("dipaksa lewat kiriman mentah pun MESSI tidak bisa dihapus", dipaksa[0], True)
+    check("maupun dimatikan", dipaksa[1], True)
+
     print("\n=== membuat modul sendiri ===")
     pg.fill("#nk", "pr-ista 2!")              # dikotori sengaja
     pg.fill("#nn", "Prista")
@@ -186,8 +223,12 @@ with Host("messi_modulpage") as host, sync_playwright() as p:
 
     # Begitu ada satu laporan saja, modulnya jadi bagian dari riwayat: menghapusnya
     # membuat laporan lama tidak bisa dibaca lagi.
+    pg.fill("#nk", "LAPOR1")
+    pg.fill("#nn", "Sudah dilapor")
+    pg.click("button:has-text('Buat modul')")
+    pg.wait_for_load_state("networkidle")
     host.php("-r", """require 'lib/bootstrap.php';
-        $m = q1("SELECT id, team_id FROM modules WHERE code = 'MESSI' LIMIT 1");
+        $m = q1("SELECT id, team_id FROM modules WHERE code = 'LAPOR1' LIMIT 1");
         $u = q1("SELECT id FROM users WHERE email = 'nicho\\@example.test'");
         q('INSERT INTO cycles (user_id, day, team_id, module_id, status, answers,
                                submitted_at, created_at) VALUES (?,?,?,?,?,?,?,?)',
@@ -195,7 +236,7 @@ with Host("messi_modulpage") as host, sync_playwright() as p:
            Clock::nowUtcSql(), Clock::nowUtcSql()]);""")
     pg.goto(host.base + "/modul.php")
     pg.wait_for_load_state("networkidle")
-    baris = pg.locator("table.mods tr", has_text="MESSI")
+    baris = pg.locator("table.mods tr", has_text="LAPOR1")
     baris.locator("button[value=hapus]").click()
     pg.wait_for_load_state("networkidle")
     check("yang sudah punya laporan tidak bisa dihapus",

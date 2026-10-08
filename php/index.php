@@ -49,7 +49,9 @@ $boot = [
     // Pintu ke halaman di luar aplikasi ini. Dikirim sebagai data, bukan ditulis di
     // dalam app.html, karena versi artifact-nya tidak punya satu pun halaman ini.
     'menu' => array_values(array_filter([
+        is_leader($user) ? ['label' => 'Izin', 'href' => 'izin.php'] : null,
         is_manager($user) ? ['label' => 'Kelola', 'href' => 'kelola.php'] : null,
+        ['label' => 'Akun', 'href' => 'akun.php'],
         ['label' => 'Keluar', 'href' => 'api/logout.php'],
     ])),
     'who' => ['email' => (string) $user['email']],

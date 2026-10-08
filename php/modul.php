@@ -201,6 +201,13 @@ if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST') {
 
 $modules = katalog_list($teamId, true);
 $edit = $editId ? katalog_get($teamId, $editId) : null;
+// MESSI tidak disusun di sini — dia adalah halaman Pertanyaan, dibaca sebagai modul.
+// Yang membuka "Susun" untuknya diantar ke sana, bukan dibiarkan mengetik di formulir
+// yang tulisannya akan ditimpa begitu setelan timnya disimpan.
+$keMessi = $edit && $edit['code'] === MODUL_MESSI;
+if ($keMessi) {
+    $edit = null;
+}
 $spec = $edit['spec'] ?? null;
 $csrf = csrf_token();
 
@@ -267,6 +274,12 @@ CSS]);
 
   <?php if ($notice): ?><p class="note ok"><?= h($notice) ?></p><?php endif; ?>
   <?php if ($error): ?><p class="note bad"><?= h($error) ?></p><?php endif; ?>
+  <?php if ($keMessi): ?>
+    <p class="note warn"><strong>MESSI disusun di halaman Pertanyaan.</strong>
+       Pertanyaan, ambang gantung dan jamnya diubah di sana, dan yang terbaca di sini
+       mengikutinya sendiri. <a href="soal.php?team=<?= $teamId ?>">Buka Pertanyaan
+       MESSI</a>.</p>
+  <?php endif; ?>
 
   <div class="card scroll">
     <table class="mods">
@@ -280,31 +293,48 @@ CSS]);
         <td><?= sprintf('%02d:00', $m['spec']['open_hour']) ?>–<?=
             sprintf('%02d:00', $m['spec']['due_hour']) ?></td>
         <td>
-          <a href="?team=<?= $teamId ?>&amp;id=<?= $m['id'] ?>">Susun</a>
+          <?php $tetap = $m['code'] === MODUL_MESSI; ?>
+          <?php if ($tetap): ?>
+            <a href="soal.php?team=<?= $teamId ?>">Ubah di Pertanyaan</a>
+          <?php else: ?>
+            <a href="?team=<?= $teamId ?>&amp;id=<?= $m['id'] ?>">Susun</a>
+          <?php endif; ?>
           <form class="row" method="post">
             <input type="hidden" name="csrf" value="<?= h($csrf) ?>">
             <input type="hidden" name="team" value="<?= $teamId ?>">
             <input type="hidden" name="id" value="<?= $m['id'] ?>">
-            <button class="quiet" type="submit" name="do"
-                    value="<?= $m['active'] ? 'nonaktif' : 'aktif' ?>"><?=
-              $m['active'] ? 'Matikan' : 'Nyalakan' ?></button>
+            <?php if (!$tetap): ?>
+              <button class="quiet" type="submit" name="do"
+                      value="<?= $m['active'] ? 'nonaktif' : 'aktif' ?>"><?=
+                $m['active'] ? 'Matikan' : 'Nyalakan' ?></button>
+            <?php endif; ?>
             <?php if ($i > 0): ?>
               <button class="quiet" type="submit" name="do" value="naik" title="Naikkan">↑</button>
             <?php endif; ?>
             <?php if ($i < count($modules) - 1): ?>
               <button class="quiet" type="submit" name="do" value="turun" title="Turunkan">↓</button>
             <?php endif; ?>
-            <button class="quiet" type="submit" name="do" value="hapus"
-              onclick="return confirm('Hapus modul ini? Hanya bisa kalau belum pernah ada laporannya.')"
-              >Hapus</button>
+            <?php if (!$tetap): ?>
+              <button class="quiet" type="submit" name="do" value="hapus"
+                onclick="return confirm('Hapus modul ini? Hanya bisa kalau belum pernah ada laporannya.')"
+                >Hapus</button>
+            <?php endif; ?>
           </form>
         </td>
       </tr>
       <?php endforeach; ?>
     </table>
   </div>
+  <p class="why" style="margin:0.75rem 0 0">MESSI diubah di
+     <a href="soal.php?team=<?= $teamId ?>">Pertanyaan</a>, dan tidak bisa dimatikan atau
+     dihapus — dialah satu-satunya modul yang punya layar pengisian, jadi tanpa dia tidak
+     ada laporan harian.</p>
 
   <h2>Modul baru</h2>
+  <p class="note warn">Modul yang kamu susun di sini sudah tersimpan utuh, tapi
+     <strong>layar pengisian hariannya belum ada</strong> — untuk sekarang yang bisa diisi
+     pemain cuma MESSI. Dikatakan di depan supaya tidak ada yang menyusun modul sepuluh
+     pertanyaan lalu menunggu laporan yang tidak akan pernah masuk.</p>
   <p class="why">Kodenya dipakai laporan untuk menunjuk balik ke modulnya, jadi tidak bisa
      diganti setelah dibuat. Huruf dan angka saja, pendek — seperti MESSI atau PRISTA.</p>
   <div class="card">

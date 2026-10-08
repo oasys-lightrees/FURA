@@ -215,9 +215,13 @@ function page_menu(array $me): void
       <small><?= h((string) $me['email']) ?></small>
       <hr>
       <a href="index.php">Laporan</a>
+      <?php if (is_leader($me)): ?>
+        <a href="izin.php">Izin</a>
+      <?php endif; ?>
       <?php if (is_manager($me)): ?>
         <a href="kelola.php">Kelola</a>
       <?php endif; ?>
+      <a href="akun.php">Akun</a>
       <hr>
       <a href="api/logout.php">Keluar</a>
     </div>

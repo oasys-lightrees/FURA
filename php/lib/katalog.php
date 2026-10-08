@@ -72,6 +72,47 @@ function katalog_by_code(int $teamId, string $code): ?array
 }
 
 /**
+ * Kenapa MESSI tidak bisa dimatikan maupun dihapus.
+ *
+ * Bukan karena dia istimewa, tapi karena dia satu-satunya yang punya layar pengisian:
+ * repo_module_id() mencarinya untuk tiap laporan harian, dan kalau tidak ada, laporan
+ * tersimpan tanpa modul. Kunci uniknya (user_id, day, module_id) menganggap dua NULL
+ * sebagai dua nilai berbeda, jadi yang terjadi bukan pesan kesalahan — satu orang
+ * pelan-pelan punya belasan laporan untuk hari yang sama, dan rekapnya berhenti masuk akal.
+ */
+function katalog_messi_wajib(): string
+{
+    return 'MESSI tidak bisa dimatikan atau dihapus: dialah satu-satunya modul yang punya '
+         . 'layar pengisian, jadi tanpa dia tidak ada laporan harian sama sekali.';
+}
+
+/**
+ * Menuliskan ulang MESSI dari setelan timnya.
+ *
+ * Halaman Pertanyaan dan tabel modul sempat jadi dua tempat yang menyimpan satu hal yang
+ * sama: mengubah ambang gantung jadi 1 hari di halaman Pertanyaan meninggalkan modulnya
+ * tetap berbunyi "Gantung >3 hari". Tidak ada pesan kesalahan, tidak ada yang kelihatan
+ * salah — cuma dua jawaban berbeda untuk satu pertanyaan, dan tidak ada cara tahu yang
+ * mana yang dipercaya. Sekarang yang satu diturunkan dari yang lain.
+ *
+ * Mengembalikan id barisnya, atau null kalau tim ini belum punya MESSI (pemasangan yang
+ * databasenya belum dimutakhirkan, atau tim yang baru dibuat dan belum disemai).
+ */
+function katalog_sync_messi(int $teamId): ?int
+{
+    $row = q_opt('SELECT id FROM modules WHERE team_id = ? AND code = ? LIMIT 1',
+                 [$teamId, MODUL_MESSI])?->fetch();
+    if (!$row) {
+        return null;
+    }
+    require_once __DIR__ . '/repo.php';
+    $spec = modul_messi(repo_config($teamId));
+    q('UPDATE modules SET spec = ?, updated_at = ? WHERE id = ?',
+      [json_encode($spec, JSON_UNESCAPED_UNICODE), Clock::nowUtcSql(), (int) $row['id']]);
+    return (int) $row['id'];
+}
+
+/**
  * Menyimpan modul. $id null berarti modul baru.
  *
  * Kuncinya tidak pernah berubah setelah dibuat. Jawaban yang sudah tersimpan menunjuk ke
@@ -111,6 +152,10 @@ function katalog_save(array $user, int $teamId, ?int $id, $in): int
     if (!$lama) {
         throw new RepoError('Modul itu tidak ada di tim ini.');
     }
+    if ($lama['code'] === MODUL_MESSI) {
+        throw new RepoError('Bentuk MESSI diambil dari halaman Pertanyaan, jadi tidak '
+                          . 'disusun di sini. Ubah di sana dan yang di sini ikut.');
+    }
     $spec['key'] = $lama['code'];       // kuncinya tetap, apa pun yang dikirim formulir
     q('UPDATE modules SET spec = ?, updated_at = ?, updated_by = ? WHERE id = ? AND team_id = ?',
       [json_encode($spec, JSON_UNESCAPED_UNICODE), $now, (int) $user['id'], $id, $teamId]);
@@ -123,8 +168,12 @@ function katalog_set_active(array $user, int $teamId, int $id, bool $active): vo
     if (!in_array($user['role'] ?? '', ['admin', 'owner'], true)) {
         throw new RepoError('Halaman ini untuk admin.');
     }
-    if (!katalog_get($teamId, $id)) {
+    $m = katalog_get($teamId, $id);
+    if (!$m) {
         throw new RepoError('Modul itu tidak ada di tim ini.');
+    }
+    if ($m['code'] === MODUL_MESSI && !$active) {
+        throw new RepoError(katalog_messi_wajib());
     }
     q('UPDATE modules SET active = ?, updated_at = ?, updated_by = ? WHERE id = ? AND team_id = ?',
       [$active ? 1 : 0, Clock::nowUtcSql(), (int) $user['id'], $id, $teamId]);
@@ -172,8 +221,12 @@ function katalog_delete(array $user, int $teamId, int $id): void
     if (!in_array($user['role'] ?? '', ['admin', 'owner'], true)) {
         throw new RepoError('Halaman ini untuk admin.');
     }
-    if (!katalog_get($teamId, $id)) {
+    $m = katalog_get($teamId, $id);
+    if (!$m) {
         throw new RepoError('Modul itu tidak ada di tim ini.');
+    }
+    if ($m['code'] === MODUL_MESSI) {
+        throw new RepoError(katalog_messi_wajib());
     }
     $dipakai = q_opt('SELECT id FROM cycles WHERE module_id = ? LIMIT 1', [$id]);
     if ($dipakai !== null && $dipakai->fetch()) {

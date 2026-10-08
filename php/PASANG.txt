@@ -75,6 +75,17 @@ cPanel -> Software -> Select PHP Version (atau MultiPHP Manager) -> pilih 8.1 / 
                    contoh: https://namadomain.com/messi
      'cron_key' => teks acak panjang, ketik asal saja yang panjang dan aneh
 
+   Satu lagi yang boleh diisi, boleh dikosongkan:
+
+     'mail_from' => alamat email yang dipakai sistem ini untuk mengirim undangan
+                    dan link masuk. Buat dulu akun emailnya di cPanel -> Email
+                    Accounts, misalnya fura@namadomain.com, lalu tulis alamat itu
+                    di sini. Pakai alamat di domain ini — alamat gmail.com hampir
+                    selalu masuk spam.
+
+   Kalau 'mail_from' dikosongkan, aplikasinya tetap jalan penuh; yang berbeda cuma
+   undangan dan link masuk harus kamu salin lalu kirim japri sendiri.
+
    Simpan.
 
 
@@ -119,14 +130,19 @@ cPanel -> Software -> Select PHP Version (atau MultiPHP Manager) -> pilih 8.1 / 
    akan pernah ditandai bolos untuk hari sebelum dia bergabung, dan yang belum
    menerima undangannya tidak dihitung sama sekali.
 
+   Kalau 'mail_from' sudah diisi di config.php, tiap undangan juga langsung dikirim
+   ke email orangnya, dan tabelnya menandai mana yang terkirim dan mana yang gagal.
+   Yang gagal tetap bisa kamu salin dari situ.
+
    Lupa password? Tombol "Link buat password baru" di baris orangnya. Tetap tidak
    ada password yang perlu kamu ketik atau kirim.
 
-   Dan orangnya sendiri punya jalan menitipkan pesan: di halaman masuk ada "Lupa
-   password?". Permintaannya muncul di atas halaman Orang & tim dengan namanya, dan
-   barisnya ditandai "minta link masuk" sampai kamu mengeluarkan linknya. Sistem ini
-   TIDAK mengirim email, jadi tidak ada yang menunggu di inbox siapa pun — yang
-   menolong tetap kamu.
+   Dan orangnya sendiri punya jalan pulang: di halaman masuk ada "Lupa password?".
+   Kalau 'mail_from' sudah diisi, link masuk 60 menit dikirim ke emailnya sendiri dan
+   kamu tidak perlu mengerjakan apa pun. Kalau belum, permintaannya muncul di atas
+   halaman Orang & tim dengan namanya, dan barisnya ditandai "minta link masuk"
+   sampai kamu mengeluarkan linknya — yang menolong tetap kamu. Tandanya hilang
+   sendiri begitu orangnya berhasil masuk.
 
    PERAN
      Owner    semua, termasuk mengangkat dan mencabut admin. Akun pertama otomatis
@@ -150,6 +166,15 @@ cPanel -> Software -> Select PHP Version (atau MultiPHP Manager) -> pilih 8.1 / 
    ambang yang berlaku di timmu — dan sekarang dia salah satu modul, bukan
    satu-satunya.
 
+   MESSI sendiri TIDAK disusun di halaman itu: bentuknya diambil dari halaman
+   Pertanyaan, jadi barisnya cuma mengantar ke sana. Dia juga tidak bisa dimatikan
+   atau dihapus — dialah satu-satunya modul yang punya layar pengisian, jadi tanpa
+   dia tidak ada laporan harian sama sekali.
+
+   PERLU TAHU DULU: modul yang kamu susun sendiri sudah tersimpan utuh, tapi LAYAR
+   PENGISIAN HARIANNYA BELUM ADA. Untuk sekarang yang bisa diisi pemain cuma MESSI.
+   Jadi silakan menyusunnya, tapi jangan menunggu laporannya masuk.
+
    Modul baru: beri kode pendek (huruf dan angka, misalnya PRISTA), lalu susun
    pertanyaannya. Enam jenis yang bisa dipakai:
 
@@ -171,7 +196,32 @@ cPanel -> Software -> Select PHP Version (atau MultiPHP Manager) -> pilih 8.1 / 
    dari katalog — laporan lamanya tetap bisa dibaca.
 
 
-8. SESUAIKAN PERTANYAANNYA (boleh dilewati)
+8. IZIN, CUTI, SAKIT
+   Menu kanan atas -> Izin. Bisa dibuka leader maupun admin.
+   Pilih orangnya, isi tanggal mulai dan selesai, boleh ditambah keterangan
+   ("cuti tahunan", "sakit", "dinas luar"). Satu hari saja: isi dua tanggal yang sama.
+
+   Hari yang ditandai izin tidak dihitung "tidak lapor", tidak muncul di "Perlu
+   perhatian", dan tidak ditagih bot di pengingat jam tutup. Akhir pekan tidak perlu
+   ditandai — memang tidak pernah dihitung. Hari yang laporannya sudah masuk tidak
+   ikut ditandai: laporan yang sungguhan selalu menang.
+
+   Bisa untuk hari yang sudah lewat, jadi tanda merah yang tidak adil bisa dibereskan
+   belakangan — dan bisa dibatalkan lagi, yang mengembalikan tanda merahnya.
+
+   Leader hanya bisa menandai orang di timnya sendiri; admin dan owner semua tim.
+
+
+9. GANTI PASSWORD SENDIRI
+   Menu kanan atas -> Akun. Di situ tiap orang bisa mengganti namanya dan
+   passwordnya sendiri — password sekarang ikut ditanya, dan begitu berganti, semua
+   perangkat lain yang masih masuk dikeluarkan.
+
+   Peran, tim dan tanggal mulai ditampilkan di situ tapi tidak bisa diketik: ketiganya
+   menentukan orang itu muncul di rekap siapa, jadi yang mengubahnya admin.
+
+
+10. SESUAIKAN PERTANYAANNYA (boleh dilewati)
    Menu kanan atas -> Kelola -> Pertanyaan. Kalau ada lebih dari satu tim, pilih
    dulu timnya di atas — pertanyaan milik tim.
    Yang bisa diubah dari situ, tanpa menyentuh kode:
@@ -193,7 +243,10 @@ Tanpa ini aplikasinya tetap jalan penuh; bedanya tidak ada pesan otomatis.
 Dengan ini, tiap hari kerja space tim dapat dua pesan:
 
   09:00  laporan hari ini dibuka + janji siapa saja yang jatuh tempo hari ini
-  17:00  pengingat, menyebut siapa yang belum lapor
+  17:00  pengingat, menyebut siapa yang belum lapor — yang sedang izin tidak disebut
+
+Kalau jam 17 terlewat karena cron-nya tidak jalan jam itu, pengingatnya menyusul di
+jam berikutnya, dengan kalimat yang mengakui jam tutupnya sudah lewat.
 
 Cuma dua, dan dua-duanya sekadar mengingatkan orang untuk membuka websitenya.
 Rekapnya TIDAK dikirim ke chat: atasan membacanya di tab "Tim" di website,
@@ -216,9 +269,11 @@ langsung memasukkan — link semacam itu di space bersama berarti siapa pun di
 space bisa masuk sebagai orang lain. Orang masuk dengan password sekali, dan
 sesinya bertahan 30 hari, jadi praktis login sebulan sekali.
 
-Ada yang lupa password? Kelola -> Orang & tim -> tombol "Link masuk" di barisnya ->
-kirim JAPRI ke orangnya. Berlaku 60 menit, sekali pakai. Kalau dia sudah menekan
-"Lupa password?" di halaman masuk, namanya sudah menunggu di atas halaman itu.
+Ada yang lupa password? Kalau 'mail_from' sudah diisi di config.php, dia cukup menekan
+"Lupa password?" di halaman masuk dan link masuknya dikirim sendiri ke emailnya. Kalau
+belum: Kelola -> Orang & tim -> tombol "Link masuk" di barisnya -> kirim JAPRI ke
+orangnya. Berlaku 60 menit, sekali pakai. Namanya sudah menunggu di atas halaman itu
+kalau dia sudah menekan "Lupa password?".
 
 
 OWNER SENDIRIAN DAN LUPA PASSWORD

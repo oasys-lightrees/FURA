@@ -48,6 +48,10 @@ echo "== modul yang disusun sendiri =="
 MESSI_TEST_DB=messi_modulpage_test python3 tests/test_modul_page.py
 
 echo
+echo "== akun, izin, dan jalan pulang =="
+MESSI_TEST_DB=messi_akun_test python3 tests/test_akun.py
+
+echo
 echo "== berkas baru di atas database lama =="
 MESSI_TEST_DB=messi_upgrade_test python3 tests/test_upgrade_path.py
 

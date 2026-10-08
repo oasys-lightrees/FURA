@@ -109,11 +109,14 @@ function tick_team(array $did, string $today, int $hour, int $teamId): array
                              fn() => tick_notify_open($today, $teamId, $cfg));
     }
 
-    // One hour before closing — the nudge, and only to the people it is about.
-    if ($hour >= $cfg['due_hour'] - 1 && $hour < $cfg['due_hour']
-        && !job_done('notify_due', $tag)) {
+    // Satu jam sebelum tutup — dan sesudahnya pun masih, kalau belum pernah terkirim
+    // hari ini. Dulu jendelanya satu jam tepat: cron yang terlewat di jam itu berarti
+    // tidak ada pengingat sore sama sekali untuk seharian, dan yang terlihat cuma "botnya
+    // kadang kirim kadang tidak". Pengingat pagi sudah menyusul sejak awal dengan cara
+    // yang sama; yang sore ketinggalan.
+    if ($hour >= $cfg['due_hour'] - 1 && !job_done('notify_due', $tag)) {
         $did = tick_announce($did, 'notify_due', $tag, 'nudged',
-                             fn() => tick_notify_due($today, $teamId, $cfg));
+                             fn() => tick_notify_due($today, $teamId, $cfg, $hour));
     }
 
     return $did;
@@ -161,21 +164,28 @@ function tick_notify_open(string $today, int $teamId, array $cfg): string
 /**
  * Only sent when somebody is actually missing, and it names them.
  *
+ * $hour dipakai untuk satu hal: menentukan kalimatnya. Pesan yang menyusul sesudah jam
+ * tutup tidak boleh berkata "satu jam lagi tutup".
+ *
  * @return string 'sent' | 'kosong' (tidak ada yang telat, atau tidak ada space) | 'gagal'
  */
-function tick_notify_due(string $today, int $teamId, array $cfg): string
+function tick_notify_due(string $today, int $teamId, array $cfg, ?int $hour = null): string
 {
     if (!chat_enabled($cfg['chat_webhook'])) {
         return 'kosong';
     }
-    $names = q('SELECT u.name FROM users u
+    // Yang sedang izin tidak ikut disebut. Menagih laporan dari orang yang cutinya sudah
+    // dicatat atasannya sendiri adalah cara tercepat membuat seluruh pesan ini diabaikan.
+    $names = q("SELECT u.name FROM users u
                   LEFT JOIN cycles c ON c.user_id = u.id AND c.day = ?
                  WHERE u.active = 1 AND u.accepted_at IS NOT NULL AND u.joined_on <= ?
                    AND u.team_id = ? AND c.submitted_at IS NULL
-                 ORDER BY u.name', [$today, $today, $teamId])->fetchAll(PDO::FETCH_COLUMN);
+                   AND (c.status IS NULL OR c.status <> 'excused')
+                 ORDER BY u.name", [$today, $today, $teamId])->fetchAll(PDO::FETCH_COLUMN);
     if (!$names) {
         return 'kosong';
     }
-    return chat_send(chat_reminder($names, $cfg['due_hour']), 15, $cfg['chat_webhook'])
+    $lewat = $hour !== null && $hour >= (int) $cfg['due_hour'];
+    return chat_send(chat_reminder($names, $cfg['due_hour'], $lewat), 15, $cfg['chat_webhook'])
         ? 'sent' : 'gagal';
 }

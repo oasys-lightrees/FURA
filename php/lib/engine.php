@@ -288,6 +288,30 @@ function messi_config_snapshot(array $cfg): array
     return ['channels' => $cfg['channels'], 'threshold_days' => $cfg['threshold_days']];
 }
 
+/**
+ * Apakah ini benar-benar tanggal berbentuk YYYY-MM-DD, dan tanggal yang memang ada.
+ *
+ * Dibutuhkan karena dua hal. DateTimeImmutable melempar untuk teks yang tidak dia kenali,
+ * dan tanggal selalu datang dari formulir. Dan "2026-02-31" tidak dia tolak — dia
+ * menerimanya sebagai 3 Maret, yang berarti seseorang mengetik tanggal mustahil dan
+ * sistemnya diam-diam memilih tanggal lain untuknya.
+ */
+function messi_is_day(string $day): bool
+{
+    if (!preg_match('/^(\d{4})-(\d{2})-(\d{2})$/', $day, $m)) {
+        return false;
+    }
+    return checkdate((int) $m[2], (int) $m[3], (int) $m[1]);
+}
+
+/** Berapa hari dari $from sampai $to, dua-duanya ikut dihitung. */
+function messi_day_span(string $from, string $to): int
+{
+    $a = new DateTimeImmutable($from . ' 00:00:00', new DateTimeZone('UTC'));
+    $b = new DateTimeImmutable($to . ' 00:00:00', new DateTimeZone('UTC'));
+    return (int) $a->diff($b)->days + 1;
+}
+
 function messi_is_workday(string $day): bool
 {
     $dt = new DateTimeImmutable($day . ' 00:00:00', new DateTimeZone('UTC'));

@@ -28,7 +28,7 @@ first module.
 ```bash
 python3 web/tests/run_all.py   # 245 browser checks against the live page
 pytest -q                      # 29 engine-rule tests, no browser or database
-sh php/tests/run_all.sh        # 644 checks on the PHP + MySQL build
+sh php/tests/run_all.sh        # 750 checks on the PHP + MySQL build
 ./run.sh                       # the FastAPI + Postgres build on :8000
 ```
 

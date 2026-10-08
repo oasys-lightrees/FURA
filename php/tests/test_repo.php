@@ -337,6 +337,45 @@ eq('laporan lama tanpa cuplikan tetap terbaca',
 repo_save_config($admin, $tim, messi_config_default());
 eq('dikembalikan ke bawaan berarti benar-benar bawaan', repo_config(), messi_config_default());
 
+/* --------------------------------- satu kebenaran: Pertanyaan dan modul MESSI */
+
+// Dua tempat yang menyimpan satu hal yang sama akan berbeda, dan yang berbeda tidak
+// kelihatan berbeda: halaman Pertanyaan berkata ambangnya 1 hari sementara modulnya tetap
+// berbunyi "Gantung >3 hari". Tidak ada pesan kesalahan — cuma dua jawaban untuk satu
+// pertanyaan, dan tidak ada cara tahu yang mana yang dipercaya.
+require_once __DIR__ . '/../lib/katalog.php';
+repo_module_id($tim);                                   // memastikan MESSI sudah disemai
+$kolom = fn() => array_column(katalog_by_code($tim, MODUL_MESSI)['spec']['fields'][0]['cols'],
+                              'label');
+eq('bawaannya, modul MESSI berbunyi seperti ambang bawaannya',
+   in_array('Gantung >3 hari', $kolom(), true), true);
+
+repo_save_config($admin, $tim, ['threshold_days' => 1, 'due_hour' => 16]);
+eq('ambang yang diubah di Pertanyaan langsung terbaca di modulnya',
+   in_array('Gantung >1 hari', $kolom(), true), true);
+eq('dan yang lama tidak tertinggal di sana',
+   in_array('Gantung >3 hari', $kolom(), true), false);
+eq('jamnya ikut', katalog_by_code($tim, MODUL_MESSI)['spec']['due_hour'], 16);
+
+// Kalau bentuknya bisa diubah di dua tempat, perbedaannya kembali besok.
+throws('modul MESSI tidak bisa disusun dari halaman Modul',
+       fn() => katalog_save($admin, $tim, (int) katalog_by_code($tim, MODUL_MESSI)['id'],
+                            modul_default('MESSI', 'Bukan MESSI')),
+       'halaman Pertanyaan');
+
+// Tanpa MESSI, repo_module_id() mengembalikan null, laporan tersimpan tanpa modul, dan
+// kunci unik (user_id, day, module_id) berhenti menahan apa pun karena MySQL menganggap
+// dua NULL sebagai dua nilai berbeda.
+$idMessi = (int) katalog_by_code($tim, MODUL_MESSI)['id'];
+throws('MESSI tidak bisa dihapus', fn() => katalog_delete($admin, $tim, $idMessi),
+       'tidak bisa dimatikan atau dihapus');
+throws('dan tidak bisa dimatikan',
+       fn() => katalog_set_active($admin, $tim, $idMessi, false),
+       'tidak bisa dimatikan atau dihapus');
+eq('sehingga tiap laporan harian selalu punya modulnya', repo_module_id($tim), $idMessi);
+
+repo_save_config($admin, $tim, messi_config_default());
+
 /* ------------------------------------------------------------------ dua tim */
 
 $timHr = repo_add_team($admin, 'HR');
@@ -483,6 +522,199 @@ ok('an expired link is refused', auth_consume_login_link($stale) === null);
 
 ok('a leader is a leader', is_leader($lead));
 ok('a player is not', !is_leader($nicho));
+
+/* ------------------------------------------------- ganti password sendiri */
+
+$_COOKIE = [];
+Auth::$looked = false;
+$ganti = auth_login('dita2@example.test', TEST_PASSWORD);
+ok('dia masuk dulu', $ganti !== null);
+// Sesi di perangkat lain, dibuat sebelum passwordnya berganti.
+$lamaToken = random_token();
+q('INSERT INTO sessions (token, user_id, expires_at, created_at) VALUES (?,?,?,?)',
+  [$lamaToken, $ganti['id'], '2026-12-31 00:00:00', Clock::nowUtcSql()]);
+
+eq('password sekarang yang salah ditolak',
+   auth_change_password($ganti, 'bukan-ini', 'rahasia-baru-sekali', 'rahasia-baru-sekali'),
+   'Password sekarang salah.');
+eq('password baru yang kependekan ditolak',
+   auth_change_password($ganti, TEST_PASSWORD, 'pendek', 'pendek'),
+   'Password baru minimal 10 karakter.');
+eq('dua kotak yang berbeda ditolak',
+   auth_change_password($ganti, TEST_PASSWORD, 'rahasia-baru-sekali', 'rahasia-baru-dua'),
+   'Dua kotak password baru belum sama.');
+eq('dan password yang itu-itu juga ditolak',
+   auth_change_password($ganti, TEST_PASSWORD, TEST_PASSWORD, TEST_PASSWORD),
+   'Password barunya sama dengan yang sekarang.');
+eq('sampai sini password lamanya masih berlaku',
+   auth_login('dita2@example.test', TEST_PASSWORD) !== null, true);
+
+eq('yang benar diterima',
+   auth_change_password(auth_user() ?? $ganti, TEST_PASSWORD,
+                        'rahasia-baru-sekali', 'rahasia-baru-sekali'), null);
+ok('password lamanya mati', auth_login('dita2@example.test', TEST_PASSWORD) === null);
+$_COOKIE = [];
+Auth::$looked = false;
+ok('password barunya hidup',
+   auth_login('dita2@example.test', 'rahasia-baru-sekali') !== null);
+// Password baru yang tidak menutup pintu lama bukan password baru: sesi berumur 30 hari
+// dan tidak peduli password-nya sudah bukan yang itu lagi.
+eq('dan sesi di perangkat lain ikut mati',
+   (int) q1('SELECT COUNT(*) AS n FROM sessions WHERE token = ?', [$lamaToken])['n'], 0);
+
+/* ------------------------------------------------------------------- izin */
+
+$_COOKIE = [];
+Auth::$looked = false;
+$cuti = make_user('cuti@example.test', 'Cuti', 'player', '2026-09-01');
+
+throws('pemain tidak bisa menandai dirinya sendiri izin',
+       fn() => repo_set_excused($nicho, (int) $cuti['id'], '2026-09-29', '2026-09-29', true),
+       'leader dan admin');
+throws('tanggal yang tidak ada ditolak',
+       fn() => repo_set_excused($admin, (int) $cuti['id'], '2026-02-31', '2026-02-31', true),
+       'Tanggalnya belum lengkap');
+throws('rentang terbalik ditolak',
+       fn() => repo_set_excused($admin, (int) $cuti['id'], '2026-09-30', '2026-09-28', true),
+       'sebelum tanggal mulai');
+throws('rentang yang kelewat panjang ditolak',
+       fn() => repo_set_excused($admin, (int) $cuti['id'], '2026-09-01', '2027-09-01', true),
+       'Rentangnya lebih dari');
+
+// Sen 28 Sep sampai Jum 2 Okt: lima hari kerja, dua hari akhir pekan di luarnya.
+eq('seminggu cuti jadi lima hari kerja, bukan tujuh',
+   repo_set_excused($lead, (int) $cuti['id'], '2026-09-28', '2026-10-04', true, 'cuti tahunan'),
+   5);
+eq('akhir pekan tidak ikut ditandai',
+   (int) q1("SELECT COUNT(*) AS n FROM cycles WHERE user_id = ? AND status = 'excused'
+              AND day IN ('2026-10-03','2026-10-04')", [$cuti['id']])['n'], 0);
+eq('menandainya lagi tidak menandai apa pun dua kali',
+   repo_set_excused($lead, (int) $cuti['id'], '2026-09-28', '2026-10-02', true), 0);
+
+// Inilah seluruh gunanya: hari yang lewat tanpa laporan tidak lagi jadi tuduhan.
+repo_reap('2026-09-30');
+eq('hari izin tidak ikut tersapu jadi tidak lapor',
+   q1("SELECT status FROM cycles WHERE user_id = ? AND day = '2026-09-28'",
+      [$cuti['id']])['status'], 'excused');
+$lihat = repo_cycles(90, (int) $cuti['id']);
+eq('dan halamannya menerimanya sebagai izin, bukan sebagai laporan kosong',
+   $lihat[uid((int) $cuti['id']) . '__2026-09-28']['excused'] ?? null, true);
+eq('lengkap dengan keterangannya',
+   $lihat[uid((int) $cuti['id']) . '__2026-09-28']['izin']['note'] ?? null, 'cuti tahunan');
+
+$daftar = repo_excused(null, 365, 365);
+eq('daftarnya menyebut lima harinya', count(array_filter($daftar,
+   fn($r) => $r['user_id'] === (int) $cuti['id'])), 5);
+eq('beserta siapa yang menandainya',
+   $daftar[0]['by'] ?? 0, (int) $lead['id']);
+
+// Laporan yang sungguhan selalu menang: menimpanya dengan izin berarti laporan itu
+// hilang dari rekap, dan tidak ada yang akan tahu kenapa.
+eq('hari yang laporannya sudah masuk tidak ikut ditandai izin',
+   repo_set_excused($admin, (int) $nicho['id'], '2026-09-30', '2026-09-30', true), 0);
+eq('dan statusnya tidak tersentuh',
+   q1("SELECT status FROM cycles WHERE user_id = ? AND day = '2026-09-30'",
+      [$nicho['id']])['status'], 'submitted');
+
+// Dibatalkan: hari yang sudah lewat kembali jadi tidak lapor, bukan "belum lapor
+// selamanya" — penyapu cuma menyentuh hari sebelum hari ini, dan hari itu sudah lewat.
+eq('dibatalkan mengembalikan tiga harinya',
+   repo_set_excused($lead, (int) $cuti['id'], '2026-09-28', '2026-09-30', false), 3);
+eq('hari yang sudah lewat kembali tercatat tidak lapor',
+   q1("SELECT status FROM cycles WHERE user_id = ? AND day = '2026-09-28'",
+      [$cuti['id']])['status'], 'missed');
+eq('hari ini kembali menunggu diisi',
+   q1("SELECT status FROM cycles WHERE user_id = ? AND day = '2026-09-30'",
+      [$cuti['id']])['status'], 'pending');
+eq('dan yang di luar rentang pembatalan tetap izin',
+   q1("SELECT status FROM cycles WHERE user_id = ? AND day = '2026-10-01'",
+      [$cuti['id']])['status'], 'excused');
+
+// Leader membaca dan menandai timnya sendiri. Nama orang di tim lain bukan miliknya.
+$timLain = repo_add_team($admin, 'Tim Lain');
+q('UPDATE users SET team_id = ? WHERE id = ?', [$timLain, $cuti['id']]);
+throws('leader tidak bisa menandai orang di tim lain',
+       fn() => repo_set_excused($lead, (int) $cuti['id'], '2026-10-05', '2026-10-05', true),
+       'bukan di timmu');
+eq('tapi admin bisa',
+   repo_set_excused($admin, (int) $cuti['id'], '2026-10-05', '2026-10-05', true), 1);
+
+/* ------------------------------------------------------------------- email */
+
+require_once __DIR__ . '/../lib/mail.php';
+
+// Pemasangan tanpa mail_from tidak boleh menjanjikan apa pun: email yang dijanjikan lalu
+// tidak datang lebih buruk daripada mengatakan terus terang bahwa yang menolong admin.
+ok('tanpa mail_from, pemasangan ini tidak mengirim email', !mail_enabled());
+eq('dan tidak ada yang berangkat', mail_send('a@example.test', 'A', 'Judul', 'Isi'), false);
+
+// Baris baru di dalam header adalah cara menyelipkan header lain — satu "\nBcc: ..."
+// di nama pengirim sudah cukup untuk mengirim salinan tiap undangan ke mana pun.
+eq('baris baru di nama pengirim tidak bisa menyelipkan header',
+   mail_header_text("FURA\nBcc: diam@example.test"), 'FURA Bcc: diam@example.test');
+ok('dan nama ber-aksen dibungkus, bukan dikirim mentah',
+   str_starts_with(mail_header_text('Tim Café'), '=?UTF-8?B?'));
+
+$kotak = [];
+Mail::$send = function (string $to, string $name, string $subject, string $body) use (&$kotak): bool {
+    $kotak[] = compact('to', 'name', 'subject', 'body');
+    return true;
+};
+ok('dengan celahnya terpasang, email bisa dikirim', mail_enabled());
+
+$undangUrl = 'https://example.test/messi/undang.php?t=' . str_repeat('a', 64);
+ok('undangan terkirim', mail_invite($cuti, $undangUrl, true));
+eq('ke alamat orangnya', $kotak[0]['to'], 'cuti@example.test');
+ok('menyebut namanya', str_contains($kotak[0]['body'], 'Cuti'));
+ok('membawa linknya utuh', str_contains($kotak[0]['body'], $undangUrl));
+ok('dan mengatakan link itu sekali pakai', str_contains($kotak[0]['body'], 'sekali pakai'));
+
+$kotak = [];
+mail_invite($cuti, $undangUrl, false);
+ok('yang sudah lama memakainya tidak dikirimi paragraf perkenalan',
+   !str_contains($kotak[0]['body'], 'didaftarkan di FURA'));
+ok('dan judulnya tentang password, bukan tentang undangan',
+   str_contains($kotak[0]['subject'], 'Password baru'));
+
+// Yang dikembalikan sengaja tidak membedakan "tidak terdaftar" dari "gagal terkirim":
+// halaman yang menjawab berbeda untuk email yang terdaftar dan yang tidak adalah daftar
+// nama siapa saja yang bekerja di sini.
+$kotak = [];
+ok('alamat yang tidak terdaftar tidak mengirim apa pun ke siapa pun',
+   auth_mail_reset('hantu@example.test') === false && $kotak === []);
+
+$belum = make_user('belum@example.test', 'Belum', 'player', '2026-09-28');
+q('UPDATE users SET accepted_at = NULL WHERE id = ?', [$belum['id']]);
+$kotak = [];
+ok('yang belum pernah membuat password tidak dikirimi link masuk — dia menunggu undangan',
+   auth_mail_reset('belum@example.test') === false && $kotak === []);
+
+$kotak = [];
+ok('yang terdaftar menerima link masuknya', auth_mail_reset('nicho@example.test'));
+eq('ke alamatnya sendiri', $kotak[0]['to'], 'nicho@example.test');
+ok('berisi link sekali pakai ke halaman masuk',
+   str_contains($kotak[0]['body'], 'login.php?t='));
+ok('dan menyebutkan berapa lama berlakunya', str_contains($kotak[0]['body'], '60 menit'));
+
+// Link yang dikirim benar-benar bisa dipakai, bukan sekadar teks yang bentuknya mirip.
+preg_match('~login\.php\?t=([a-f0-9]{64})~', $kotak[0]['body'], $cocok);
+$_COOKIE = [];
+Auth::$looked = false;
+eq('dan link itu memang memasukkan orang yang tepat',
+   (auth_consume_login_link($cocok[1] ?? '') ?? [])['email'], 'nicho@example.test');
+
+// Dia sudah masuk, jadi "saya lupa passwordnya" sudah selesai — siapa pun yang
+// menyelesaikannya. Dulu yang menghapusnya cuma admin yang menekan tombol.
+auth_ask_reset('nicho@example.test');
+ok('permintaan lupa password tercatat', q1('SELECT reset_asked_at FROM users WHERE id = ?',
+   [$nicho['id']])['reset_asked_at'] !== null);
+$_COOKIE = [];
+Auth::$looked = false;
+auth_login('nicho@example.test', TEST_PASSWORD);
+eq('dan hilang sendiri begitu dia berhasil masuk',
+   q1('SELECT reset_asked_at FROM users WHERE id = ?', [$nicho['id']])['reset_asked_at'], null);
+
+Mail::$send = null;
 
 /* -------------------------------------------------------------------- done */
 

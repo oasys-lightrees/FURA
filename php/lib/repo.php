@@ -80,6 +80,11 @@ function repo_save_config(array $user, int $teamId, $in): array
       ['messi', $teamId, json_encode($cfg, JSON_UNESCAPED_UNICODE), Clock::nowUtcSql(),
        (int) $user['id']]);
     Cfg::forget();
+    // Modul MESSI tim ini adalah hasil setelan di atas, bukan dokumen kedua di sebelahnya.
+    // Dituliskan ulang di sini, sesudah Cfg::forget() — kalau sebelumnya, yang dipakai
+    // adalah setelan lama yang masih tersimpan di memori permintaan ini.
+    require_once __DIR__ . '/katalog.php';
+    katalog_sync_messi($teamId);
     return $cfg;
 }
 
@@ -211,6 +216,10 @@ function repo_cycles(int $sinceDays = 90, ?int $onlyUser = null, ?int $onlyTeam 
                 ->setTimezone(new DateTimeZone(MESSI_TZ))->format('c')
             : null;
         $doc['late'] = $r['status'] === 'late';
+        // Izin: hari yang ditandai leader sebagai cuti, sakit atau dinas luar. Dikirim
+        // sebagai penanda tersendiri, bukan sebagai status mentah, karena halaman tidak
+        // pernah membaca status — dia menghitungnya sendiri dari ada-tidaknya laporan.
+        $doc['excused'] = $r['status'] === 'excused';
         $out[$doc['owner'] . '__' . $r['day']] = $doc;
     }
     return $out;
@@ -275,11 +284,11 @@ function repo_module_id(?int $teamId): ?int
     // murah daripada satu lagi tempat yang harus dibersihkan saat tes berpindah database.
     require_once __DIR__ . '/katalog.php';
     $row = q_opt('SELECT id FROM modules WHERE team_id = ? AND code = ? LIMIT 1',
-                 [$teamId, 'MESSI'])?->fetch();
+                 [$teamId, MODUL_MESSI])?->fetch();
     if (!$row) {
         katalog_seed($teamId);
         $row = q_opt('SELECT id FROM modules WHERE team_id = ? AND code = ? LIMIT 1',
-                     [$teamId, 'MESSI'])?->fetch();
+                     [$teamId, MODUL_MESSI])?->fetch();
     }
     return $row ? (int) $row['id'] : null;
 }
@@ -468,6 +477,131 @@ function repo_save_roster(array $user, string $docId, array $doc): array
         q('UPDATE users SET name = ? WHERE id = ?', [mb_substr($name, 0, 120), $user['id']]);
     }
     return ['ok' => true];
+}
+
+/* ------------------------------------------------------------------- izin */
+
+/** Sejauh mana ke depan izin boleh dicatat sekaligus. Cuti dua bulan masih masuk; satu
+ *  tahun hampir selalu salah ketik tanggal. */
+const MESSI_IZIN_MAX_DAYS = 62;
+
+/**
+ * Menandai hari-hari seseorang sebagai izin, atau membatalkannya.
+ *
+ * Inilah satu-satunya jalan menghapus tanda "tidak lapor" yang tidak adil. Sebelum ini
+ * ada, orang yang cuti seminggu kembali ke kantor dengan lima hari merah di rekapnya dan
+ * tidak ada satu pun tombol untuk membetulkannya — dan rekap yang menyimpan tuduhan yang
+ * semua orang tahu salah adalah rekap yang berhenti dibaca.
+ *
+ * Tiga hal yang dijaga di sini:
+ *   - Yang menandai leader atau admin, bukan orangnya sendiri. Izin yang bisa diberikan
+ *     sendiri bukan izin, cuma tombol "hapus tanda merah".
+ *   - Leader hanya boleh menandai orang di timnya. Nama orang di tim lain bukan miliknya.
+ *   - Hari yang laporannya sudah masuk tidak disentuh. Menimpanya dengan izin berarti
+ *     laporan yang sungguhan hilang dari rekap, dan tidak ada yang akan tahu kenapa.
+ *
+ * @return int berapa hari yang benar-benar berubah
+ */
+function repo_set_excused(array $actor, int $userId, string $from, string $to, bool $on,
+                          string $note = ''): int
+{
+    require_once __DIR__ . '/auth.php';
+    if (!is_leader($actor)) {
+        throw new RepoError('Yang bisa menandai izin cuma leader dan admin.');
+    }
+    $target = q1('SELECT id, name, team_id, joined_on FROM users WHERE id = ?', [$userId]);
+    if (!$target) {
+        throw new RepoError('Orang itu tidak ada.');
+    }
+    if (!is_manager($actor) && (int) $target['team_id'] !== repo_team_of($actor)) {
+        throw new RepoError('Orang itu bukan di timmu.');
+    }
+    if (!messi_is_day($from) || !messi_is_day($to)) {
+        throw new RepoError('Tanggalnya belum lengkap.');
+    }
+    if ($to < $from) {
+        throw new RepoError('Tanggal selesainya sebelum tanggal mulai.');
+    }
+    if (messi_day_span($from, $to) > MESSI_IZIN_MAX_DAYS) {
+        throw new RepoError('Rentangnya lebih dari ' . MESSI_IZIN_MAX_DAYS . ' hari. '
+                          . 'Catat per bulan saja.');
+    }
+
+    $today = Clock::today();
+    $now = Clock::nowUtcSql();
+    $team = $target['team_id'] === null ? null : (int) $target['team_id'];
+    $n = 0;
+
+    for ($day = $from; $day <= $to; $day = messi_add_days($day, 1)) {
+        // Hari libur tidak dihitung tidak lapor sejak awal, jadi menandainya izin cuma
+        // menambah baris yang tidak berarti apa-apa.
+        if (!messi_is_workday($day) || $day < $target['joined_on']) {
+            continue;
+        }
+        $row = q1('SELECT id, status FROM cycles WHERE user_id = ? AND day = ?',
+                  [$userId, $day]);
+        if ($row && in_array($row['status'], ['submitted', 'late'], true)) {
+            continue;                   // laporannya sudah masuk; itu yang benar
+        }
+        if ($on) {
+            if ($row && $row['status'] === 'excused') {
+                continue;
+            }
+            $id = repo_ensure_cycle($userId, $day, $team);
+            // Catatannya disimpan di dalam answers, bukan di kolom baru: hari izin tidak
+            // punya jawaban apa pun, jadi tempat itu memang kosong. Siapa yang menandai
+            // ikut dicatat — izin tanpa nama yang memberikannya tidak bisa ditanyakan
+            // ke siapa pun.
+            q('UPDATE cycles SET status = ?, answers = ?, submitted_at = NULL WHERE id = ?',
+              ['excused',
+               json_encode(['izin' => ['note' => mb_substr(trim($note), 0, 120),
+                                       'by' => (int) $actor['id'], 'at' => $now]],
+                           JSON_UNESCAPED_UNICODE),
+               $id]);
+            $n++;
+        } elseif ($row && $row['status'] === 'excused') {
+            // Dibatalkan: hari yang sudah lewat kembali jadi tidak lapor, hari yang belum
+            // kembali menunggu. Membiarkan semuanya 'pending' akan membuat hari kemarin
+            // terbaca "belum lapor" selamanya, karena penyapu hanya menyentuh hari
+            // sebelum hari ini sekali — dan hari itu sudah dilewatinya.
+            q('UPDATE cycles SET status = ?, answers = NULL WHERE id = ?',
+              [$day < $today ? 'missed' : 'pending', $row['id']]);
+            $n++;
+        }
+    }
+    return $n;
+}
+
+/**
+ * Hari-hari izin yang tercatat, untuk ditampilkan.
+ *
+ * Jendelanya dua arah: yang sudah lewat masih perlu terlihat untuk diperiksa, yang akan
+ * datang perlu terlihat supaya cuti yang sudah dicatat tidak dicatat dua kali.
+ *
+ * @return array<int, array{user_id:int, name:string, day:string, note:string, by:int}>
+ */
+function repo_excused(?int $onlyTeam = null, int $back = 30, int $ahead = 92): array
+{
+    $where = 'c.status = ? AND c.day >= ? AND c.day <= ?';
+    $args = ['excused', messi_add_days(Clock::today(), -$back),
+             messi_add_days(Clock::today(), $ahead)];
+    if ($onlyTeam !== null) {
+        // Dari orangnya, bukan dari laporannya: izin bulan depan untuk orang yang baru
+        // pindah tim harus terlihat oleh leader timnya yang sekarang.
+        $where .= ' AND u.team_id = ?';
+        $args[] = $onlyTeam;
+    }
+    $out = [];
+    foreach (q('SELECT c.user_id, c.day, c.answers, u.name FROM cycles c
+                  JOIN users u ON u.id = c.user_id
+                 WHERE ' . $where . ' ORDER BY u.name, c.day', $args) as $r) {
+        $a = json_decode((string) $r['answers'], true);
+        $izin = is_array($a) && is_array($a['izin'] ?? null) ? $a['izin'] : [];
+        $out[] = ['user_id' => (int) $r['user_id'], 'name' => (string) $r['name'],
+                  'day' => (string) $r['day'], 'note' => (string) ($izin['note'] ?? ''),
+                  'by' => (int) ($izin['by'] ?? 0)];
+    }
+    return $out;
 }
 
 /* -------------------------------------------------------------- the machine */

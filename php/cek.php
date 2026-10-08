@@ -166,6 +166,47 @@ if ($hasConfig) {
     }
 }
 
+/* ------------------------------------------------------------------ email */
+
+if ($hasConfig) {
+    require_once __DIR__ . '/lib/mail.php';
+    $dari = mail_from()['email'];
+    $bisaKirim = function_exists('mail');
+    if ($dari === '') {
+        row('warn', 'Email', 'belum diisi',
+            'Tanpa ini undangan dan link masuk harus disalin admin lalu dikirim japri — '
+            . 'aplikasinya tetap jalan penuh. Mau dikirim sendiri? Buat satu akun email di '
+            . 'domain ini lewat cPanel &rarr; <em>Email Accounts</em>, misalnya '
+            . '<code>fura@domainmu.com</code>, lalu tulis alamatnya di <code>mail_from</code> '
+            . 'di config.php.');
+    } elseif (!filter_var($dari, FILTER_VALIDATE_EMAIL)) {
+        row('bad', 'Email', 'alamat pengirimnya bukan email',
+            'Perbaiki <code>mail_from</code> di config.php.');
+    } elseif (!$bisaKirim) {
+        // Sebagian hosting mematikan mail() lewat disable_functions.
+        row('bad', 'Email', 'fungsi mail() dimatikan hosting ini',
+            'Kosongkan <code>mail_from</code> supaya aplikasinya tidak menjanjikan email '
+            . 'yang tidak pernah terkirim, lalu minta hosting menyalakan <code>mail</code>.');
+    } else {
+        row('ok', 'Email', 'dikirim dari ' . $dari,
+            'Kalau pesannya masuk spam, tambahkan SPF di DNS domain ini — di cPanel: '
+            . '<em>Email Deliverability</em> &rarr; <em>Repair</em>.');
+    }
+}
+
+if ($installed) {
+    $gagalMail = q1("SELECT ran_at, detail FROM job_log WHERE kind = 'mail_fail'
+                      ORDER BY id DESC LIMIT 1");
+    if ($gagalMail) {
+        $jamMail = (int) ((time() - strtotime($gagalMail['ran_at'] . ' UTC')) / 3600);
+        row($jamMail < 48 ? 'bad' : 'warn', 'Email terakhir gagal',
+            $gagalMail['ran_at'] . ' UTC — ' . h($gagalMail['detail']),
+            'Linknya tetap berlaku dan bisa disalin dari halaman Orang &amp; tim. Kalau ini '
+            . 'terus terjadi, kosongkan <code>mail_from</code> sampai hostingnya beres — '
+            . 'lebih baik tidak menjanjikan email daripada menjanjikan yang tidak datang.');
+    }
+}
+
 /* ------------------------------------------------------------------ cron */
 
 if ($installed) {

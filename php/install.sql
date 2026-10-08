@@ -106,7 +106,10 @@ CREATE TABLE IF NOT EXISTS cycles (
   -- Modul yang dilaporkan. Satu orang bisa punya beberapa laporan di hari yang sama,
   -- satu untuk tiap modul yang dia pegang.
   module_id       INT UNSIGNED DEFAULT NULL,
-  status          ENUM('pending','submitted','late','missed') NOT NULL DEFAULT 'pending',
+  -- 'excused' adalah izin: cuti, sakit, dinas luar. Ditandai leader atau admin, dan
+  -- sengaja berupa status laporan, bukan tabel sendiri — hari yang diizinkan adalah hari
+  -- yang tidak dihitung tidak lapor, jadi tempatnya memang di baris hari itu.
+  status          ENUM('pending','submitted','late','missed','excused') NOT NULL DEFAULT 'pending',
   answers         LONGTEXT DEFAULT NULL CHECK (answers IS NULL OR JSON_VALID(answers)),
   submitted_at    DATETIME DEFAULT NULL,
   created_at      DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,

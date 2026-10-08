@@ -28,7 +28,7 @@ def _free_port() -> int:
 class Host:
     """A running copy of the app. Use as a context manager."""
 
-    def __init__(self, db: str, seed: str = ""):
+    def __init__(self, db: str, seed: str = "", extra: dict | None = None):
         self.db = os.environ.get("MESSI_TEST_DB", db)
         self.seed_arg = seed
         self.port = _free_port()
@@ -54,6 +54,10 @@ class Host:
                 "cron_key": "test-key",
                 "first_day": "2026-09-28",
                 "session_days": 30,
+                # Bawaannya mail_from kosong, jadi pemasangan ini tidak menjanjikan email
+                # apa pun — persis seperti pemasangan yang belum mengisinya. Tes yang
+                # memang tentang email menyalakannya lewat `extra`.
+                **(extra or {}),
             }, indent=2)
             + "\nJSON, true);\n"
         )

@@ -292,6 +292,8 @@ h2 { font-size:11.5px; font-weight:700; letter-spacing:.09em; text-transform:upp
 .miss { background:var(--broken-bg); border:1px solid var(--line);
          border-left:3px solid var(--broken); border-radius:11px; padding:12px 14px;
          font-size:14px; margin-bottom:20px; }
+/* Izin bukan kesalahan, jadi bentuknya sama tapi warnanya bukan merah. */
+.miss.izin { background:var(--kept-bg); border-left-color:var(--kept); }
 .note { font-size:12.5px; color:var(--muted); margin-top:28px; padding-top:14px;
         border-top:1px solid var(--line); }
 @media (prefers-reduced-motion: reduce) { * { transition:none !important; } }
@@ -535,8 +537,14 @@ function docCfg(doc) {
 }
 const docTotals = doc => totalsIn((doc || {}).grid, docCfg(doc).channels);
 const docLamp = doc => lampAt(docTotals(doc), docCfg(doc).threshold_days);
+/* Izin — cuti, sakit, dinas luar — diperiksa sebelum "tidak lapor", bukan sesudah. Hari
+   yang ditandai izin leader bukan hari yang dilewatkan orangnya, dan tanda merah yang
+   tidak bisa dihapus adalah alasan paling cepat sebuah rekap berhenti dipercaya. Laporan
+   yang sudah masuk tetap menang di atas izin: kalau dia mengisi juga, itu yang benar. */
 const statusOf = (day, doc) =>
-  doc && doc.submittedAt ? (doc.late ? "late" : "submitted") : (day < today() ? "missed" : "pending");
+  doc && doc.submittedAt ? (doc.late ? "late" : "submitted")
+  : doc && doc.excused ? "excused"
+  : (day < today() ? "missed" : "pending");
 
 /* ---- state --------------------------------------------------------------- */
 const S = { me:null, name:"", isLeader:false, cycles:new Map(), commitments:new Map(),
@@ -910,7 +918,7 @@ function recent() {
     const t = doc ? docTotals(doc) : null;
     return `<div class="card ${st === "missed" ? "bad" : ""}"><div class="row">
       <span class="strong">${esc(fmt(day))}</span><span class="grow"></span>
-      <span class="meta">${st === "missed" ? "tidak lapor"
+      <span class="meta">${st === "missed" ? "tidak lapor" : st === "excused" ? "izin"
         : t.hanging === 0 ? "aman" : t.hanging + " gantung"}${st === "late" ? " · telat" : ""}</span>
     </div></div>`;
   }).join("");
@@ -1029,13 +1037,18 @@ function screenPlayer() {
   if (nowHour() < OPEN_AT && !doc) return `<div class="blank"><b>Belum dibuka.</b>
     Pengisian dibuka jam ${hhmm(OPEN_AT)}. Nanti ada pesan pengingat.</div>` + recent();
 
-  if (st === "pending" || S.editing) {
+  if (st === "pending" || st === "excused" || S.editing) {
     const n = stepName();
     const body = n === "angka" ? stepAngka() : n === "gantung" ? stepGantung() : stepKirim();
     if (n !== "angka") return body;
+    // Ditandai izin tapi tetap masuk: formulirnya tetap dibuka, bukan dikunci. Yang
+    // ditandai izin lalu ternyata kerja setengah hari tahu sendiri mana yang benar.
+    const izin = st === "excused"
+      ? `<div class="miss izin">Hari ini kamu ditandai <b>izin</b>, jadi tidak wajib lapor.
+         Kalau tetap mau mengisi, silakan — laporanmu yang akan tercatat.</div>` : "";
     const gaps = missedDays(S.me, 5);
-    if (!gaps.length) return body;
-    return `<div class="miss">Kamu belum lapor ${esc(gaps.map(fmt).join(" dan "))}.
+    if (!gaps.length) return izin + body;
+    return izin + `<div class="miss">Kamu belum lapor ${esc(gaps.map(fmt).join(" dan "))}.
       Yang lewat tidak bisa diisi lagi — mulai dari hari ini.</div>` + body;
   }
   return screenDone(doc);
@@ -1128,7 +1141,9 @@ function screenLeader() {
       return `<div class="card"><div class="row">
         <span class="pip off"></span><span class="strong">${esc(nameOf(r.uid))}</span>
         <span class="grow"></span><span class="meta">${
-          r.st === "missed" ? "tidak lapor" : "belum lapor"}</span></div></div>`;
+          r.st === "excused" ? "izin" + (r.doc && r.doc.izin && r.doc.izin.note
+                                          ? " · " + esc(r.doc.izin.note) : "")
+          : r.st === "missed" ? "tidak lapor" : "belum lapor"}</span></div></div>`;
     }
     const t = docTotals(r.doc), lamp = docLamp(r.doc);
     return `<div class="card">

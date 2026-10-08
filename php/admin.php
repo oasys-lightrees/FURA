@@ -14,6 +14,7 @@ require __DIR__ . '/lib/require-php8.php';
 require_once __DIR__ . '/lib/auth.php';
 require_once __DIR__ . '/lib/repo.php';
 require_once __DIR__ . '/lib/schema.php';
+require_once __DIR__ . '/lib/mail.php';
 require_once __DIR__ . '/lib/layout.php';
 
 // Says what is missing on the first screen, not on the first click.
@@ -91,7 +92,26 @@ function admin_tambah(array $teams, array $canGive, string $name, string $email,
        VALUES (?,?,?,?,?,?,?)',
       [$email, mb_substr($name, 0, 120), '', $role, $team, $joined, Clock::nowUtcSql()]);
     $id = (int) db()->lastInsertId();
-    return [null, ['name' => $name, 'email' => $email, 'url' => auth_make_invite($id)]];
+    $url = auth_make_invite($id);
+    return [null, ['name' => $name, 'email' => $email, 'url' => $url,
+                   'mail' => admin_kirim(['name' => $name, 'email' => $email], $url, true)]];
+}
+
+/**
+ * Mengirim linknya ke emailnya, kalau pemasangan ini bisa mengirim email.
+ *
+ * Hasilnya ikut ditampilkan per baris, bukan cuma "terkirim" di atas: dari sepuluh
+ * undangan bisa saja sembilan sampai dan satu ditolak, dan satu kalimat untuk sepuluh
+ * baris membuat yang satu itu tidak kelihatan.
+ *
+ * @return string 'sent' | 'gagal' | 'off' (pemasangan ini memang tidak mengirim email)
+ */
+function admin_kirim(array $orang, string $url, bool $baru): string
+{
+    if (!mail_enabled()) {
+        return 'off';
+    }
+    return mail_invite($orang, $url, $baru) ? 'sent' : 'gagal';
 }
 
 /**
@@ -190,8 +210,10 @@ if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST') {
         if (!admin_may_touch($me, $target)) {
             $error = 'Tidak bisa mengubah baris itu.';
         } else {
+            $url = auth_make_invite($targetId);
             $links[] = ['name' => $target['name'], 'email' => $target['email'],
-                        'url' => auth_make_invite($targetId)];
+                        'url' => $url,
+                        'mail' => admin_kirim($target, $url, $target['accepted_at'] === null)];
             $linksLabel = ($target['accepted_at'] === null ? 'Undangan baru untuk ' : 'Link buat password baru untuk ')
                           . $target['name'] . ' — berlaku 72 jam, sekali pakai.';
             // Tanpa $notice: peringatan "kirim japri" sudah ada tepat di sebelah linknya,
@@ -206,8 +228,10 @@ if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST') {
         if (!admin_may_touch($me, $target)) {
             $error = 'Tidak bisa mengubah baris itu.';
         } else {
-            $links[] = ['name' => $target['name'], 'email' => $target['email'],
-                        'url' => auth_make_login_link($targetId, 60)];
+            $url = auth_make_login_link($targetId, 60);
+            $links[] = ['name' => $target['name'], 'email' => $target['email'], 'url' => $url,
+                        'mail' => mail_enabled()
+                            ? (mail_login_link($target, $url, 60) ? 'sent' : 'gagal') : 'off'];
             $linksLabel = 'Link masuk untuk ' . $target['name'] . ' — berlaku 60 menit, sekali pakai.';
             auth_clear_reset($targetId);
         }
@@ -320,20 +344,49 @@ CSS]);
   <?php if ($mintaLink): ?>
     <p class="note warn"><strong><?= h(implode(', ', array_map(
          fn($p) => (string) $p['name'], $mintaLink))) ?></strong>
-       bilang lupa passwordnya. Tekan <em>Link masuk</em> di barisnya, lalu kirim
-       linknya japri.</p>
+       bilang lupa passwordnya.
+       <?php if (mail_enabled()): ?>
+         Link masuk sudah dikirim ke emailnya sendiri — baris ini hilang begitu dia
+         berhasil masuk. Kalau emailnya tidak sampai, tekan <em>Link masuk</em> di
+         barisnya dan kirim linknya japri.
+       <?php else: ?>
+         Tekan <em>Link masuk</em> di barisnya, lalu kirim linknya japri.
+       <?php endif; ?></p>
   <?php endif; ?>
 
   <?php if ($links): ?>
-    <p class="note ok"><?= h($linksLabel) ?><br>
-       Kirim <strong>japri</strong>, jangan ke space — siapa pun yang bisa membaca space
-       itu bisa memakainya.</p>
+    <?php
+    // Berapa yang sampai sendiri, dan berapa yang masih harus disalin tangan. Dipisahkan
+    // karena kalimat yang menyuruh "kirim japri" salah untuk yang sudah terkirim, dan
+    // kalimat "sudah dikirim" berbahaya untuk yang gagal — orangnya akan menunggu email
+    // yang tidak pernah ada.
+    $terkirim = count(array_filter($links, fn($l) => ($l['mail'] ?? 'off') === 'sent'));
+    $gagalKirim = count(array_filter($links, fn($l) => ($l['mail'] ?? 'off') === 'gagal'));
+    ?>
+    <p class="note ok"><?= h($linksLabel) ?>
+       <?php if ($terkirim): ?><br><strong><?= $terkirim === count($links)
+         ? ($terkirim === 1 ? 'Sudah dikirim ke emailnya.' : 'Semuanya sudah dikirim ke emailnya.')
+         : $terkirim . ' dari ' . count($links) . ' sudah dikirim ke emailnya.' ?></strong>
+         Minta orangnya cek folder spam kalau belum kelihatan.<?php endif; ?>
+       <?php if ($terkirim < count($links)): ?><br>Yang belum terkirim: salin linknya di
+         bawah dan kirim <strong>japri</strong>, jangan ke space — siapa pun yang bisa
+         membaca space itu bisa memakainya.<?php endif; ?></p>
+    <?php if ($gagalKirim): ?>
+      <p class="note bad"><strong><?= $gagalKirim ?> email gagal dikirim.</strong>
+         Linknya tetap berlaku — salin dari tabel di bawah. Penyebabnya ada di
+         <a href="cek.php">Cek sistem</a>, baris <em>Email</em>.</p>
+    <?php endif; ?>
     <div class="card scroll" style="margin:0 0 1rem">
       <table class="links">
         <tr><th>Orang</th><th>Link</th><th></th></tr>
         <?php foreach ($links as $l): ?>
           <tr>
-            <td class="who"><strong><?= h($l['name']) ?></strong><span><?= h($l['email']) ?></span></td>
+            <td class="who"><strong><?= h($l['name']) ?></strong><span><?= h($l['email']) ?></span>
+              <?php if (($l['mail'] ?? 'off') === 'sent'): ?>
+                <span class="tag">email terkirim</span>
+              <?php elseif (($l['mail'] ?? 'off') === 'gagal'): ?>
+                <span class="tag minta">email gagal</span>
+              <?php endif; ?></td>
             <td><code><?= h($l['url']) ?></code></td>
             <td><button class="quiet" type="button" data-salin="<?= h($l['url']) ?>">Salin</button></td>
           </tr>

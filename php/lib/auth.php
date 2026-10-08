@@ -75,6 +75,20 @@ function auth_user(): ?array
     return Auth::$user;
 }
 
+/**
+ * Membuang jawaban "siapa yang bertanya" yang sudah tersimpan untuk permintaan ini.
+ *
+ * Dipakai halaman yang baru saja mengubah baris orangnya sendiri. Tanpa ini, nama yang
+ * baru diganti masih tersimpan di memori permintaan ini, jadi halaman yang menjawab
+ * "Tersimpan" menggambar kepala halaman dengan nama yang lama — dan yang terlihat adalah
+ * tombol simpan yang tidak bekerja.
+ */
+function auth_forget(): void
+{
+    Auth::$looked = false;
+    Auth::$user = null;
+}
+
 function auth_logout(): void
 {
     $token = $_COOKIE[MESSI_COOKIE] ?? '';
@@ -111,6 +125,11 @@ function auth_login(string $email, string $password): ?array
         return null;
     }
     auth_clear_failures($email);
+    // Dia sudah masuk, jadi "saya lupa passwordnya" sudah selesai — siapa pun yang
+    // menyelesaikannya. Dulu yang menghapusnya cuma admin yang menekan tombol, jadi orang
+    // yang tiba-tiba ingat passwordnya meninggalkan label "minta link masuk" selamanya,
+    // dan admin mengejar pekerjaan yang sudah tidak ada.
+    auth_clear_reset((int) $user['id']);
     if (password_needs_rehash($hash, PASSWORD_DEFAULT)) {
         q('UPDATE users SET password_hash = ? WHERE id = ?',
           [password_hash($password, PASSWORD_DEFAULT), $user['id']]);
@@ -242,6 +261,56 @@ function auth_accept_invite(string $token, string $password): ?array
     return q1('SELECT * FROM users WHERE id = ?', [(int) $row['id']]);
 }
 
+/* ------------------------------------------------------- password sendiri */
+
+/**
+ * Sesi di perangkat lain, dihentikan.
+ *
+ * Dipanggil begitu password berganti. Kalau tidak, orang yang mengganti password karena
+ * curiga akunnya dipakai orang lain justru tidak mengusir siapa pun: sesi lama berumur 30
+ * hari dan tidak peduli password-nya sudah bukan yang itu lagi. Password baru yang tidak
+ * menutup pintu lama bukan password baru.
+ */
+function auth_end_other_sessions(int $userId): int
+{
+    $keep = (string) ($_COOKIE[MESSI_COOKIE] ?? '');
+    return q('DELETE FROM sessions WHERE user_id = ? AND token <> ?',
+             [$userId, $keep])->rowCount();
+}
+
+/**
+ * Mengganti password sendiri.
+ *
+ * Password sekarang ikut ditanya walaupun orangnya sudah masuk: sesi berumur 30 hari, jadi
+ * laptop yang ditinggal terbuka di meja adalah jalan untuk mengambil alih akun — dan
+ * mengambil alih tanpa perlu tahu password lamanya berarti pemilik aslinya tidak bisa
+ * masuk lagi sama sekali.
+ *
+ * @return string|null kalimat kesalahan untuk dibaca orangnya, atau null kalau berhasil
+ */
+function auth_change_password(array $user, string $current, string $new, string $again): ?string
+{
+    if (!password_verify($current, (string) ($user['password_hash'] ?? ''))) {
+        return 'Password sekarang salah.';
+    }
+    if (strlen($new) < 10) {
+        return 'Password baru minimal 10 karakter.';
+    }
+    if ($new !== $again) {
+        return 'Dua kotak password baru belum sama.';
+    }
+    if ($new === $current) {
+        return 'Password barunya sama dengan yang sekarang.';
+    }
+    q('UPDATE users SET password_hash = ? WHERE id = ?',
+      [password_hash($new, PASSWORD_DEFAULT), (int) $user['id']]);
+    auth_end_other_sessions((int) $user['id']);
+    // Dia sudah menolong dirinya sendiri, jadi permintaan "saya lupa" yang masih
+    // menggantung di halaman Orang & tim tidak perlu dikerjakan admin lagi.
+    auth_clear_reset((int) $user['id']);
+    return null;
+}
+
 /* ----------------------------------------------------------- "saya lupa" */
 
 /**
@@ -275,10 +344,35 @@ function auth_ask_reset(string $email): bool
     return $ran !== null;
 }
 
-/** Dibersihkan begitu admin benar-benar mengeluarkan linknya. */
+/** Dibersihkan begitu dia masuk lagi — lewat link dari admin, lewat email, atau karena
+ *  tiba-tiba ingat sendiri passwordnya. */
 function auth_clear_reset(int $userId): void
 {
     q_opt('UPDATE users SET reset_asked_at = NULL WHERE id = ?', [$userId]);
+}
+
+/**
+ * Mengirim link masuk langsung ke emailnya.
+ *
+ * Yang dikembalikan sengaja tidak membedakan "alamatnya tidak terdaftar" dari "emailnya
+ * gagal dikirim": halaman yang menjawab berbeda untuk email yang terdaftar dan yang tidak
+ * adalah daftar nama siapa saja yang bekerja di sini, dan siapa pun boleh membukanya.
+ * Pemanggilnya mencatat permintaannya untuk admin apa pun hasilnya, jadi kedua jalur
+ * berakhir di tempat yang sama.
+ */
+function auth_mail_reset(string $email): bool
+{
+    require_once __DIR__ . '/mail.php';
+    if (!mail_enabled()) {
+        return false;
+    }
+    $u = q1('SELECT * FROM users WHERE email = ? AND active = 1', [strtolower(trim($email))]);
+    // Yang belum pernah membuat passwordnya tidak sedang lupa — dia sedang menunggu
+    // undangannya, dan undangan tidak dikeluarkan dari halaman ini.
+    if (!$u || (array_key_exists('accepted_at', $u) && $u['accepted_at'] === null)) {
+        return false;
+    }
+    return mail_login_link($u, auth_make_login_link((int) $u['id'], 60), 60);
 }
 
 /* ------------------------------------------------------- one-time login links */
@@ -318,6 +412,7 @@ function auth_consume_login_link(string $token): ?array
         throw $e;
     }
     auth_start_session((int) $row['id']);
+    auth_clear_reset((int) $row['id']);        // dia sudah masuk; permintaannya selesai
     return $row;
 }
 

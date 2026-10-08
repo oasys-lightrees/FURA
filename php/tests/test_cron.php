@@ -138,7 +138,11 @@ repo_save_cycle($nicho, uid((int) $nicho['id']) . '__2026-09-29', $clean);
 repo_save_cycle($lead, uid((int) $lead['id']) . '__2026-09-29', hanging('2026-09-30'));
 
 $m = tick_at('2026-09-29T11:00:00Z');                       // 18:00
-eq('tetap tidak ada rekap yang diposting', count($m), 0);
+// Jam 17:00 hari ini tidak pernah dijalankan — jadi yang datang sekarang justru susulan
+// pengingat jam tutup, bukan rekap. Rekapnya memang tidak dikirim ke chat sama sekali.
+eq('jam 18:00 yang datang cuma satu pesan', count($m), 1);
+ok('dan isinya pengingat yang menyusul', said($m, 'Sudah lewat jam tutup'));
+ok('bukan isi laporan siapa pun', !said($m, 'WAG Klien A'));
 
 /* ================================================ Rabu 30 Sep — orang baru */
 
@@ -318,6 +322,51 @@ Chat::$send = function (string $text, string $webhook = '') use (&$sent): bool {
     $sent[] = ['text' => $text, 'webhook' => $webhook];
     return true;
 };
+
+/* ------------------------------------- pengingat jam tutup yang menyusul */
+
+/**
+ * Cron yang terlewat satu jam dulu berarti tidak ada pengingat sore sama sekali seharian.
+ *
+ * Jendelanya dulu satu jam tepat: hanya dikirim antara due_hour-1 dan due_hour. Di hosting
+ * bersama, satu jam yang terlewat bukan kejadian langka — dan yang terlihat cuma "botnya
+ * kadang kirim kadang tidak", tanpa satu pun petunjuk kenapa. Pengingat pagi sudah
+ * menyusul sejak awal dengan cara yang sama; yang sore ketinggalan.
+ */
+q('DELETE FROM job_log WHERE kind IN (?,?)', ['notify_open', 'notify_due']);
+$pagi7 = tick_at('2026-10-07T02:30:00Z');          // Rab 09:30, harinya dibuka seperti biasa
+ok('harinya dibuka seperti biasa', said($pagi7, 'sudah dibuka'));
+
+// Lalu cron-nya mati dari jam 17 sampai jam 21. Yang jalan berikutnya jam 21:30.
+$susul = tick_at('2026-10-07T14:30:00Z');          // 21:30 Jakarta, jam tutup 18:00
+ok('pengingat jam tutup tetap terkirim walau jamnya sudah lewat', said($susul, 'belum lapor'));
+ok('menyebut yang belum lapor dengan namanya', said($susul, 'Nicho'));
+// Pengingat yang jelas-jelas salah tentang jam berapa sekarang berhenti dipercaya.
+ok('dan kalimatnya tidak lagi berkata satu jam lagi tutup', !said($susul, 'Satu jam lagi'));
+ok('melainkan mengakui jam tutupnya sudah lewat', said($susul, 'Sudah lewat jam tutup (18:00)'));
+ok('sambil mengatakan laporannya masih bisa diisi', said($susul, 'tercatat telat'));
+
+eq('dan sesudah menyusul tidak dikirim dua kali', tick_at('2026-10-07T15:30:00Z'), []);
+
+// Yang terkirim di jamnya sendiri tetap berbunyi seperti dulu: susulan bukan pengganti.
+q('DELETE FROM job_log WHERE kind = ?', ['notify_due']);
+$tepat = tick_at('2026-10-07T10:30:00Z');          // 17:30, satu jam sebelum tutup
+ok('di jamnya sendiri kalimatnya masih yang lama', said($tepat, 'Satu jam lagi tutup (18:00)'));
+
+/* --------------------------------------------- yang izin tidak ikut ditagih */
+
+/**
+ * Menagih laporan dari orang yang cutinya sudah dicatat atasannya sendiri adalah cara
+ * tercepat membuat seluruh pesan ini diabaikan — oleh dia maupun oleh rekannya yang ikut
+ * membaca space-nya.
+ */
+q('DELETE FROM job_log WHERE kind IN (?,?)', ['notify_open', 'notify_due']);
+Clock::freeze('2026-10-08T02:30:00Z');                 // Kam 09:30
+repo_set_excused($owner, (int) $nicho['id'], '2026-10-08', '2026-10-08', true, 'sakit');
+
+$sore = tick_at('2026-10-08T10:30:00Z');               // 17:30, satu jam sebelum tutup
+ok('yang izin tidak ikut disebut di pengingat', !said($sore, 'Nicho'));
+ok('sementara yang lain tetap disebut', said($sore, 'Dita'));
 
 /* ------------------------------------- satu tim rusak tidak menelan tim lain */
 

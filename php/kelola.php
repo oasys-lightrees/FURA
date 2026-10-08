@@ -50,9 +50,14 @@ $people = q('SELECT role, active, accepted_at, reset_asked_at FROM users')->fetc
 $aktif  = count(array_filter($people, fn($p) => (int) $p['active'] === 1
                                              && $p['accepted_at'] !== null));
 $belum  = count(array_filter($people, fn($p) => $p['accepted_at'] === null));
-// Permintaan link masuk: satu-satunya jalan pulang orang yang lupa passwordnya selama
-// pemasangan ini belum bisa mengirim email.
+// Permintaan link masuk. Kalau mail_from sudah diisi, linknya sudah dikirim sendiri ke
+// emailnya dan baris ini hilang begitu orangnya berhasil masuk; kalau belum, admin yang
+// harus mengeluarkannya — dan itu satu-satunya jalan pulangnya.
 $minta  = count(array_filter($people, fn($p) => ($p['reset_asked_at'] ?? null) !== null));
+
+// Hari izin yang tercatat dari bulan lalu sampai tiga bulan ke depan. Angka, bukan daftar:
+// yang dibutuhkan di halaman ini cuma "ada atau belum", sisanya di halamannya sendiri.
+$izinN = count(repo_excused(is_manager($me) ? null : repo_team_of($me)));
 
 /* -------------------------------------------------------------- penyiapan */
 
@@ -197,6 +202,12 @@ CSS]);
           <?= sprintf('%02d:00', (int) $cfg['open_hour']) ?>–<?=
               sprintf('%02d:00', (int) $cfg['due_hour']) ?> ·
           <?= count($cfg['channels']) ?> channel</em>
+    </a>
+    <a href="izin.php">
+      <b>Izin</b>
+      <span>Cuti, sakit, dinas luar — supaya harinya tidak tercatat tidak lapor.</span>
+      <em><?= $izinN === 0 ? 'Belum ada yang tercatat'
+          : ($izinN === 1 ? '1 hari izin tercatat' : $izinN . ' hari izin tercatat') ?></em>
     </a>
     <a href="cek.php">
       <b>Cek sistem</b>

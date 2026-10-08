@@ -234,6 +234,16 @@ function schema_steps(): array
             },
         ],
         [
+            'id'   => 'cycles.status izin',
+            'why'  => 'Menambah status "izin" pada laporan harian, supaya cuti, sakit dan '
+                    . 'dinas luar tidak tercatat sebagai tidak lapor. Laporan yang sudah '
+                    . 'ada tidak berubah sama sekali.',
+            'todo' => fn() => !str_contains(schema_column_type('cycles', 'status'), "'excused'"),
+            'run'  => fn() => db()->exec("ALTER TABLE cycles MODIFY COLUMN status
+                                  ENUM('pending','submitted','late','missed','excused')
+                                  NOT NULL DEFAULT 'pending'"),
+        ],
+        [
             'id'   => 'modules',
             'why'  => 'Membuat tabel modul, lalu menuliskan MESSI yang sekarang berjalan ke '
                     . 'dalamnya — lengkap dengan channel, ambang dan kalimat yang sudah kamu '
