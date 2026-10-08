@@ -36,10 +36,17 @@ function messi_tick(): array
     // Databasenya belum menyusul versi kodenya. Berhenti dengan catatan, bukan dengan
     // fatal: cron yang mati diam-diam adalah cron yang tidak ada yang tahu sudah mati.
     require_once __DIR__ . '/schema.php';
+    // Cron sering jadi yang pertama menyentuh database sesudah berkas baru diunggah —
+    // jam tiga pagi, saat tidak ada satu pun orang yang bisa menekan tombol apa pun.
+    $naik = schema_upgrade_auto();
     $pending = schema_pending();
     if ($pending) {
         log_job('needs_upgrade', $today . ' ' . implode(', ', array_column($pending, 'id')));
         return ['needs_upgrade' => count($pending)];
+    }
+
+    if ($naik) {
+        $did['dimutakhirkan'] = count($naik);
     }
 
     /* -- housekeeping, every run -------------------------------------------- */

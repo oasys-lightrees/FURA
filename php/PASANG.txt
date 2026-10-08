@@ -38,10 +38,16 @@ cPanel -> Software -> Select PHP Version (atau MultiPHP Manager) -> pilih 8.1 / 
    commitments, settings, login_attempts, job_log
 
    SUDAH PERNAH PASANG VERSI SEBELUMNYA?
-   Upload dulu berkas barunya (langkah 3), lalu masuk sebagai admin dan buka
-   "Pemutakhiran database" dari halaman Kelola. Satu tombol, dan dia yang
-   mengurus tabel maupun kolom yang kurang. Data yang sudah ada tidak dihapus,
-   dan menjalankannya dua kali tidak melakukan apa-apa pada kali kedua.
+   Upload saja berkas barunya (langkah 3). Databasenya menyusul sendiri: halaman
+   pertama yang membutuhkan bentuk baru mengerjakannya, jadi biasanya sudah beres
+   sebelum kamu sempat sadar ada yang perlu dikerjakan. Data yang sudah ada tidak
+   dihapus, dan tidak ada tombol yang perlu ditekan.
+
+   Kalau karena suatu hal gagal — hak akses database kurang, misalnya — barulah
+   halaman "belum siap" muncul seperti dulu, menyebutkan apa yang kurang. Tombol
+   manualnya tetap ada di Kelola -> Pemutakhiran database, dan alasannya tercatat
+   di Kelola -> Cek sistem.
+
    (Import ulang install.sql lewat phpMyAdmin juga aman, tapi tidak cukup
    sendirian: kolom baru di tabel yang sudah ada tidak ikut terbuat.)
 

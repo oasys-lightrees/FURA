@@ -153,7 +153,7 @@ lib/schema.php     langkah pemutakhiran, tiap langkah memeriksa dirinya sendiri
 install.sql        sepuluh tabel
 PASANG.txt         langkah pemasangan, bahasa non-teknis
 make-zip.sh        bikin messi-cpanel.zip
-tests/             638 pemeriksaan (tidak ikut ke server)
+tests/             644 pemeriksaan (tidak ikut ke server)
 ```
 
 ## Yang diputuskan server, bukan browser
@@ -215,11 +215,11 @@ menyebutkan mana yang barusan terjadi.
 | `tests/test_modul.php` | 63 — modul sebagai dokumen; ujian terberatnya MESSI sendiri ditulis ulang sebagai modul dan harus berperilaku sama persis |
 | `tests/test_repo.php` | 113 — terhadap MySQL sungguhan, di database yang dia buat sendiri |
 | `tests/test_cron.php` | 66 — seminggu penuh jam demi jam, jam dibekukan, pesan bot ditangkap |
-| `tests/test_live.py` | 64 — browser terhadap aplikasi yang benar-benar jalan |
+| `tests/test_live.py` | 68 — browser terhadap aplikasi yang benar-benar jalan |
 | `tests/test_admin.py` | 125 — pemasangan pertama, undangan satu dan borongan, lupa password, link sekali pakai, mengubah pertanyaan, uji kirim webhook |
 | `tests/test_modul_page.py` | 35 — menyusun modul lewat halamannya: menambah, menggeser, menghapus, dan yang sudah diketik tidak hilang saat menekan tombol |
 | `tests/test_schema.php` | 49 — pemasangan lama di-upgrade, lalu dibandingkan kolom demi kolom dengan yang baru |
-| `tests/test_upgrade_path.py` | 24 — aplikasi sungguhan di atas database versi lama: masih bisa masuk, setiap halaman lain menyebut apa yang kurang, lalu satu tombol menghidupkannya |
+| `tests/test_upgrade_path.py` | 26 — aplikasi sungguhan di atas database versi lama: masih bisa masuk, setiap halaman lain menyebut apa yang kurang, lalu satu tombol menghidupkannya |
 | `tests/check_sync.php` | memastikan `app.html` belum menyimpang dari `web/messi.html` |
 
 Yang dicoba juga: laporan atas nama orang lain, permintaan tanpa token, cron tanpa kunci,

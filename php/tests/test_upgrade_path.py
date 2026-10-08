@@ -1,13 +1,14 @@
 """Berkas baru di atas database lama — jendela yang dilewati tiap pemasangan.
 
-Antara meng-upload versi baru dan menjalankan pemutakhirannya selalu ada jarak: semenit,
-sejam, atau sampai besok pagi kalau yang mengurus sedang tidak di tempat. Di jendela itu
-aplikasinya harus tetap bisa dimasuki — kalau tidak, pintu satu-satunya menuju tombol
-pemutakhiran ada di balik pintu yang terkunci.
+Dulu jendela itu dijaga sebuah tombol: siapa pun yang membuka aplikasinya mendapat
+halaman "belum siap" sampai ada admin yang sempat menekan "Jalankan". Tombol itu dipasang
+sebagai penjagaan, tapi tidak pernah sekali pun jawabannya "jangan" — jadi yang benar-benar
+dihasilkannya cuma seluruh tim menatap tembok sampai adminnya membuka laptop.
 
-Suite ini menjalankan aplikasi sungguhan di atas skema versi sebelumnya, lalu memeriksa
-tiga hal berurutan: masih bisa masuk, setiap halaman lain mengatakan apa yang kurang dan
-ke mana harus pergi, dan setelah satu tombol ditekan semuanya hidup dengan data lama utuh.
+Sekarang halaman pertama yang membutuhkan bentuk baru menyusulkan databasenya sendiri.
+Suite ini memeriksa jendela itu dari ujung ke ujung: masih bisa masuk dengan password
+lama, halaman pertama yang dibuka langsung hidup tanpa satu tombol pun ditekan, yang
+dikerjakannya tercatat, dan data lamanya utuh.
 
     MESSI_TEST_SOCKET=/var/run/mysqld/mysqld.sock python3 php/tests/test_upgrade_path.py
 """
@@ -49,7 +50,12 @@ with Host("messi_upgrade_test", seed="lama") as host, sync_playwright() as p:
                  return [r.status, (await r.text()).slice(0, 4000)];
                }""", [host.base + path, method, data])
 
+    def tertunda():
+        return int(host.php("-r", """require 'lib/schema.php'; echo count(schema_pending());""")
+                   .stdout.strip() or "-1")
+
     print("\n=== sebelum dimutakhirkan ===")
+    check("databasenya memang masih bentuk lama", tertunda(), lambda n: n > 0)
     pg.goto(host.base + "/login.php")
     check("halaman masuk tetap terbuka", pg.inner_text("h1"), "FURA")
 
@@ -63,42 +69,54 @@ with Host("messi_upgrade_test", seed="lama") as host, sync_playwright() as p:
     check("dan masuk dengan password lama tetap berhasil",
           pg.url, lambda u: not u.endswith("/login.php"))
 
+    # Masuk mendaratkan orangnya di aplikasinya — dan itu sendiri sudah cukup: halaman
+    # itulah yang pertama membutuhkan bentuk baru, jadi dialah yang menyusulkannya.
+    check("mendarat di aplikasinya, bukan di tembok",
+          pg.inner_text("body"), lambda s: "Database perlu dimutakhirkan" not in s)
+    check("dan sesudah itu databasenya tidak punya sisa", tertunda(), 0)
+
     # Halaman berikutnya diperiksa lewat fetch, dan fetch butuh berdiri di halaman yang
-    # memang punya asal-usul. Halaman cek dipilih karena dia satu-satunya yang dijamin
-    # terbuka justru ketika yang lain sedang tidak — itu memang gunanya.
+    # memang punya asal-usul.
     pg.goto(host.base + "/cek.php")
     pg.wait_for_load_state("networkidle")
-    check("halaman cek tetap terbuka, karena gunanya memang melaporkan keadaan",
-          pg.inner_text("h1"), lambda s: "Cek sistem" in s)
-    check("dan menyebut bahwa bentuk databasenya tertinggal",
-          pg.inner_text("body"), lambda s: "belum dikerjakan" in s)
+    check("halaman cek terbuka", pg.inner_text("h1"), lambda s: "Cek sistem" in s)
+    check("dan menyebut bentuk databasenya sudah sesuai",
+          pg.inner_text("body"), lambda s: "sesuai dengan versi yang terpasang" in s)
 
-    # Halaman yang memang butuh bentuk baru tidak berpura-pura jalan — tapi juga tidak
-    # kosong: yang tidak bisa ditindaklanjuti adalah halaman yang tidak mengatakan apa-apa.
-    for path in ["/index.php", "/admin.php", "/soal.php"]:
+    def job_log(kind):
+        return host.php("-r", f"""require 'lib/bootstrap.php';
+            foreach (q("SELECT detail FROM job_log WHERE kind = '{kind}'") as $r) {{
+                echo $r['detail'] . "\n"; }}""").stdout.strip()
+
+    print("\n=== yang dikerjakannya tercatat ===")
+    code, body = status("/index.php")
+    check("index.php hidup", code, 200)
+    check("dan yang tergambar memang aplikasinya",
+          body, lambda s: "Database perlu dimutakhirkan" not in s and "FURA" in s)
+
+    naik = job_log("schema_auto")
+    check("yang dikerjakannya tercatat", naik, lambda s: s != "")
+    check("beserta nama langkah-langkahnya", naik, lambda s: "teams" in s and "modules" in s)
+
+    # Permintaan kedua tidak mengerjakan apa pun lagi: yang tertunda sudah habis, dan
+    # kuncinya memastikan dua permintaan yang datang bersamaan tidak saling menimpa.
+    status("/index.php")
+    check("dibuka lagi tidak menaikkan apa pun untuk kedua kalinya",
+          job_log("schema_auto").count("\n"), 0)
+
+    for path in ["/admin.php", "/soal.php", "/modul.php"]:
         code, body = status(path)
-        check(f"{path} mengatakan apa yang kurang, bukan halaman kosong",
-              body, lambda s: "Database perlu dimutakhirkan" in s)
-        check(f"{path} menunjukkan ke mana harus pergi",
-              body, lambda s: "upgrade.php" in s)
+        check(f"{path} ikut hidup", body, lambda s: "Database perlu dimutakhirkan" not in s)
 
     code, body = status("/api/data.php")
-    check("API pun menjawab dengan kalimat, bukan badan kosong",
-          body, lambda s: "dimutakhirkan" in s.lower())
+    check("API pun menjawab dengan data, bukan keluhan",
+          body, lambda s: "dimutakhirkan" not in s.lower())
 
-    print("\n=== menjalankan pemutakhirannya ===")
+    print("\n=== tombolnya tetap ada, dan mengatakan tidak ada sisa ===")
     pg.goto(host.base + "/upgrade.php")
     pg.wait_for_load_state("networkidle")
     check("halaman pemutakhiran terbuka", pg.inner_text("h1"), "Pemutakhiran database")
-    check("menyebut berapa hal yang akan dikerjakan",
-          pg.inner_text("body"), lambda s: "belum dikerjakan" in s or "perlu dikerjakan" in s)
-    check("tiap langkah dijelaskan akibatnya ke data, bukan sebagai SQL",
-          pg.inner_text("body"), lambda s: "tidak dihapus" in s and "SELECT" not in s)
-
-    pg.click("button:has-text('Jalankan sekarang')")
-    pg.wait_for_load_state("networkidle")
-    check("selesai", pg.inner_text(".ok"), lambda s: "Selesai" in s)
-    check("dan sesudahnya tidak ada lagi yang tertunda",
+    check("dan mengatakan tidak ada lagi yang tertunda",
           pg.inner_text("body"), lambda s: "sudah sesuai dengan versi" in s)
 
     print("\n=== sesudahnya ===")

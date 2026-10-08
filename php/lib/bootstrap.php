@@ -176,6 +176,13 @@ function messi_require_current(): void
 {
     messi_require_ready();
     require_once __DIR__ . '/schema.php';
+    if (!schema_pending()) {
+        return;
+    }
+    // Dicoba dikerjakan sendiri dulu. Langkah-langkahnya menambah dan bukan membuang, dan
+    // masing-masing memeriksa dirinya sendiri — jadi yang dulu menunggu satu tombol
+    // sekarang beres sebelum orangnya sempat sadar ada yang perlu dikerjakan.
+    schema_upgrade_auto();
     $pending = schema_pending();
     if (!$pending) {
         return;

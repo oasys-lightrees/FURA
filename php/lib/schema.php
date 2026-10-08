@@ -339,6 +339,57 @@ function schema_run_install_sql(): void
  * Membuat tabel yang belum ada, lalu menjalankan langkah yang belum dijalankan.
  * Mengembalikan daftar apa yang barusan dikerjakan — kosong berarti tidak ada yang perlu.
  */
+/**
+ * Menyusulkan databasenya sendiri, tanpa menunggu ada yang menekan tombol.
+ *
+ * Tombol "Jalankan" itu dulu dipasang sebagai penjagaan: perubahan bentuk database tidak
+ * bisa dibatalkan, jadi biar ada manusia yang menekannya. Dalam praktiknya tidak ada satu
+ * pun kali di mana jawabannya "jangan" — yang terjadi cuma seluruh tim menatap halaman
+ * "belum siap" sampai adminnya sempat membuka laptop. Penjagaan yang selalu dilewati
+ * bukan penjagaan, cuma tembok.
+ *
+ * Yang membuat ini aman bukan tombolnya, melainkan sifat langkah-langkahnya: menambah,
+ * bukan membuang; dan tiap langkah memeriksa dirinya sendiri, jadi berhenti di tengah
+ * lalu dijalankan lagi akan menyelesaikan sisanya.
+ *
+ * Gagal pun tidak membuat halamannya meledak: yang tertunda tetap tertunda, temboknya
+ * muncul seperti dulu, dan alasannya tercatat di job_log supaya halaman Cek sistem bisa
+ * menyebutkannya.
+ */
+function schema_upgrade_auto(): array
+{
+    // Kunci tingkat server, bukan tingkat tabel. Dua permintaan yang datang bersamaan akan
+    // menjalankan ALTER yang sama pada tabel yang sama, dan MySQL tidak membungkus DDL
+    // dalam transaksi — yang kedua tidak ditolak dengan rapi, dia gagal di tengah.
+    $punya = (int) (q1('SELECT GET_LOCK(?, ?) AS k', ['fura_schema', 10])['k'] ?? 0);
+    if ($punya !== 1) {
+        return [];                 // ada yang sedang mengerjakannya; yang ini tidak ikut campur
+    }
+    try {
+        // Diperiksa lagi setelah kuncinya dipegang: menunggu tadi justru bisa berarti ada
+        // yang sedang menyelesaikannya, dan sekarang sudah tidak ada sisa apa pun.
+        if (!schema_pending()) {
+            return [];
+        }
+        $did = schema_upgrade();
+        if ($did) {
+            log_job('schema_auto', implode(', ', $did));
+        }
+        return $did;
+    } catch (Throwable $e) {
+        // Ditelan di sini, tapi tidak disembunyikan: temboknya kembali muncul, dan
+        // alasannya ada di job_log untuk dibaca halaman Cek sistem.
+        try {
+            log_job('schema_error', substr($e->getMessage(), 0, 400));
+        } catch (Throwable $x) {
+            // databasenya sendiri yang tidak bisa dihubungi: tidak ada tempat mencatat
+        }
+        return [];
+    } finally {
+        q_opt('SELECT RELEASE_LOCK(?)', ['fura_schema']);
+    }
+}
+
 function schema_upgrade(): array
 {
     schema_run_install_sql();
