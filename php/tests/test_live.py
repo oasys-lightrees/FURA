@@ -213,6 +213,23 @@ with Host("messi_live_test") as host, sync_playwright() as p:
     check("yang belum lapor ditandai begitu", body, lambda s: "belum lapor" in s)
     check("laporan penuh tidak terhampar sekaligus", "Deklarasi:" not in body)
 
+    print("\n--- baris tab tidak ikut ke layar katalog ---")
+    # Diukur tingginya, bukan dibaca atributnya: atribut "hidden" selalu benar, yang salah
+    # pikselnya. ".tabs{display:flex}" mengalahkan [hidden] bawaan browser, dan selama ini
+    # tidak kelihatan karena kerangka tuan rumah artifact menyertakan aturannya sendiri —
+    # yang tidak ada saat halaman yang sama dipasang di server.
+    lead.click("[data-home]")
+    lead.wait_for_timeout(350)
+    check("kembali ke katalog", lead.inner_text("h1"), "Modul")
+    check("dan baris tab benar-benar tidak memakan tempat",
+          lead.eval_on_selector("#tabs", "e=>Math.round(e.getBoundingClientRect().height)"), 0)
+    check("begitu juga baris modul",
+          lead.eval_on_selector("#modbar", "e=>Math.round(e.getBoundingClientRect().height)"), 0)
+    lead.click("[data-mod=messi]")
+    lead.wait_for_timeout(350)
+    check("dan kembali muncul begitu masuk modul",
+          lead.eval_on_selector("#tabs", "e=>e.getBoundingClientRect().height"), lambda h: h > 20)
+
     print("\n--- leader mengisi laporannya sendiri ---")
     lead.click('[data-tab="hari-ini"]')
     lead.wait_for_timeout(400)

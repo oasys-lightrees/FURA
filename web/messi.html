@@ -28,6 +28,13 @@
   --kept-bg:#1b2a23; --due-bg:#2b2318; --broken-bg:#2c1d1b; }
 
 * { box-sizing:border-box; }
+/* Halaman ini pernah digantung sebagai artifact, dan kerangka tuan rumahnya menyertakan
+   aturan ini sendiri — jadi selama ini dia ada tanpa pernah ditulis di sini. Begitu
+   halaman yang sama dipasang sendiri di server, aturan itu hilang: ".tabs{display:flex}"
+   mengalahkan [hidden] bawaan browser, dan baris tab tetap terlihat di layar katalog
+   tempat dia seharusnya tidak ada. Ditulis di sini supaya halamannya berdiri sendiri,
+   tidak bergantung pada siapa yang menggantungnya. */
+[hidden] { display:none !important; }
 html, body { height:100%; }
 body { margin:0; background:var(--paper); color:var(--ink); font-family:var(--ui);
        font-size:16px; line-height:1.5; -webkit-font-smoothing:antialiased;
