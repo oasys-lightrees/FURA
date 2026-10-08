@@ -120,6 +120,20 @@ eq('a promise met on its date was kept',   messi_commitment_outcome('2026-10-02'
 eq('a promise met early was kept',         messi_commitment_outcome('2026-10-02', '2026-10-01'), 'kept');
 eq('a promise met a day late was broken',  messi_commitment_outcome('2026-10-02', '2026-10-03'), 'broken');
 
+// Janji yang jatuh di hari libur baru bisa dikerjakan hari kerja berikutnya. Menandainya
+// ingkar hari Minggu berarti menghukum orang yang belum punya satu pun hari kerja untuk
+// menyelesaikannya. 3 Okt 2026 Sabtu, 4 Okt Minggu, 5 Okt Senin.
+eq('tenggat hari Sabtu sebenarnya hari Senin',
+   messi_workday_on_or_after('2026-10-03'), '2026-10-05');
+eq('dan tenggat hari kerja tetap hari itu juga',
+   messi_workday_on_or_after('2026-10-02'), '2026-10-02');
+eq('janji Sabtu belum ingkar di hari Minggu',
+   messi_commitment_outcome('2026-10-03', '2026-10-04'), 'kept');
+eq('maupun di hari Senin — hari kerjanya baru hari itu',
+   messi_commitment_outcome('2026-10-03', '2026-10-05'), 'kept');
+eq('baru hari Selasa dia benar-benar lewat',
+   messi_commitment_outcome('2026-10-03', '2026-10-06'), 'broken');
+
 /* ------------------------------------------------------------- missed days */
 
 $done = ['submitted_at' => '2026-09-29 10:00:00', 'status' => 'submitted'];

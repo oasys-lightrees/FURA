@@ -232,6 +232,11 @@ button[disabled] { opacity:0.45; cursor:not-allowed }
 .grid input, .grid select { width:100% }
 form.row { display:inline-flex; gap:0.375rem; align-items:center; margin:0 0.25rem 0.25rem 0 }
 
+/* Tanggal yang dibacakan. Kotak tanggal bawaan browser menuliskan dirinya mm/dd/yyyy
+   kalau bahasa browsernya Inggris — berapa pun bahasa halamannya — jadi "10/08/2026"
+   bisa berarti dua tanggal yang berbeda, dan yang salah pilih baru tahu besok. */
+.tgl { display:block; margin:0.25rem 0 0; font-size:0.75rem; color:var(--muted) }
+
 /* tabel */
 table { width:100%; border-collapse:collapse }
 th { text-align:left; font-size:0.75rem; font-weight:600; color:var(--muted);
@@ -349,6 +354,27 @@ function page_foot(): void
     paint();
   });
   paint();
+
+  // Tiap kotak tanggal mendapat tanggalnya sendiri dalam kata, di bawahnya. Dipasang di
+  // sini, bukan di tiap halaman: yang dipasang per halaman ketinggalan di halaman kesekian.
+  var HARI = ["Min","Sen","Sel","Rab","Kam","Jum","Sab"];
+  var BULAN = ["Jan","Feb","Mar","Apr","Mei","Jun","Jul","Agu","Sep","Okt","Nov","Des"];
+  function kata(v) {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(v)) return "";
+    var t = new Date(v + "T00:00:00Z");
+    if (isNaN(t)) return "";
+    return HARI[t.getUTCDay()] + " " + t.getUTCDate() + " " + BULAN[t.getUTCMonth()]
+         + " " + t.getUTCFullYear();
+  }
+  Array.prototype.forEach.call(document.querySelectorAll("input[type=date]"), function (i) {
+    var out = document.createElement("small");
+    out.className = "tgl";
+    i.insertAdjacentElement("afterend", out);
+    var paint = function () { out.textContent = kata(i.value); };
+    i.addEventListener("input", paint);
+    i.addEventListener("change", paint);
+    paint();
+  });
 
   // Menu yang cuma bisa ditutup dengan tombolnya sendiri terasa macet.
   var menu = document.getElementById("userMenu");

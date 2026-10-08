@@ -63,11 +63,19 @@ with sync_playwright() as p:
     check("laporan penuh tidak terhampar semua sekaligus",
           "MESSI Report" not in body and "Deklarasi:" not in body)
     pg.click('[data-open="u_nicho"]'); pg.wait_for_timeout(250)
-    opened = txt(pg, ".report")
-    check("tapi laporan satu orang bisa dibuka", opened, lambda s: "MESSI Report" in s)
-    check("isinya laporan orang yang diklik", opened, lambda s: "Report by: Nicho" in s)
+    opened = txt(pg, ".rv")
+    # Dibaca sebagai layar, bukan sebagai teks yang kebetulan ditampilkan: angkanya tabel,
+    # dan yang tidak dijawab tidak dicetak sama sekali.
+    check("tapi laporan satu orang bisa dibuka", opened, lambda s: "Semua" in s)
+    check("angkanya terbaca sebagai angka", opened, lambda s: "21" in s)
+    check("yang gantung disebutkan", opened, lambda s: "Klien A" in s)
+    check("judul berbahasa Inggris tidak ikut tercetak",
+          opened, lambda s: "MESSI Report" not in s and "Report by" not in s)
+    check("dan paragraf deklarasinya tidak memakan separuh kartunya",
+          opened, lambda s: "sudah menyatakan" in s and "Deklarasi:" not in s)
+    check("teks lamanya tetap bisa disalin", opened, lambda s: "Salin teksnya" in s)
     pg.click('[data-open="u_nicho"]'); pg.wait_for_timeout(250)
-    check("dan bisa ditutup lagi", pg.query_selector(".report") is None)
+    check("dan bisa ditutup lagi", pg.query_selector(".rv") is None)
     check("tidak ada tombol kirim di halaman manager", pg.eval_on_selector("#bar","e=>e.hidden"))
     pg.screenshot(path=str(SHOTS)+"/t-manager.png", full_page=True)
 
@@ -89,7 +97,7 @@ with sync_playwright() as p:
 
     print("\n--- manager mengisi laporannya sendiri ---")
     pg.click('[data-tab="hari-ini"]'); pg.wait_for_timeout(300)
-    check("kembali ke form sendiri", txt(pg,".stepno"), "LANGKAH 1 DARI 2")
+    check("kembali ke form sendiri", txt(pg,".stepno"), "LANGKAH 1")
     def g(r,c,v): pg.fill(f'[data-row={r}][data-col={c}]', str(v))
     for r,o in [("WAG",6),("TGG",2),("GCG",1)]: g(r,"open",o)
     g("WAG","reply",4); pg.wait_for_timeout(200)
@@ -124,6 +132,22 @@ with sync_playwright() as p:
     pgE.click('[data-tab="tim"]'); pgE.wait_for_timeout(400)
     check("Bayu yang memang tidak pernah lapor tetap diangkat",
           pgE.inner_text("body"), lambda s: "Belum lapor beberapa hari." in s)
+
+    print("\n--- tiga orang yang sama-sama sepi jadi satu kartu, bukan tiga ---")
+    # Tiga kartu yang berbunyi persis sama mendorong satu permintaan bantuan yang
+    # sungguhan ke bawah layar, dan yang di bawah layar tidak dibaca.
+    pgF = new_page(ctx, "u_lead", at=AT, store={
+      "roster": {"u_lead":{"name":"Lia","joined":D2}, "u_bayu":{"name":"Bayu","joined":D2},
+                 "u_cici":{"name":"Cici","joined":D2}, "u_deni":{"name":"Deni","joined":D2}},
+      "cycles": {"u_lead__"+TODAY: cyc("u_lead", TODAY)},
+      "commitments": {}})
+    pgF.click('[data-tab="tim"]'); pgF.wait_for_timeout(400)
+    kartu = pgF.eval_on_selector_all(
+        ".card.bad", "e=>e.map(x=>x.textContent)")
+    check("satu kartu untuk ketiganya", len(kartu), 1)
+    check("dan ketiganya disebut namanya di dalamnya",
+          kartu[0], lambda s: all(n in s for n in ["Bayu", "Cici", "Deni"]))
+    check("beserta berapa hari masing-masing", kartu[0], lambda s: "hari" in s)
 
     print("\n--- semua beres: halaman manager harus kosong ---")
     # Realistic: on the roster since day one, and reported every workday since.

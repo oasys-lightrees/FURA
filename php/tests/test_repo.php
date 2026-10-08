@@ -562,6 +562,28 @@ ok('password barunya hidup',
 eq('dan sesi di perangkat lain ikut mati',
    (int) q1('SELECT COUNT(*) AS n FROM sessions WHERE token = ?', [$lamaToken])['n'], 0);
 
+/* ------------------------------------------ janji yang jatuh di hari libur */
+
+// Sab 3 Okt: hari yang tidak punya jam kerja sama sekali. Dulu janji seperti ini ditandai
+// tidak ditepati Minggu pagi — sebelum orangnya pernah punya satu hari kerja untuk
+// menyelesaikannya, dan tanpa satu pun cara membantahnya.
+$janji = make_user('janji@example.test', 'Janji', 'player', '2026-09-01');
+q('INSERT INTO commitments (user_id, action_text, due_date, status, created_at)
+   VALUES (?,?,?,?,?)',
+  [$janji['id'], 'Kirim berkas', '2026-10-03', 'open', Clock::nowUtcSql()]);
+$status = fn() => q1('SELECT status FROM commitments WHERE user_id = ?',
+                     [$janji['id']])['status'];
+
+// Yang diperiksa statusnya, bukan jumlah yang dikembalikan: suite ini sudah punya janji
+// lain yang memang sudah lewat, dan angka yang ikut menghitung mereka tidak mengatakan
+// apa pun tentang janji yang satu ini.
+repo_break_overdue('2026-10-04');                  // Minggu
+eq('hari Minggu, janji Sabtu belum ingkar', $status(), 'open');
+repo_break_overdue('2026-10-05');                  // Senin
+eq('hari Senin pun belum — hari kerjanya baru hari itu', $status(), 'open');
+repo_break_overdue('2026-10-06');                  // Selasa
+eq('hari Selasa baru ditandai tidak ditepati', $status(), 'broken');
+
 /* ------------------------------------------------------------------- izin */
 
 $_COOKIE = [];

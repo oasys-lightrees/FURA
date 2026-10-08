@@ -16,7 +16,9 @@ with sync_playwright() as p:
 
     print("\n=== USER (Nicho, bukan owner) ===")
     pg = new_page(ctx, "u_nicho", at=AT)
-    check("halaman termuat di langkah 1", txt(pg,".stepno"), "LANGKAH 1 DARI 2")
+    # Totalnya belum pasti di langkah pertama — kalau ada yang gantung, satu langkah lagi
+    # muncul. Jadi di sini angkanya saja; dulu tertulis "DARI 2" lalu berubah jadi "DARI 3".
+    check("halaman termuat di langkah 1", txt(pg,".stepno"), "LANGKAH 1")
     check("nama dikenali dari akun", pg.get_attribute("#avatar","title"), "Nicho")
     check("player TIDAK melihat tab manager", pg.eval_on_selector("#tabs","e=>e.hidden"))
     check("otomatis masuk roster", "u_nicho" in store_of(pg)["roster"])
@@ -44,7 +46,7 @@ with sync_playwright() as p:
 
     pg.click('[data-goto="1"]') if pg.query_selector('[data-goto="1"]') else None
     pg.wait_for_timeout(200)
-    if txt(pg,".stepno") != "LANGKAH 1 DARI 2":
+    if txt(pg,".stepno") != "LANGKAH 1":
         pg.click("#back") if pg.query_selector("#back") else None
         pg.wait_for_timeout(200)
     g("WAG","gt3",2); g("WAG","lt3",1); pg.wait_for_timeout(200)
@@ -62,6 +64,19 @@ with sync_playwright() as p:
     pg.click("#next"); pg.wait_for_timeout(200)
     check("tanggal wajib", "Pilih tanggalnya" in txt(pg,".bar .err"))
     pg.fill("[data-pd='0']","2026-10-02")
+    pg.wait_for_timeout(150)
+    # Kotak tanggal bawaan browser menuliskan dirinya mm/dd/yyyy kalau bahasa browsernya
+    # Inggris — berapa pun bahasa halamannya — jadi "10/02/2026" bisa berarti dua tanggal.
+    check("tanggal yang dipilih ikut dibacakan", txt(pg,"[data-tgl='0']"),
+          lambda s: "2 Okt" in s)
+    pg.fill("[data-pd='0']","2026-10-03")        # Sabtu
+    pg.wait_for_timeout(150)
+    check("dan akhir pekan disebutkan sebelum sempat dijanjikan",
+          txt(pg,"[data-tgl='0']"), lambda s: "bukan hari kerja" in s)
+    pg.fill("[data-pd='0']","2026-10-02")
+    pg.wait_for_timeout(150)
+    check("hari kerja tidak diberi peringatan apa-apa", txt(pg,"[data-tgl='0']"),
+          lambda s: "bukan hari kerja" not in s)
     pg.click("#next"); pg.wait_for_timeout(250)
     check("sampai layar cek", txt(pg,".stepno"), "LANGKAH 3 DARI 3")
     check("ringkasan menampilkan angka", txt(pg,".rev"), lambda s: "21" in s and "3" in s)
@@ -109,7 +124,7 @@ with sync_playwright() as p:
     pgC.fill("[data-row=WAG][data-col=reply]", "6")
     pgC.wait_for_timeout(200)
     check("hari bersih memang melewati langkah gantung",
-          txt(pgC, ".stepno"), "LANGKAH 1 DARI 2")
+          txt(pgC, ".stepno"), "LANGKAH 1")
     pgC.click("#next"); pgC.wait_for_timeout(300)
     check("janji yang jatuh tempo tetap muncul di langkah kirim",
           pgC.query_selector('[data-resolve="c-1"]') is not None)

@@ -186,6 +186,42 @@ with Host("messi_akun", extra={"mail_from": "fura@example.test"}) as host, sync_
     check("dan tidak lagi tertulis tidak lapor untuk dia",
           barisRio, lambda s: "tidak lapor" not in s)
 
+    # Angka di kepala rekap: yang izin bukan yang belum lapor, dan bukan bagian dari
+    # penyebutnya. Dulu keduanya tercampur, jadi angka yang paling sering dibaca atasan
+    # menghitung orang yang cutinya dicatat atasan itu sendiri.
+    hariIni = db("echo Clock::today();")
+
+    def izinkan(on):
+        db("require 'lib/repo.php';"
+           "$u = q1(\"SELECT * FROM users WHERE email='lead\\\\@example.test'\");"
+           "$r = (int) q1(\"SELECT id FROM users WHERE email='rio\\\\@example.test'\")['id'];"
+           "repo_set_excused($u, $r, '" + hariIni + "', '" + hariIni + "', "
+           + ("true, 'sakit'" if on else "false") + ");")
+
+    izinkan(True)
+    # Halaman baru, bukan halaman yang sudah dipakai berpindah-pindah hari: yang diukur
+    # di sini adalah apa yang dilihat orang yang baru membuka rekapnya pagi ini.
+    ctxRekap = browser.new_context(viewport={"width": 1100, "height": 900})
+    pgRekap = sign_in(ctxRekap, host.base, "lead@example.test", PASSWORD, results=results,
+                      enter=None)
+    pgRekap.wait_for_selector("[data-rekap]", timeout=15000)
+    pgRekap.click("[data-rekap]")
+    pgRekap.wait_for_selector(".stats", timeout=15000)
+    angka = pgRekap.inner_text(".stats")
+    check("yang izin punya kotaknya sendiri", angka, lambda s: "izin" in s)
+    # Tiga orang di tim ini, satu izin: penyebutnya 2, bukan 3.
+    check("penyebutnya tidak ikut menghitung yang izin", angka, lambda s: "/2" in s)
+    check("dan yang izin tidak terhitung belum lapor",
+          pgRekap.evaluate("""() => {
+                const t = [...document.querySelectorAll(".stats div")]
+                  .find(d => d.textContent.includes("belum lapor"));
+                return t ? parseInt(t.textContent, 10) : -1;
+              }"""), lambda n: 0 <= n <= 2)
+    ctxRekap.close()
+    izinkan(False)
+    lia.goto(host.base + "/izin.php")
+    lia.wait_for_load_state("networkidle")
+
     # Dibatalkan, dan tanda merahnya kembali — pembatalan yang tidak mengembalikan apa pun
     # adalah tombol yang tidak jujur.
     lia.goto(host.base + "/izin.php")
@@ -231,6 +267,56 @@ with Host("messi_akun", extra={"mail_from": "fura@example.test"}) as host, sync_
           lambda s: int(s) >= 1)
     check("halaman cek menyebut emailnya menyala",
           db("echo cfg('mail_from');"), "fura@example.test")
+
+    print("\n=== yang tidak menuduh orang yang salah ===")
+
+    # Hari sebelum seseorang bergabung bukan hari yang dia lewatkan. missedDays() sudah
+    # menyaringnya; daftar "Beberapa hari lalu" dulu tidak — jadi layar pertama seorang
+    # karyawan baru adalah tiga hari merah untuk hari-hari sebelum akunnya ada.
+    db("q(\"UPDATE users SET joined_on = CURDATE() WHERE email='rio\\\\@example.test'\");")
+    # Dan dia sudah mengisi hari ini — daftar "Beberapa hari lalu" cuma digambar sesudah
+    # laporannya masuk, jadi tanpa ini layar yang diperiksa bukan layar yang bermasalah.
+    db("require 'lib/repo.php';"
+       "$r = q1(\"SELECT * FROM users WHERE email='rio\\\\@example.test'\");"
+       "repo_save_cycle($r, uid((int) $r['id']) . '__' . Clock::today(),"
+       "  ['grid' => ['WAG' => ['open' => 4, 'reply' => 4]], 'declared' => true]);")
+    ctxBaru = browser.new_context(viewport={"width": 420, "height": 900})
+    pgBaru = sign_in(ctxBaru, host.base, "rio@example.test", PASSWORD, results=results)
+    pgBaru.wait_for_timeout(600)
+    check("laporannya memang sudah masuk", pgBaru.inner_text("h1"), "Sudah terkirim")
+    badan = pgBaru.inner_text("body")
+    check("orang yang baru bergabung tidak melihat hari merah sama sekali",
+          badan, lambda s: "tidak lapor" not in s)
+    check("dan tidak ditawari daftar hari yang belum pernah jadi miliknya",
+          badan, lambda s: "Beberapa hari lalu" not in s)
+    ctxBaru.close()
+
+    # Kotak tanggal bawaan browser menuliskan dirinya mm/dd/yyyy kalau bahasa browsernya
+    # Inggris — berapa pun bahasa halamannya.
+    ctxAdm = browser.new_context(viewport={"width": 420, "height": 900})
+    pgAdm = sign_in(ctxAdm, host.base, "lead@example.test", PASSWORD, results=results,
+                    enter=None)
+    pgAdm.goto(host.base + "/izin.php")
+    pgAdm.wait_for_load_state("networkidle")
+    check("tiap kotak tanggal dibacakan dalam kata",
+          pgAdm.eval_on_selector_all(".tgl", "e=>e.map(x=>x.textContent).filter(Boolean)"),
+          lambda v: len(v) >= 2 and all(len(x) > 6 for x in v))
+
+    # Tabel yang lebih lebar daripada layarnya bukan sekadar "harus digeser": kolom
+    # paling kanan — tempat semua tombolnya — tidak pernah terlihat sampai orangnya
+    # menebak bahwa tabel itu bisa digeser.
+    pgAdm.goto(host.base + "/admin.php")
+    pgAdm.wait_for_load_state("networkidle")
+    check("di telepon, tombol di baris orang ada di dalam layar",
+          pgAdm.evaluate("""() => {
+                const b = [...document.querySelectorAll("table.orang button")];
+                return b.length ? Math.max(...b.map(x => x.getBoundingClientRect().right)) : 1e9;
+              }"""), lambda r: r <= 420)
+    check("dan tiap pilihan tetap punya namanya walau judul kolomnya hilang",
+          pgAdm.inner_text("table.orang"), lambda s: "Tim" in s and "Peran" in s)
+    check("satu peran satu nama, sama dengan yang di bawah avatar",
+          pgAdm.inner_text("body"), lambda s: "Pemain" in s and "Pelapor" not in s)
+    ctxAdm.close()
 
     print("\n=== kepala halaman: beda untuk tiap peran ===")
 

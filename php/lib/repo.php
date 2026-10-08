@@ -638,10 +638,26 @@ function repo_reap(string $today): int
              ['missed', 'pending', $today])->rowCount();
 }
 
-/** A promise whose date has passed without an answer is broken, and says so on its own. */
+/**
+ * A promise whose date has passed without an answer is broken, and says so on its own.
+ *
+ * Tenggat sebenarnya adalah hari kerja pertama pada atau sesudah tanggalnya, bukan
+ * tanggalnya mentah-mentah. Satu UPDATE tidak cukup untuk aturan itu — hari libur tidak
+ * bisa dihitung di dalam SQL tanpa menyalin daftar hari kerjanya ke sana, dan daftar yang
+ * ditulis dua kali adalah daftar yang suatu hari berbeda di salah satunya. Barisnya
+ * sedikit: yang diputar di sini cuma janji yang sudah lewat dan belum dijawab.
+ */
 function repo_break_overdue(string $today): int
 {
-    return q('UPDATE commitments SET status = ?, resolved_at = ?
-               WHERE status = ? AND due_date < ?',
-             ['broken', Clock::nowUtcSql(), 'open', $today])->rowCount();
+    $n = 0;
+    foreach (q('SELECT id, due_date FROM commitments WHERE status = ? AND due_date < ?',
+               ['open', $today])->fetchAll() as $r) {
+        if (messi_workday_on_or_after((string) $r['due_date']) >= $today) {
+            continue;                   // hari kerjanya belum lewat; dia belum ingkar
+        }
+        q('UPDATE commitments SET status = ?, resolved_at = ? WHERE id = ?',
+          ['broken', Clock::nowUtcSql(), (int) $r['id']]);
+        $n++;
+    }
+    return $n;
 }

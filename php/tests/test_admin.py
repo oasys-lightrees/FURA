@@ -220,7 +220,7 @@ with Host("messi_admin_test", seed="empty") as host, sync_playwright() as p:
     row = admin.locator("table.orang tr", has_text="nicho@example.test")
     check("admin tidak punya kotak untuk mengetik password orang lain",
           row.locator("input[name=password]").count(), 0)
-    row.locator("button:has-text('Link buat password baru')").click()
+    row.locator("button:has-text('Password baru')").click()
     admin.wait_for_load_state("networkidle")
     reset = admin.inner_text(".links code").strip()
     check("yang keluar adalah link, bukan password", reset,

@@ -251,14 +251,18 @@ with Host("messi_live_test") as host, sync_playwright() as p:
     me = lead.evaluate("""() => document.querySelector("[data-open]").dataset.open""")
     lead.click(f'[data-open="{me}"]')
     lead.wait_for_timeout(350)
-    opened = lead.inner_text(".report")
-    check("laporan utuh bisa dibuka dari rekap",
-          opened, lambda s: s.startswith("MESSI Report") and "Deklarasi:" in s)
+    opened = lead.inner_text(".rv")
+    check("laporan utuh bisa dibuka dari rekap", opened, lambda s: "Semua" in s)
     check("dan isinya dari database, bukan diketik ulang",
-          opened, lambda s: "Channel aktif/open" in s)
+          opened, lambda s: all(c in s for c in ["WAG", "TGG", "GCG"]) and "Semua" in s)
+    # Dibaca sebagai layar, bukan sebagai teks yang kebetulan ditampilkan.
+    check("tanpa judul berbahasa Inggris dan tanpa paragraf deklarasinya",
+          opened, lambda s: "MESSI Report" not in s and "Deklarasi:" not in s)
+    check("teks lamanya tetap bisa disalin untuk diteruskan",
+          opened, lambda s: "Salin teksnya" in s)
     lead.click(f'[data-open="{me}"]')
     lead.wait_for_timeout(300)
-    check("bisa ditutup lagi", lead.query_selector(".report") is None)
+    check("bisa ditutup lagi", lead.query_selector(".rv") is None)
 
     print("\n--- dan bisa membaca hari lain ---")
     prev = lead.query_selector("[data-day]")

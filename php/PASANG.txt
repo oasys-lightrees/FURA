@@ -150,7 +150,7 @@ cPanel -> Software -> Select PHP Version (atau MultiPHP Manager) -> pilih 8.1 / 
      Admin    mengurus orang, tim dan pertanyaan. Tidak bisa menyentuh owner maupun
               sesama admin.
      Leader   membaca rekap timnya sendiri. Tidak melihat tim lain sama sekali.
-     Pelapor  mengisi laporannya sendiri.
+     Pemain   mengisi laporannya sendiri.
 
 
 7b. BUAT TIM (kalau lebih dari satu divisi)

@@ -243,6 +243,33 @@ textarea { min-height:82px; resize:vertical; }
 h2 { font-size:11.5px; font-weight:700; letter-spacing:.09em; text-transform:uppercase;
      color:var(--muted); margin:28px 0 10px; }
 
+/* laporan satu orang, dibaca di layar */
+.rv { border-top:1px solid var(--line); margin-top:10px; padding-top:12px; }
+.rv-t { width:100%; border-collapse:collapse; font-family:var(--mono); font-size:12.5px; }
+.rv-t th { font-weight:500; color:var(--muted); text-align:right; padding:3px 0 3px 10px;
+           font-family:var(--ui); font-size:11.5px; letter-spacing:.03em; white-space:nowrap; }
+.rv-t tr th:first-child { text-align:left; padding-left:0; }
+.rv-t td { text-align:right; padding:3px 0 3px 10px; font-variant-numeric:tabular-nums; }
+.rv-t td.nil { color:var(--line); }          /* nol yang tidak perlu ikut dibaca */
+.rv-t td.r { color:var(--broken); font-weight:500; }
+.rv-t .rv-sum th, .rv-t .rv-sum td { border-top:1px solid var(--line); padding-top:6px;
+           font-weight:600; color:var(--ink); }
+.rv-d { margin:12px 0 0; display:grid; gap:9px; }
+.rv-b dt { font-size:11px; letter-spacing:.05em; text-transform:uppercase; color:var(--muted); }
+.rv-b dd { margin:2px 0 0; font-size:13.5px; line-height:1.5; }
+.rv-p { display:flex; gap:8px; align-items:baseline; padding:2px 0; }
+.rv-p em { margin-left:auto; font-style:normal; font-family:var(--mono); font-size:12px;
+           color:var(--muted); white-space:nowrap; }
+.rv-f { display:flex; align-items:center; gap:10px; margin-top:12px; padding-top:10px;
+        border-top:1px solid var(--line); font-size:12px; color:var(--muted); }
+.rv-c { margin-left:auto; flex:none; background:none; border:1px solid var(--line);
+        border-radius:7px; padding:4px 10px; font:inherit; font-size:12px; color:var(--muted);
+        cursor:pointer; }
+.rv-c:hover { color:var(--ink); border-color:var(--ink); }
+/* Nama tidak boleh dipaksa membungkus oleh angka di sebelahnya: baris yang tingginya
+   berbeda-beda membuat daftar sepuluh orang terbaca seperti sepuluh hal berbeda. */
+.prow .nama, .card .nama { white-space:nowrap; }
+
 .report { background:var(--raise); border:1px solid var(--line); border-radius:11px; padding:14px;
           font-family:var(--mono); font-size:12.5px; line-height:1.7; white-space:pre-wrap;
           word-break:break-word; text-align:left; }
@@ -513,6 +540,16 @@ const d = s => new Date(s + "T00:00:00Z");
 const iso = t => t.toISOString().slice(0,10);
 const addDays = (s,n) => { const t = d(s); t.setUTCDate(t.getUTCDate()+n); return iso(t); };
 const isWorkday = s => WORKDAYS.includes(d(s).getUTCDay());
+/* Tenggat sebenarnya sebuah janji: hari kerja pertama pada atau sesudah tanggalnya.
+   Janji yang jatuh di hari libur baru bisa dikerjakan hari kerja berikutnya, jadi
+   menandainya lewat di hari Minggu berarti menghukum orang yang belum punya satu pun
+   hari kerja untuk menyelesaikannya. Aturan yang sama ada di lib/engine.php. */
+const dueWorkday = s => {
+  let x = s;
+  for (let i = 0; i < 7; i++) { if (isWorkday(x)) return x; x = addDays(x, 1); }
+  return s;
+};
+const dueLewat = c => dueWorkday(c.due) < today();
 const fmt = s => { const t = d(s); return `${ID_SHORT[t.getUTCDay()]} ${t.getUTCDate()} ${MON[t.getUTCMonth()]}`; };
 const fmtLong = s => { const t = d(s); return `${ID_DAY[t.getUTCDay()]}, ${t.getUTCDate()} ${MON[t.getUTCMonth()]}`; };
 /** Hari kerja berikutnya ke arah `dir`, atau null kalau sudah mentok. */
@@ -571,7 +608,8 @@ const statusOf = (day, doc) =>
 /* ---- state --------------------------------------------------------------- */
 const S = { me:null, name:"", isLeader:false, cycles:new Map(), commitments:new Map(),
             roster:new Map(), tab:"hari-ini", step:1, editing:false, error:null,
-            copied:false, showReport:false, ready:false, offline:false, a:null, savedAt:null,
+            copied:false, copiedRow:null, showReport:false, ready:false, offline:false,
+            a:null, savedAt:null,
             // Layar leader: hari yang sedang dibaca, dan laporan siapa yang dibuka.
             day:null, openRow:null, teamView:null,
             // Di mana orangnya: katalog modul, penjelasan sebuah modul, atau modulnya.
@@ -780,11 +818,15 @@ const esc = s => String(s == null ? "" : s)
 const el = i => document.getElementById(i);
 const view = el("view"), bar = el("bar"), barIn = el("barIn");
 
+/* Jumlah langkahnya belum pasti sampai angkanya diisi: kalau ada yang gantung, satu
+   langkah lagi muncul. Jadi di langkah pertama totalnya tidak disebutkan — dulu di situ
+   tertulis "1 DARI 2" lalu berubah jadi "2 DARI 3", dan penghitung yang berubah sendiri
+   di tengah jalan lebih buruk daripada penghitung yang diam. */
 function progress() {
   const steps = stepList();
   return `<div class="prog">${steps.map((_,i) =>
     `<i class="${i < S.step ? "on" : ""}"></i>`).join("")}</div>
-    <div class="stepno">LANGKAH ${S.step} DARI ${steps.length}</div>`;
+    <div class="stepno">LANGKAH ${S.step}${S.step > 1 ? ` DARI ${steps.length}` : ""}</div>`;
 }
 
 function stepAngka() {
@@ -813,6 +855,20 @@ function stepAngka() {
     <div class="lamp ${lamp.level}" style="margin-top:18px"><i></i>${esc(lamp.label)}</div>`;
 }
 
+/**
+ * Tanggal yang baru dipilih, dibacakan.
+ *
+ * Kotak tanggal bawaan browser menuliskan dirinya mm/dd/yyyy kalau bahasa browsernya
+ * Inggris — berapa pun bahasa halamannya — jadi "10/08/2026" bisa berarti dua tanggal
+ * yang berbeda. Dan akhir pekan disebutkan: janji yang jatuh di hari libur baru bisa
+ * dikerjakan hari kerja berikutnya, dan orangnya berhak tahu itu sebelum menjanjikannya.
+ */
+function dueNote(v) {
+  if (!v) return "";
+  return esc(fmtLong(v)) + (isWorkday(v) ? ""
+    : ` — <b>bukan hari kerja</b>, jadi baru ditanyakan hari kerja berikutnya.`);
+}
+
 function stepGantung() {
   const t = totals(S.a.grid), day = today(), rows = planRows(S.a);
   // Mulai dari satu baris. Orang dengan satu rencana harus melihat layar yang sama
@@ -826,13 +882,14 @@ function stepGantung() {
       <div class="fld">
         <label for="due${i}">${esc(Q.due.label)}</label>
         <input id="due${i}" data-pd="${i}" type="date" min="${esc(day)}" value="${esc(r.due)}">
+        <small class="tgl" data-tgl="${i}">${dueNote(r.due)}</small>
       </div>
       ${rows.length > 1 ? `<button class="drop" type="button" data-drop="${i}"
         aria-label="Hapus rencana ini">✕</button>` : ""}
     </div>`;
   return `${progress()}
     <h1>${t.hanging} yang masih gantung</h1>
-    <p class="sub">Supaya tidak keskip, tiga hal ini perlu diisi.</p>
+    <p class="sub">Supaya tidak ada yang terlewat, tiga hal ini perlu diisi.</p>
     <div class="fld">
       <label for="detail">${esc(Q.detail.label)}</label>
       <textarea id="detail" name="detail"
@@ -910,6 +967,54 @@ function buildReport(doc) {
   return lines.join("\n");
 }
 
+/**
+ * Laporan sebagai layar, bukan sebagai teks yang kebetulan ditampilkan.
+ *
+ * buildReport() menulis format yang dulu ditempel ke grup chat: "MESSI Report / Date: /
+ * a. ... i.", lengkap dengan paragraf deklarasi. Begitu rekapnya pindah ke sini, format
+ * itu jadi satu-satunya cara atasan membaca laporan orangnya — judul berbahasa Inggris
+ * di aplikasi berbahasa Indonesia, sembilan baris berhuruf, dan "Belum ada" empat kali
+ * untuk pertanyaan yang memang tidak dijawab.
+ *
+ * Yang di bawah ini membalik urutannya: angkanya jadi tabel, dan yang kosong tidak
+ * dicetak sama sekali — yang tersisa persis hal yang perlu ditindaklanjuti. Teks lamanya
+ * tidak hilang; dia pindah ke balik tombol Salin, yang memang gunanya.
+ */
+function reportView(doc) {
+  const c = docCfg(doc), days = c.threshold_days, g = doc.grid || {};
+  const t = totalsIn(doc.grid, c.channels);
+  const plans = plansOf(doc).filter(r => r.action);
+  const teks = (judul, isi) => isi && isi.trim()
+    ? `<div class="rv-b"><dt>${esc(judul)}</dt><dd>${esc(isi.trim()).replace(/\n/g, "<br>")}</dd></div>`
+    : "";
+  const sel = (n, merah) => `<td class="${merah && n ? "r" : n ? "" : "nil"}">${n}</td>`;
+
+  return `<div class="rv">
+    <table class="rv-t">
+      <tr><th></th><th>Aktif</th><th>&gt;${days}h</th><th>&lt;${days}h</th><th>Dibalas</th></tr>
+      ${c.channels.map(x => { const r = g[x.key] || {}; return `<tr>
+        <th title="${esc(x.full)}">${esc(x.label)}</th>
+        ${sel(num(r.open))}${sel(num(r.gt3), true)}${sel(num(r.lt3))}${sel(num(r.reply))}</tr>`;
+      }).join("")}
+      <tr class="rv-sum"><th>Semua</th>
+        ${sel(t.open)}${sel(t.gt3, true)}${sel(t.lt3)}${sel(t.reply)}</tr>
+    </table>
+    <dl class="rv-d">
+      ${teks(Q.detail.label, doc.detail)}
+      ${plans.length ? `<div class="rv-b"><dt>${esc(Q.plan.label)}</dt><dd>${plans.map(r =>
+          `<span class="rv-p">${esc(r.action)}${r.due
+            ? `<em>${esc(fmt(r.due))}</em>` : ""}</span>`).join("")}</dd></div>` : ""}
+      ${Q.escalation.show ? teks(Q.escalation.label, doc.escalation) : ""}
+      ${Q.prista.show ? teks(Q.prista.label, doc.prista) : ""}
+    </dl>
+    <div class="rv-f">
+      <span>${doc.declared ? "✓ sudah menyatakan laporannya jujur" : ""}</span>
+      <button class="rv-c" type="button" data-copy="${esc(doc.owner)}__${esc(doc.day)}">${
+        S.copiedRow === doc.owner + "__" + doc.day ? "Tersalin ✓" : "Salin teksnya"}</button>
+    </div>
+  </div>`;
+}
+
 function screenDone(doc) {
   const t = docTotals(doc), lamp = docLamp(doc);
   return `<div class="done">
@@ -926,14 +1031,17 @@ function screenDone(doc) {
     ${S.showReport ? `<div class="report" id="reportText">${esc(buildReport(doc))}</div>` : ""}
     <button class="fix" type="button" id="edit">Ada yang salah? Perbaiki laporannya</button>
     ${myPromises().length ? `<h2>Yang kamu janjikan</h2>` + myPromises().map(c => `
-      <div class="card ${c.due < today() ? "bad" : "due"}"><div class="row">
+      <div class="card ${dueLewat(c) ? "bad" : "due"}"><div class="row">
         <span class="strong">${esc(c.action)}</span><span class="grow"></span>
         <span class="meta">${esc(fmt(c.due))}</span></div></div>`).join("") : ""}
     ${recent()}`;
 }
 
 function recent() {
-  const days = pastWorkdays(addDays(today(),-1), 4);
+  // Disaring tanggal bergabung, sama seperti missedDays(). Tanpa ini layar pertama
+  // seorang karyawan baru adalah tiga hari merah "tidak lapor" untuk hari-hari sebelum
+  // akunnya ada — tuduhan yang tidak mungkin benar, di hari pertamanya.
+  const days = pastWorkdays(addDays(today(),-1), 4).filter(d => d >= joinedOn(S.me));
   if (!days.length) return "";
   return `<h2>Beberapa hari lalu</h2>` + days.map(day => {
     const doc = S.cycles.get(key(S.me, day)), st = statusOf(day, doc);
@@ -1102,10 +1210,15 @@ function screenLeader() {
   rows.sort((a, b) => nameOf(a.uid).localeCompare(nameOf(b.uid)));
 
   const done = rows.filter(r => r.doc && r.doc.submittedAt);
-  const waiting = rows.filter(r => !(r.doc && r.doc.submittedAt));
+  // Yang izin bukan yang belum lapor, dan bukan juga bagian dari penyebutnya. Dulu
+  // keduanya tercampur, jadi angka yang paling sering dibaca atasan — "3/6 sudah lapor,
+  // 3 belum lapor" — menghitung orang yang cutinya dicatat atasan itu sendiri.
+  const izin = rows.filter(r => r.st === "excused");
+  const waiting = rows.filter(r => !(r.doc && r.doc.submittedAt) && r.st !== "excused");
+  const wajib = people.length - izin.length;
   const inView = new Set(people);
   const late = [...S.commitments.values()]
-    .filter(c => c.status === "open" && c.due < today())
+    .filter(c => c.status === "open" && dueLewat(c))
     .filter(c => only === null || inView.has(c.owner));
 
   /* ---- kepala: hari apa yang sedang dibaca ---- */
@@ -1127,9 +1240,10 @@ function screenLeader() {
     ${picker}
     ${nav}
     <div class="stats">
-      <div class="g"><b>${done.length}/${people.length}</b><span>sudah lapor</span></div>
+      <div class="g"><b>${done.length}/${wajib}</b><span>sudah lapor</span></div>
       <div class="${late.length ? "r" : ""}"><b>${late.length}</b><span>janji lewat</span></div>
       <div class="${waiting.length ? "r" : ""}"><b>${waiting.length}</b><span>belum lapor</span></div>
+      ${izin.length ? `<div><b>${izin.length}</b><span>izin</span></div>` : ""}
     </div>`;
 
   /* ---- yang butuh tindakan, tetap di atas ---- */
@@ -1142,13 +1256,25 @@ function screenLeader() {
     `<div class="card bad"><div class="row"><span class="strong">${esc(nameOf(c.owner))}</span>
       <span class="grow"></span><span class="meta">janji ${esc(fmt(c.due))} lewat</span></div>
       <div style="margin-top:6px">${esc(c.action)}</div></div>`));
-  // Hanya yang memang belum lapor hari ini. Orang yang sudah mengisi bukan masalah
-  // hari ini — riwayatnya tetap kelihatan, tapi sebagai catatan kecil di barisnya,
-  // bukan kartu merah yang menenggelamkan eskalasi yang sungguhan.
-  rows.filter(r => r.missed >= 2 && !(r.doc && r.doc.submittedAt)).forEach(r => cards.push(
-    `<div class="card bad"><div class="row"><span class="strong">${esc(nameOf(r.uid))}</span>
-      <span class="grow"></span><span class="meta">${r.missed} hari</span></div>
-      <div style="margin-top:6px">Belum lapor beberapa hari.</div></div>`));
+  // Hanya yang memang belum lapor hari ini, dan bukan yang sedang izin. Orang yang sudah
+  // mengisi bukan masalah hari ini — riwayatnya tetap kelihatan, tapi sebagai catatan
+  // kecil di barisnya, bukan kartu merah yang menenggelamkan eskalasi yang sungguhan.
+  //
+  // Satu kartu untuk semuanya, bukan satu kartu per orang: empat kartu yang berbunyi
+  // persis sama mendorong satu permintaan bantuan yang sungguhan ke bawah layar, dan
+  // yang di bawah layar tidak dibaca.
+  const sepi = rows.filter(r => r.missed >= 2 && !(r.doc && r.doc.submittedAt)
+                             && r.st !== "excused")
+                   .sort((a, b) => b.missed - a.missed);
+  if (sepi.length) {
+    cards.push(`<div class="card bad"><div class="row">
+      <span class="strong">${sepi.length === 1 ? esc(nameOf(sepi[0].uid))
+        : sepi.length + " orang belum lapor beberapa hari"}</span>
+      <span class="grow"></span><span class="meta">${
+        sepi.length === 1 ? sepi[0].missed + " hari" : ""}</span></div>
+      <div style="margin-top:6px">${sepi.length === 1 ? "Belum lapor beberapa hari."
+        : sepi.map(r => `${esc(nameOf(r.uid))} <em>${r.missed} hari</em>`).join(" · ")}</div></div>`);
+  }
   // Dua kolom di laptop, bertumpuk di telepon — pembungkusnya sama, CSS yang memutuskan.
   html += `<div class="cols"><div class="col">`;
   html += cards.length ? `<h2>Perlu perhatian</h2>` + cards.join("")
@@ -1161,7 +1287,7 @@ function screenLeader() {
     const open = S.openRow === r.uid;
     if (!r.doc || !r.doc.submittedAt) {
       return `<div class="card"><div class="row">
-        <span class="pip off"></span><span class="strong">${esc(nameOf(r.uid))}</span>
+        <span class="pip off"></span><span class="strong nama">${esc(nameOf(r.uid))}</span>
         <span class="grow"></span><span class="meta">${
           r.st === "excused" ? "izin" + (r.doc && r.doc.izin && r.doc.izin.note
                                           ? " · " + esc(r.doc.izin.note) : "")
@@ -1171,7 +1297,7 @@ function screenLeader() {
     return `<div class="card">
       <button class="prow" type="button" data-open="${esc(r.uid)}">
         <span class="pip ${lamp.level}"></span>
-        <span class="strong">${esc(nameOf(r.uid))}</span>
+        <span class="strong nama">${esc(nameOf(r.uid))}</span>
         <span class="grow"></span>
         <span class="meta">${t.open} aktif · ${
           t.hanging === 0 ? "aman" : t.hanging + " gantung"}${
@@ -1179,7 +1305,7 @@ function screenLeader() {
           r.missed >= 2 ? ` · ${r.missed} hari terlewat` : ""}</span>
         <span class="chev">${open ? "▾" : "›"}</span>
       </button>
-      ${open ? `<div class="report">${esc(buildReport(r.doc))}</div>` : ""}
+      ${open ? reportView(r.doc) : ""}
     </div>`;
   }).join("");
 
@@ -1273,7 +1399,7 @@ function render() {
   const tabs = el("tabs");
   if (S.isLeader && inModule && !S.intro) {
     tabs.hidden = false;
-    const late = [...S.commitments.values()].filter(c => c.status === "open" && c.due < today()).length;
+    const late = [...S.commitments.values()].filter(c => c.status === "open" && dueLewat(c)).length;
     tabs.innerHTML =
       `<button role="tab" data-tab="hari-ini" aria-selected="${S.tab === "hari-ini"}">Punya saya</button>
        <button role="tab" data-tab="tim" aria-selected="${S.tab === "tim"}">Tim${
@@ -1425,9 +1551,23 @@ view.addEventListener("click", ev => {
   if (tp) { S.teamView = +tp.dataset.team; S.openRow = null; render(); toTop(); return; }
   const day = ev.target.closest && ev.target.closest("[data-day]");
   if (day) { S.day = day.dataset.day; S.openRow = null; render(); toTop(); return; }
+  // Diperiksa sebelum data-open: tombolnya ada di dalam baris yang bisa dibuka-tutup,
+  // jadi tanpa ini menyalin teksnya sekaligus menutup laporan yang sedang dibaca.
+  const salin = ev.target.closest && ev.target.closest("[data-copy]");
+  if (salin) { ev.stopPropagation(); copyRow(salin.dataset.copy); return; }
   const row = ev.target.closest && ev.target.closest("[data-open]");
   if (row) { const u = row.dataset.open; S.openRow = S.openRow === u ? null : u; render(); }
 });
+
+/** Menyalin laporan satu orang dalam bentuk teks — format yang sama yang dulu ditempel
+ *  ke grup chat, untuk saat atasan memang perlu meneruskannya ke tempat lain. */
+function copyRow(id) {
+  const doc = S.cycles.get(id);
+  if (!doc) return;
+  const tandai = () => { S.copiedRow = id; render();
+    setTimeout(() => { S.copiedRow = null; render(); }, 2200); };
+  try { navigator.clipboard.writeText(buildReport(doc)).then(tandai, () => {}); } catch { /* ignore */ }
+}
 view.addEventListener("focusin", ev => {
   if (ev.target.dataset && ev.target.dataset.row) ev.target.select();
 });
@@ -1464,6 +1604,10 @@ view.addEventListener("input", ev => {
       ev.target.value = clean;
       try { ev.target.setSelectionRange(at, at); } catch { /* ignore */ }
     }
+  }
+  if (ev.target.dataset && ev.target.dataset.pd !== undefined) {
+    const out = view.querySelector(`[data-tgl="${ev.target.dataset.pd}"]`);
+    if (out) out.innerHTML = dueNote(ev.target.value);
   }
   if (!ev.target.matches("[data-row],[name],textarea,input")) return;
   S.a = collect();

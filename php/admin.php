@@ -323,8 +323,36 @@ td.who span { color:var(--muted); font-size:0.8125rem }
 /* Tombol yang paling sering dipakai ada di kolom paling kanan, dan di layar sempit
    kolom itu di luar layar. Tabelnya memang bisa digeser — yang kurang cuma orang tahu
    bahwa ada yang bisa digeser. */
+/* Tombol baris: tiga tombol seukuran tombol utama di tiap baris membuat enam orang jadi
+   delapan belas tombol yang semuanya terlihat sama penting — termasuk yang merusak. */
+button.kecil { padding:0.3125rem 0.625rem; font-size:0.8125rem }
+/* Judul kolom yang dibawa masuk ke dalam barisnya, dipakai hanya waktu tabelnya berhenti
+   jadi tabel. Elemen sungguhan, bukan content pada ::before: yang digambar CSS tidak ikut
+   tersalin waktu orang menyalin halamannya, dan tidak selalu terbaca pembaca layar. */
+.lbl { display:none; font-size:0.75rem; font-weight:500; color:var(--muted);
+       margin:0 0 0.125rem }
+button.bahaya:hover { border-color:var(--broken); color:var(--broken) }
+
+/* Di telepon tabelnya lebih lebar daripada layarnya, dan yang terjadi bukan sekadar
+   "harus digeser": barisnya jadi setinggi dua kali isinya karena tombolnya membungkus
+   di luar layar, dan kolom paling kanan — tempat semua tombolnya — tidak pernah terlihat
+   sampai orangnya menebak bahwa tabel itu bisa digeser. Jadi di bawah 46rem tabelnya
+   berhenti jadi tabel: satu orang satu kartu, judul kolomnya dibawa masuk ke dalam. */
 .geser { display:none; color:var(--muted); font-size:0.8125rem; margin:0 0 0.5rem }
-@media (max-width: 46rem) { .geser { display:block } }
+@media (max-width: 46rem) {
+  .scroll { overflow-x:visible }
+  table.orang, table.orang tbody, table.orang tr, table.orang td { display:block; width:100% }
+  table.orang tr:first-child { display:none }                 /* baris judul kolom */
+  table.orang tr { border-top:1px solid var(--line); padding:0.875rem 0 }
+  table.orang tr:nth-child(2) { border-top:0; padding-top:0 }
+  table.orang td { border:0; padding:0.25rem 0 }
+  table.orang td.who { padding-bottom:0.5rem }
+  table.orang.tim input[name=name] { width:auto; min-width:9rem }
+  /* Tanpa judul kolom, dua pilihan berdampingan jadi dua kotak tanpa nama. */
+  table.orang td.k .lbl { display:block }
+  table.orang form.row { margin:0 0.375rem 0.375rem 0 }
+  table.orang select { width:auto; min-width:8rem }
+}
 .pisah { display:flex; align-items:center; gap:0.75rem; margin:1.5rem 0 1rem;
          color:var(--muted); font-size:0.8125rem }
 .pisah::before, .pisah::after { content:""; flex:1; border-top:1px solid var(--line) }
@@ -402,7 +430,10 @@ CSS]);
   <?php endif; ?>
 
   <?php
-  $roleNames = ['player' => 'Pelapor', 'leader' => 'Leader', 'admin' => 'Admin', 'owner' => 'Owner'];
+  // Dari lib/layout.php, bukan daftar kedua di sini: halaman ini sempat menyebut peran
+  // yang sama "Pelapor" sementara menu di bawah avatar menyebutnya "Pemain" — dua kata
+  // untuk satu hal, di dua layar yang dibuka orang yang sama.
+  $roleNames = MESSI_ROLE_LABEL;
   ?>
 
   <p class="geser">Tabelnya lebih lebar dari layar ini — geser ke samping untuk
@@ -420,7 +451,7 @@ CSS]);
         <?php if ($p['reset_asked_at'] !== null): ?>
           <span class="tag minta">minta link masuk</span>
         <?php endif; ?></td>
-      <td>
+      <td class="k"><span class="lbl">Tim</span>
         <?php if (!$boleh): ?>
           <span class="tag"><?= h($teams[(int) $p['team_id']]['name'] ?? '—') ?></span>
         <?php else: ?>
@@ -437,7 +468,7 @@ CSS]);
         </form>
         <?php endif; ?>
       </td>
-      <td>
+      <td class="k"><span class="lbl">Peran</span>
         <?php if ($mine): ?>
           <span class="tag"><?= h($roleNames[$p['role']] ?? $p['role']) ?> (kamu)</span>
         <?php elseif (!$boleh): ?>
@@ -455,22 +486,26 @@ CSS]);
         </form>
         <?php endif; ?>
       </td>
-      <td><?= h(messi_fmt_day($p['joined_on'])) ?></td>
+      <td class="k"><span class="lbl">Mulai lapor</span><?= h(messi_fmt_day($p['joined_on'])) ?></td>
       <td>
         <?php if ($boleh): ?>
         <form class="row" method="post">
           <input type="hidden" name="csrf" value="<?= h($csrf) ?>">
           <input type="hidden" name="do" value="invite">
           <input type="hidden" name="id" value="<?= (int) $p['id'] ?>">
-          <button class="quiet" type="submit"><?= $p['accepted_at'] === null
-            ? 'Kirim ulang undangan' : 'Link buat password baru' ?></button>
+          <button class="quiet kecil" type="submit" title="<?= $p['accepted_at'] === null
+            ? 'Mengirim ulang undangannya; dia yang membuat passwordnya sendiri.'
+            : 'Link sekali pakai untuk membuat password baru. Berlaku 72 jam.' ?>"><?=
+            $p['accepted_at'] === null ? 'Undang ulang' : 'Password baru' ?></button>
         </form>
         <?php if ($p['accepted_at'] !== null): ?>
         <form class="row" method="post">
           <input type="hidden" name="csrf" value="<?= h($csrf) ?>">
           <input type="hidden" name="do" value="link">
           <input type="hidden" name="id" value="<?= (int) $p['id'] ?>">
-          <button class="quiet" type="submit">Link masuk</button>
+          <button class="quiet kecil" type="submit"
+            title="Link sekali pakai yang langsung memasukkan dia, tanpa password. Berlaku 60 menit."
+            >Link masuk</button>
         </form>
         <?php endif; ?>
         <form class="row" method="post">
@@ -478,7 +513,11 @@ CSS]);
           <input type="hidden" name="do" value="active">
           <input type="hidden" name="id" value="<?= (int) $p['id'] ?>">
           <input type="hidden" name="active" value="<?= $p['active'] ? 0 : 1 ?>">
-          <button class="quiet" type="submit"><?= $p['active'] ? 'Nonaktifkan' : 'Aktifkan' ?></button>
+          <button class="quiet kecil <?= $p['active'] ? 'bahaya' : '' ?>" type="submit"
+            title="<?= $p['active']
+              ? 'Dia berhenti muncul di rekap dan berhenti dihitung. Laporan lamanya tetap ada.'
+              : 'Dia kembali muncul di rekap dan kembali dihitung.' ?>"><?=
+            $p['active'] ? 'Nonaktifkan' : 'Aktifkan' ?></button>
         </form>
         <?php endif; ?>
       </td>
@@ -542,7 +581,7 @@ CSS]);
   <p class="why">Tiap tim punya pertanyaan, ambang, jam dan space chat-nya sendiri.
      Satu orang satu tim.</p>
   <div class="card">
-    <table>
+    <table class="orang tim">
       <tr><th>Nama</th><th>Orang</th><th></th></tr>
       <?php foreach ($teams as $t): ?>
       <tr>
@@ -555,7 +594,7 @@ CSS]);
             <button class="quiet" type="submit">Ganti nama</button>
           </form>
         </td>
-        <td><?= count(array_filter($people,
+        <td class="k"><span class="lbl">Isinya</span><?= count(array_filter($people,
               fn($p) => (int) $p['team_id'] === (int) $t['id'] && $p['active'])) ?> orang</td>
         <td><a href="soal.php?team=<?= (int) $t['id'] ?>">Pertanyaan tim ini</a></td>
       </tr>

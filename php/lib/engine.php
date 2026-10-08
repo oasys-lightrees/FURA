@@ -406,9 +406,28 @@ function messi_submit_status(int $hourNow, int $dueHour = MESSI_DUE_HOUR): strin
 
 /** A promise met after its date was not met. A rate that counts late as kept measures
  *  nothing at all. */
+/**
+ * Hari kerja pertama pada atau sesudah tanggal ini.
+ *
+ * Janji yang jatuh di hari libur baru bisa dikerjakan hari kerja berikutnya, jadi hari
+ * kerja itulah tenggat sebenarnya. Tanpa ini, janji hari Sabtu ditandai tidak ditepati
+ * Minggu pagi — orangnya tidak pernah punya satu pun hari kerja untuk menyelesaikannya,
+ * dan tetap tercatat ingkar.
+ */
+function messi_workday_on_or_after(string $day): string
+{
+    for ($i = 0; $i < 7; $i++) {
+        $d = messi_add_days($day, $i);
+        if (messi_is_workday($d)) {
+            return $d;
+        }
+    }
+    return $day;            // tidak ada hari kerja sama sekali: setelan yang mustahil
+}
+
 function messi_commitment_outcome(string $dueDate, string $today): string
 {
-    return $today <= $dueDate ? 'kept' : 'broken';
+    return $today <= messi_workday_on_or_after($dueDate) ? 'kept' : 'broken';
 }
 
 /** Missed working days, never counting the days before someone joined. */
