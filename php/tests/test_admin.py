@@ -605,26 +605,48 @@ with Host("messi_admin_test", seed="empty") as host, sync_playwright() as p:
     admin.click("button:has-text('Tambah tim')")
     admin.wait_for_load_state("networkidle")
     barisNicho = admin.locator("table.orang tr", has_text="nicho@example.test")
-    barisNicho.locator("select[name=team]").select_option(label="Sales")
-    admin.wait_for_load_state("networkidle")
+    # Kotak tim mengirim formulirnya sendiri saat diubah, jadi yang ditunggu navigasinya —
+    # "networkidle" bisa selesai sebelum navigasi itu dimulai, dan yang terbaca sesudahnya
+    # adalah halaman yang lama.
+    with admin.expect_navigation():
+        barisNicho.locator("select[name=team]").select_option(label="Sales")
+    # Tim yang masih berisi orang tetap boleh dibubarkan — tapi orangnya ikut pindah ke
+    # tim yang dipilih di barisnya. Dibiarkan tanpa tim, mereka tidak hilang tapi berhenti
+    # terhitung: tidak muncul di rekap mana pun, dan tidak dibukakan laporan harian.
     sales = timRow("Sales")
-    check("tim yang ada orangnya tidak menawarkan Hapus",
-          sales.locator("button:has-text('Hapus')").count(), 0)
+    check("tim yang ada orangnya menawarkan tujuan pindahnya",
+          sales.locator("select[name=ke]").count(), 1)
+    check("dan tetap boleh dibubarkan", sales.locator("button:has-text('Hapus')").count(), 1)
+
+    # Timnya sendiri boleh dipindah — tanpa itu ada jalan buntu yang rapi: tim hanya bisa
+    # dimatikan kalau kosong, kosong berarti semua orangnya pindah, dan kalau kamu tidak
+    # bisa memindahkan dirimu sendiri maka tim yang berisi kamu tidak akan pernah kosong.
+    barisAku = admin.locator("table.orang tr", has_text="(kamu)")
+    check("barisku sendiri punya kotak tim", barisAku.locator("select[name=team]").count(), 1)
+    check("tapi peranku tidak bisa kuubah sendiri",
+          barisAku.locator("select[name=role]").count(), 0)
+    check("dan aku tidak bisa menonaktifkan diriku sendiri",
+          barisAku.locator("button:has-text('Nonaktifkan')").count(), 0)
+    with admin.expect_navigation():
+        barisAku.locator("select[name=team]").select_option(label="Sales")
+    check("pindah tim sendiri berhasil", admin.inner_text(".note.ok"),
+          lambda s: "Kamu dipindah ke Sales" in s)
+    with admin.expect_navigation():
+        admin.locator("table.orang tr", has_text="(kamu)").locator(
+            "select[name=team]").select_option(label="Tim")
+
+    # Dimatikan bersama isinya, dalam satu tekanan.
+    sales = timRow("Sales")
+    sales.locator("select[name=ke]").select_option(label="Tim")
     sales.locator("button:has-text('Matikan')").click()
     admin.wait_for_load_state("networkidle")
-    check("dan mematikannya pun ditolak selama orangnya masih di situ",
-          admin.inner_text(".note.bad"), lambda s: "Pindahkan dulu" in s)
-
-    # Dipindahkan keluar, barulah timnya boleh dimatikan.
-    barisNicho = admin.locator("table.orang tr", has_text="nicho@example.test")
-    # Namanya, bukan urutannya: daftar tim urut nama, jadi index 0 justru "Sales" sendiri
-    # dan orangnya tidak pindah ke mana-mana.
-    barisNicho.locator("select[name=team]").select_option(label="Tim")
-    admin.wait_for_load_state("networkidle")
-    timRow("Sales").locator("button:has-text('Matikan')").click()
-    admin.wait_for_load_state("networkidle")
-    check("sesudah kosong, timnya boleh dimatikan",
+    check("timnya dimatikan walau masih berisi orang",
           admin.inner_text(".note.ok"), lambda s: "Tim dimatikan" in s)
+    check("dan ke mana orangnya pindah ikut disebutkan",
+          admin.inner_text(".note.ok"), lambda s: "orang dipindah ke Tim" in s)
+    check("orangnya memang pindah, bukan jadi tanpa tim",
+          admin.locator("table.orang tr", has_text="nicho@example.test")
+               .locator("select[name=team]").input_value(), lambda v: v != "")
     check("barisnya ditandai dimatikan", timRow("Sales").inner_text(),
           lambda s: "dimatikan" in s)
     # Yang dimatikan tidak boleh lagi jadi tujuan perpindahan: orang yang dipindah ke

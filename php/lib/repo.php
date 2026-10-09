@@ -174,7 +174,8 @@ function repo_team_usage(int $teamId): array
  * Inilah jalan yang benar untuk divisi yang bubar: menghapusnya berarti membuang rekap
  * tiga bulan bersamanya.
  */
-function repo_set_team_active(array $user, int $teamId, bool $active): void
+function repo_set_team_active(array $user, int $teamId, bool $active,
+                              ?int $moveTo = null): void
 {
     require_once __DIR__ . '/auth.php';
     if (!is_manager($user)) {
@@ -185,11 +186,6 @@ function repo_set_team_active(array $user, int $teamId, bool $active): void
         throw new RepoError('Tim itu tidak ada.');
     }
     if (!$active) {
-        $pakai = repo_team_usage($teamId);
-        if ($pakai['orang'] > 0) {
-            throw new RepoError('Masih ada ' . $pakai['orang'] . ' orang di tim ini. '
-                              . 'Pindahkan dulu mereka ke tim lain.');
-        }
         // Selalu harus ada satu tim yang hidup: tanpa itu orang berikutnya yang ditambahkan
         // tidak punya tim untuk ditempati, dan pelaporan harian berhenti punya pertanyaan.
         $lain = (int) q1('SELECT COUNT(*) AS n FROM teams WHERE active = 1 AND id <> ?',
@@ -197,8 +193,33 @@ function repo_set_team_active(array $user, int $teamId, bool $active): void
         if ($lain === 0) {
             throw new RepoError('Ini satu-satunya tim yang aktif. Buat tim lain dulu.');
         }
+        repo_move_team_people($teamId, $moveTo);
     }
     q('UPDATE teams SET active = ? WHERE id = ?', [$active ? 1 : 0, $teamId]);
+}
+
+/**
+ * Memindahkan isi sebuah tim sebelum timnya hilang.
+ *
+ * Tanpa ini orangnya tidak hilang, tapi jadi tanpa tim — dan orang tanpa tim tidak muncul
+ * di rekap mana pun, tidak dibukakan laporan harian oleh cron, dan tidak pernah dihitung
+ * tidak lapor. Dia masih bisa masuk dan mengisi, tapi tidak ada seorang pun yang akan
+ * melihatnya lagi. Kegagalan paling buruk bentuknya bukan pesan kesalahan; bentuknya
+ * orang yang diam-diam berhenti terhitung.
+ */
+function repo_move_team_people(int $teamId, ?int $moveTo): void
+{
+    $n = (int) q1('SELECT COUNT(*) AS n FROM users WHERE team_id = ?', [$teamId])['n'];
+    if ($n === 0) {
+        return;
+    }
+    if ($moveTo === null || $moveTo === $teamId || !isset(repo_teams()[$moveTo])) {
+        throw new RepoError('Masih ada ' . $n . ' orang di tim ini. Pilih dulu tim '
+                          . 'tujuan mereka.');
+    }
+    // Laporan yang sudah dikirim membawa timnya sendiri, jadi perpindahan ini tidak
+    // menyentuh rekap kemarin.
+    q('UPDATE users SET team_id = ? WHERE team_id = ?', [$moveTo, $teamId]);
 }
 
 /**
@@ -213,7 +234,7 @@ function repo_set_team_active(array $user, int $teamId, bool $active): void
  * adalah SQLSTATE[23000] — benar, tapi tidak memberi tahu apa pun tentang apa yang harus
  * dikerjakan sekarang.
  */
-function repo_delete_team(array $user, int $teamId): void
+function repo_delete_team(array $user, int $teamId, ?int $moveTo = null): void
 {
     require_once __DIR__ . '/auth.php';
     if (!is_manager($user)) {
@@ -223,10 +244,6 @@ function repo_delete_team(array $user, int $teamId): void
         throw new RepoError('Tim itu tidak ada.');
     }
     $pakai = repo_team_usage($teamId);
-    if ($pakai['orang'] > 0) {
-        throw new RepoError('Masih ada ' . $pakai['orang'] . ' orang di tim ini. '
-                          . 'Pindahkan dulu mereka ke tim lain.');
-    }
     if ($pakai['laporan'] > 0) {
         throw new RepoError('Tim ini sudah punya ' . $pakai['laporan'] . ' laporan, jadi '
                           . 'tidak bisa dihapus — rekap lamanya akan ikut hilang. '
@@ -235,6 +252,10 @@ function repo_delete_team(array $user, int $teamId): void
     if ((int) q1('SELECT COUNT(*) AS n FROM teams')['n'] <= 1) {
         throw new RepoError('Ini satu-satunya tim. Buat tim lain dulu.');
     }
+    // Orangnya ikut pindah, bukan ditinggalkan tanpa tim. Kunci asingnya memang akan
+    // mengosongkan team_id mereka sendiri (ON DELETE SET NULL), dan itu persis bentuk
+    // kegagalan yang tidak kelihatan: mereka hilang dari tiap rekap tanpa sepatah kata.
+    repo_move_team_people($teamId, $moveTo);
     // Modul dan setelan tim ini ikut terhapus (CASCADE) — dan itu memang yang diinginkan:
     // keduanya tidak berarti apa-apa tanpa timnya, dan sampai di sini sudah dipastikan
     // belum ada satu pun laporan yang menunjuk ke sana.

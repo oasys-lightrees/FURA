@@ -581,10 +581,15 @@ eq('dan boleh dihapus', isset(repo_teams(true)[$timBaru]), false);
 // orangnya tidak muncul di rekap mana pun.
 $timIsi = repo_add_team($admin, 'Ada Isinya');
 $warga = make_user('warga@example.test', 'Warga', 'player', '2026-09-28', $timIsi);
-throws('tim yang masih ada orangnya tidak bisa dihapus',
-       fn() => repo_delete_team($admin, $timIsi), 'Pindahkan dulu');
-throws('maupun dimatikan', fn() => repo_set_team_active($admin, $timIsi, false),
-       'Pindahkan dulu');
+// Tim yang masih berisi orang boleh dibubarkan — asal orangnya ikut pindah. Dibiarkan
+// tanpa tim, mereka tidak hilang tapi berhenti terhitung: tidak muncul di rekap mana pun,
+// tidak dibukakan laporan harian, tidak pernah ditandai tidak lapor.
+throws('tanpa tim tujuan, yang berisi orang ditolak',
+       fn() => repo_delete_team($admin, $timIsi), 'Pilih dulu tim tujuan');
+throws('tim tujuan yang bukan tim pun ditolak',
+       fn() => repo_delete_team($admin, $timIsi, 999999), 'Pilih dulu tim tujuan');
+throws('dan tim tujuan tidak boleh timnya sendiri',
+       fn() => repo_delete_team($admin, $timIsi, $timIsi), 'Pilih dulu tim tujuan');
 
 // Begitu ada satu laporan saja, timnya jadi bagian dari riwayat: menghapusnya membuat
 // rekap bulan lalu kehilangan namanya, dan modul beserta pertanyaannya ikut terbawa.
@@ -598,7 +603,7 @@ throws('tim yang sudah punya laporan tidak bisa dihapus',
 throws('dan ditawari jalan lain', fn() => repo_delete_team($admin, $timIsi), 'Matikan saja');
 
 repo_set_team_active($admin, $timIsi, false);
-eq('tapi boleh dimatikan', repo_teams(true)[$timIsi]['active'], false);
+eq('sesudah kosong, boleh dimatikan', repo_teams(true)[$timIsi]['active'], false);
 eq('dan hilang dari daftar tim yang dipakai halaman mana pun',
    isset(repo_teams()[$timIsi]), false);
 eq('sementara laporannya tetap terbaca',
@@ -610,6 +615,25 @@ repo_set_team_active($admin, $timIsi, false);
 // Tim bawaan tidak boleh jatuh ke tim yang sudah dimatikan: orang baru yang masuk ke
 // sana tidak terlihat oleh siapa pun, termasuk oleh yang memasukkannya.
 ok('tim bawaan selalu tim yang aktif', repo_teams()[repo_default_team()]['active'] ?? false);
+
+// Dibubarkan bersama isinya: orangnya pindah, bukan ditinggalkan tanpa tim.
+$timPindah = repo_add_team($admin, 'Pindah Semua');
+$ikut = make_user('ikut@example.test', 'Ikut', 'player', '2026-09-28', $timPindah);
+eq('timnya memang berisi satu orang', repo_team_usage($timPindah)['orang'], 1);
+repo_delete_team($admin, $timPindah, $tim);
+eq('timnya hilang', isset(repo_teams(true)[$timPindah]), false);
+eq('tapi orangnya pindah, bukan jadi tanpa tim',
+   (int) q1('SELECT team_id FROM users WHERE id = ?', [$ikut['id']])['team_id'], $tim);
+ok('jadi dia tetap muncul di rekap timnya yang baru',
+   isset(repo_roster($tim)[uid((int) $ikut['id'])]));
+
+// Yang sama untuk mematikan: tim yang dimatikan tidak muncul di pemilih mana pun, jadi
+// orang yang ditinggal di dalamnya sama saja dengan orang tanpa tim.
+$timMati = repo_add_team($admin, 'Matikan Berisi');
+q('UPDATE users SET team_id = ? WHERE id = ?', [$timMati, $ikut['id']]);
+repo_set_team_active($admin, $timMati, false, $tim);
+eq('dimatikan pun orangnya ikut pindah',
+   (int) q1('SELECT team_id FROM users WHERE id = ?', [$ikut['id']])['team_id'], $tim);
 
 /* ------------------------------------------ janji yang jatuh di hari libur */
 

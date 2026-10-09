@@ -56,6 +56,24 @@ function admin_may_touch(array $me, ?array $target): bool
 }
 
 /**
+ * Timnya sendiri boleh dipindah; peran dan status aktifnya tidak.
+ *
+ * Dua larangan itu menjaga hal yang berbeda: menurunkan peran sendiri bisa membuat
+ * perusahaan kehilangan satu-satunya owner, dan menonaktifkan diri sendiri mengunci
+ * orangnya di luar pintunya sendiri. Pindah tim tidak melakukan keduanya — admin tetap
+ * membaca semua tim, dan tidak ada tombol yang hilang karenanya.
+ *
+ * Tanpa pengecualian ini ada jalan buntu yang rapi: tim hanya bisa dimatikan kalau sudah
+ * kosong, kosong berarti semua orangnya pindah, dan kamu tidak bisa memindahkan dirimu
+ * sendiri — jadi tim yang berisi kamu tidak akan pernah bisa dimatikan oleh siapa pun.
+ */
+function admin_may_move(array $me, ?array $target): bool
+{
+    return admin_may_touch($me, $target)
+        || ($target && (int) $target['id'] === (int) $me['id']);
+}
+
+/**
  * Menambah satu orang, lalu membuatkan undangannya.
  *
  * Dipakai formulir satu orang maupun kotak tempel-banyak. Satu tempat, karena aturan
@@ -246,7 +264,7 @@ if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST') {
 
     } elseif ($do === 'team') {
         $team = (int) ($_POST['team'] ?? 0);
-        if (!admin_may_touch($me, $target)) {
+        if (!admin_may_move($me, $target)) {
             $error = 'Tidak bisa mengubah baris itu.';
         } elseif (!isset($teams[$team])) {
             $error = 'Tim itu tidak ada.';
@@ -254,7 +272,12 @@ if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST') {
             // Laporan yang sudah dikirim membawa timnya sendiri, jadi pindah tim hari ini
             // tidak menyentuh rekap kemarin.
             q('UPDATE users SET team_id = ? WHERE id = ?', [$team, $targetId]);
-            $notice = $target['name'] . ' dipindah ke ' . $teams[$team]['name'] . '.';
+            $notice = ((int) $target['id'] === (int) $me['id'] ? 'Kamu' : $target['name'])
+                    . ' dipindah ke ' . $teams[$team]['name'] . '.';
+            if ((int) $target['id'] === (int) $me['id']) {
+                auth_forget();                 // halaman ini menggambar ulang barisnya
+                $me = auth_user() ?? $me;
+            }
         }
 
     } elseif ($do === 'role') {
@@ -288,21 +311,29 @@ if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST') {
             $error = $e->getMessage();
         }
 
-    } elseif ($do === 'timaktif' || $do === 'timmati') {
+    } elseif ($do === 'timaktif' || $do === 'timmati' || $do === 'hapustim') {
+        $timId = (int) ($_POST['team'] ?? 0);
+        $ke = (int) ($_POST['ke'] ?? 0);
+        // Berapa orang yang ikut pindah, dihitung sebelum timnya hilang.
+        $ikut = $do === 'timaktif' ? 0 : repo_team_usage($timId)['orang'];
+        $kemana = $teams[$ke]['name'] ?? '';
+        $pindah = $ikut > 0 && $kemana !== ''
+            ? ' ' . $ikut . ' orang dipindah ke ' . $kemana . '.' : '';
         try {
-            repo_set_team_active($me, (int) ($_POST['team'] ?? 0), $do === 'timaktif');
-            $notice = $do === 'timaktif' ? 'Tim dinyalakan.'
-                : 'Tim dimatikan. Namanya hilang dari semua pilihan; laporan lamanya tetap bisa dibaca.';
+            if ($do === 'hapustim') {
+                repo_delete_team($me, $timId, $ke ?: null);
+                $notice = 'Tim dihapus.' . $pindah;
+            } else {
+                repo_set_team_active($me, $timId, $do === 'timaktif', $ke ?: null);
+                $notice = $do === 'timaktif' ? 'Tim dinyalakan.'
+                    : 'Tim dimatikan.' . $pindah . ' Namanya hilang dari semua pilihan; '
+                    . 'laporan lamanya tetap bisa dibaca.';
+            }
             $teams = repo_teams();
-        } catch (RepoError $e) {
-            $error = $e->getMessage();
-        }
-
-    } elseif ($do === 'hapustim') {
-        try {
-            repo_delete_team($me, (int) ($_POST['team'] ?? 0));
-            $notice = 'Tim dihapus.';
-            $teams = repo_teams();
+            // Yang memindahkan dirinya sendiri ikut berpindah: barisnya digambar ulang
+            // di halaman yang sama ini.
+            auth_forget();
+            $me = auth_user() ?? $me;
         } catch (RepoError $e) {
             $error = $e->getMessage();
         }
@@ -476,7 +507,7 @@ CSS]);
           <span class="tag minta">minta link masuk</span>
         <?php endif; ?></td>
       <td class="k"><span class="lbl">Tim</span>
-        <?php if (!$boleh): ?>
+        <?php if (!admin_may_move($me, $p)): ?>
           <span class="tag"><?= h($teams[(int) $p['team_id']]['name'] ?? '—') ?></span>
         <?php else: ?>
         <form class="row" method="post">
@@ -623,19 +654,40 @@ CSS]);
             $pakai['laporan'] ? ' · ' . $pakai['laporan'] . ' laporan' : '' ?></td>
         <td>
           <a href="soal.php?team=<?= (int) $t['id'] ?>">Pertanyaan tim ini</a>
+          <?php
+          // Ke mana orangnya pindah kalau timnya dibubarkan. Hanya tim yang aktif dan
+          // bukan tim ini sendiri; kalau timnya memang kosong, pilihan ini tidak perlu ada.
+          $tujuan = array_filter($teams, fn($x) => (int) $x['id'] !== (int) $t['id']);
+          ?>
           <form class="row" method="post">
             <input type="hidden" name="csrf" value="<?= h($csrf) ?>">
             <input type="hidden" name="team" value="<?= (int) $t['id'] ?>">
-            <button class="quiet kecil<?= $t['active'] ? ' bahaya' : '' ?>" type="submit"
-              name="do" value="<?= $t['active'] ? 'timmati' : 'timaktif' ?>"
-              title="<?= $t['active']
-                ? 'Namanya hilang dari semua pilihan. Laporan lamanya tetap bisa dibaca.'
-                : 'Tim ini muncul lagi di semua pilihan.' ?>"><?=
-              $t['active'] ? 'Matikan' : 'Nyalakan' ?></button>
-            <?php if ($pakai['orang'] === 0 && $pakai['laporan'] === 0 && count($allTeams) > 1): ?>
+            <?php if ($pakai['orang'] > 0 && $tujuan): ?>
+              <label class="lbl" style="display:block">Orangnya pindah ke</label>
+              <select name="ke">
+                <?php foreach ($tujuan as $x): ?>
+                  <option value="<?= (int) $x['id'] ?>"><?= h($x['name']) ?></option>
+                <?php endforeach; ?>
+              </select>
+            <?php endif; ?>
+            <?php if ($t['active'] || $tujuan): ?>
+              <button class="quiet kecil<?= $t['active'] ? ' bahaya' : '' ?>" type="submit"
+                name="do" value="<?= $t['active'] ? 'timmati' : 'timaktif' ?>"
+                <?= $t['active'] && $pakai['orang'] > 0
+                  ? 'onclick="return confirm(\'Matikan tim ini? ' . (int) $pakai['orang']
+                    . ' orang di dalamnya ikut dipindahkan.\')"' : '' ?>
+                title="<?= $t['active']
+                  ? 'Namanya hilang dari semua pilihan. Laporan lamanya tetap bisa dibaca.'
+                  : 'Tim ini muncul lagi di semua pilihan.' ?>"><?=
+                $t['active'] ? 'Matikan' : 'Nyalakan' ?></button>
+            <?php endif; ?>
+            <?php if ($pakai['laporan'] === 0 && count($allTeams) > 1
+                      && ($pakai['orang'] === 0 || $tujuan)): ?>
               <button class="quiet kecil bahaya" type="submit" name="do" value="hapustim"
-                onclick="return confirm('Hapus tim ini? Pertanyaan dan modulnya ikut terhapus. Tidak bisa dibatalkan.')"
-                title="Belum pernah dipakai, jadi tidak ada riwayat yang ikut hilang."
+                onclick="return confirm('Hapus tim ini? Pertanyaan dan modulnya ikut terhapus<?=
+                  $pakai['orang'] > 0 ? ', dan ' . (int) $pakai['orang']
+                    . ' orang di dalamnya dipindahkan' : '' ?>. Tidak bisa dibatalkan.')"
+                title="Belum punya laporan, jadi tidak ada riwayat yang ikut hilang."
                 >Hapus</button>
             <?php endif; ?>
           </form>
@@ -643,11 +695,12 @@ CSS]);
       </tr>
       <?php endforeach; ?>
     </table>
-    <p class="why" style="margin:0.75rem 0 0">Tim yang sudah pernah dipakai tidak bisa
-       dihapus — <strong>dimatikan</strong> saja: namanya hilang dari semua pilihan, tapi
-       rekap lamanya tetap bisa dibaca. Yang bisa dihapus hanya tim yang belum punya orang
-       dan belum punya satu laporan pun. Mau ganti nama saja? Ketik di kotaknya, tekan
-       <em>Ganti nama</em> — laporan lamanya ikut, tidak ada yang lepas.</p>
+    <p class="why" style="margin:0.75rem 0 0">Tim yang masih ada orangnya tetap bisa
+       dibubarkan — orangnya ikut dipindahkan ke tim yang kamu pilih di barisnya. Tapi tim
+       yang <strong>sudah punya laporan</strong> tidak bisa dihapus, cuma
+       <strong>dimatikan</strong>: namanya hilang dari semua pilihan, rekap lamanya tetap
+       bisa dibaca. Mau ganti nama saja? Ketik di kotaknya, tekan <em>Ganti nama</em> —
+       laporan lamanya ikut, tidak ada yang lepas.</p>
     <form method="post" style="margin:1.25rem 0 0">
       <input type="hidden" name="csrf" value="<?= h($csrf) ?>">
       <input type="hidden" name="do" value="addteam">
