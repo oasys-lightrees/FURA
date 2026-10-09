@@ -288,6 +288,25 @@ if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST') {
             $error = $e->getMessage();
         }
 
+    } elseif ($do === 'timaktif' || $do === 'timmati') {
+        try {
+            repo_set_team_active($me, (int) ($_POST['team'] ?? 0), $do === 'timaktif');
+            $notice = $do === 'timaktif' ? 'Tim dinyalakan.'
+                : 'Tim dimatikan. Namanya hilang dari semua pilihan; laporan lamanya tetap bisa dibaca.';
+            $teams = repo_teams();
+        } catch (RepoError $e) {
+            $error = $e->getMessage();
+        }
+
+    } elseif ($do === 'hapustim') {
+        try {
+            repo_delete_team($me, (int) ($_POST['team'] ?? 0));
+            $notice = 'Tim dihapus.';
+            $teams = repo_teams();
+        } catch (RepoError $e) {
+            $error = $e->getMessage();
+        }
+
     } elseif ($do === 'renteam') {
         $team = (int) ($_POST['team'] ?? 0);
         $name = trim((string) preg_replace('/\s+/u', ' ', (string) ($_POST['name'] ?? '')));
@@ -302,6 +321,11 @@ if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST') {
         }
     }
 }
+
+// Pemilih tim di tiap baris orang cuma berisi yang aktif — memindahkan seseorang ke tim
+// yang sudah dimatikan berarti menyembunyikannya dari semua rekap. Tabel Tim di bawah
+// yang memperlihatkan semuanya, karena di situlah yang mati dihidupkan lagi.
+$allTeams = repo_teams(true);
 
 $people = q('SELECT id, name, email, role, active, joined_on, team_id, invited_at,
                     accepted_at, reset_asked_at
@@ -583,23 +607,47 @@ CSS]);
   <div class="card">
     <table class="orang tim">
       <tr><th>Nama</th><th>Orang</th><th></th></tr>
-      <?php foreach ($teams as $t): ?>
-      <tr>
+      <?php foreach ($allTeams as $t): $pakai = repo_team_usage((int) $t['id']); ?>
+      <tr class="<?= $t['active'] ? '' : 'off' ?>">
         <td>
           <form class="row" method="post">
             <input type="hidden" name="csrf" value="<?= h($csrf) ?>">
             <input type="hidden" name="do" value="renteam">
             <input type="hidden" name="team" value="<?= (int) $t['id'] ?>">
             <input name="name" value="<?= h($t['name']) ?>" maxlength="60" required>
-            <button class="quiet" type="submit">Ganti nama</button>
+            <button class="quiet kecil" type="submit">Ganti nama</button>
+          </form>
+          <?php if (!$t['active']): ?><span class="tag">dimatikan</span><?php endif; ?>
+        </td>
+        <td class="k"><span class="lbl">Isinya</span><?= $pakai['orang'] ?> orang<?=
+            $pakai['laporan'] ? ' · ' . $pakai['laporan'] . ' laporan' : '' ?></td>
+        <td>
+          <a href="soal.php?team=<?= (int) $t['id'] ?>">Pertanyaan tim ini</a>
+          <form class="row" method="post">
+            <input type="hidden" name="csrf" value="<?= h($csrf) ?>">
+            <input type="hidden" name="team" value="<?= (int) $t['id'] ?>">
+            <button class="quiet kecil<?= $t['active'] ? ' bahaya' : '' ?>" type="submit"
+              name="do" value="<?= $t['active'] ? 'timmati' : 'timaktif' ?>"
+              title="<?= $t['active']
+                ? 'Namanya hilang dari semua pilihan. Laporan lamanya tetap bisa dibaca.'
+                : 'Tim ini muncul lagi di semua pilihan.' ?>"><?=
+              $t['active'] ? 'Matikan' : 'Nyalakan' ?></button>
+            <?php if ($pakai['orang'] === 0 && $pakai['laporan'] === 0 && count($allTeams) > 1): ?>
+              <button class="quiet kecil bahaya" type="submit" name="do" value="hapustim"
+                onclick="return confirm('Hapus tim ini? Pertanyaan dan modulnya ikut terhapus. Tidak bisa dibatalkan.')"
+                title="Belum pernah dipakai, jadi tidak ada riwayat yang ikut hilang."
+                >Hapus</button>
+            <?php endif; ?>
           </form>
         </td>
-        <td class="k"><span class="lbl">Isinya</span><?= count(array_filter($people,
-              fn($p) => (int) $p['team_id'] === (int) $t['id'] && $p['active'])) ?> orang</td>
-        <td><a href="soal.php?team=<?= (int) $t['id'] ?>">Pertanyaan tim ini</a></td>
       </tr>
       <?php endforeach; ?>
     </table>
+    <p class="why" style="margin:0.75rem 0 0">Tim yang sudah pernah dipakai tidak bisa
+       dihapus — <strong>dimatikan</strong> saja: namanya hilang dari semua pilihan, tapi
+       rekap lamanya tetap bisa dibaca. Yang bisa dihapus hanya tim yang belum punya orang
+       dan belum punya satu laporan pun. Mau ganti nama saja? Ketik di kotaknya, tekan
+       <em>Ganti nama</em> — laporan lamanya ikut, tidak ada yang lepas.</p>
     <form method="post" style="margin:1.25rem 0 0">
       <input type="hidden" name="csrf" value="<?= h($csrf) ?>">
       <input type="hidden" name="do" value="addteam">

@@ -190,7 +190,7 @@ lib/schema.php     langkah pemutakhiran, tiap langkah memeriksa dirinya sendiri
 install.sql        sepuluh tabel
 PASANG.txt         langkah pemasangan, bahasa non-teknis
 make-zip.sh        bikin messi-cpanel.zip
-tests/             792 pemeriksaan (tidak ikut ke server)
+tests/             802 pemeriksaan (tidak ikut ke server)
 ```
 
 ## Yang diputuskan server, bukan browser
@@ -250,10 +250,10 @@ menyebutkan mana yang barusan terjadi.
 |--------|--------|
 | `tests/test_engine.php` | 104 — aturan, dicocokkan dengan `tests/test_core.py` |
 | `tests/test_modul.php` | 63 — modul sebagai dokumen; ujian terberatnya MESSI sendiri ditulis ulang sebagai modul dan harus berperilaku sama persis |
-| `tests/test_repo.php` | 176 — terhadap MySQL sungguhan, di database yang dia buat sendiri |
+| `tests/test_repo.php` | 190 — terhadap MySQL sungguhan, di database yang dia buat sendiri |
 | `tests/test_cron.php` | 78 — seminggu penuh jam demi jam, jam dibekukan, pesan bot ditangkap |
 | `tests/test_live.py` | 70 — browser terhadap aplikasi yang benar-benar jalan |
-| `tests/test_admin.py` | 125 — pemasangan pertama, undangan satu dan borongan, lupa password, link sekali pakai, mengubah pertanyaan, uji kirim webhook |
+| `tests/test_admin.py` | 135 — pemasangan pertama, undangan satu dan borongan, lupa password, link sekali pakai, mengubah pertanyaan, uji kirim webhook |
 | `tests/test_modul_page.py` | 41 — menyusun modul lewat halamannya: menambah, menggeser, menghapus, dan yang sudah diketik tidak hilang saat menekan tombol |
 | `tests/test_akun.py` | 60 — ganti nama dan password sendiri, sesi perangkat lain mati, hitungan rekap yang tidak ikut menghitung orang izin, orang baru yang tidak dituduh untuk hari sebelum dia masuk, izin menghapus tanda "tidak lapor", "lupa password" yang menjawab sama untuk alamat terdaftar dan tidak, dan baris menu di kepala yang isinya berbeda untuk tiap peran (tingginya diukur, bukan atributnya) |
 | `tests/test_schema.php` | 49 — pemasangan lama di-upgrade, lalu dibandingkan kolom demi kolom dengan yang baru |

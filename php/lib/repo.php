@@ -110,7 +110,11 @@ function repo_teams(bool $withInactive = false): array
  */
 function repo_default_team(): int
 {
-    $row = q1('SELECT id FROM teams ORDER BY id LIMIT 1');
+    // Yang aktif dulu. Tim yang sudah dimatikan tidak muncul di pemilih mana pun, jadi
+    // menjadikannya tim bawaan berarti orang baru dimasukkan ke tim yang tidak terlihat
+    // oleh siapa pun — termasuk oleh yang memasukkannya.
+    $row = q1('SELECT id FROM teams WHERE active = 1 ORDER BY id LIMIT 1')
+        ?: q1('SELECT id FROM teams ORDER BY id LIMIT 1');
     if ($row) {
         return (int) $row['id'];
     }
@@ -141,6 +145,100 @@ function repo_add_team(array $user, string $name): int
     }
     q('INSERT INTO teams (name, created_at) VALUES (?,?)', [$name, Clock::nowUtcSql()]);
     return (int) db()->lastInsertId();
+}
+
+/**
+ * Berapa orang yang masih menunjuk ke tim ini, dan berapa laporan yang sudah menyebutnya.
+ *
+ * Dua angka ini yang memutuskan sebuah tim boleh dihapus atau cuma boleh dimatikan.
+ *
+ * @return array{orang:int, laporan:int}
+ */
+function repo_team_usage(int $teamId): array
+{
+    $orang = (int) q1('SELECT COUNT(*) AS n FROM users WHERE team_id = ?', [$teamId])['n'];
+    // Laporan bisa menunjuk ke tim lewat dua jalan: timnya sendiri saat dikirim, dan
+    // modul milik tim itu. Yang kedua yang menggigit — modul ikut terhapus bersama
+    // timnya, dan kunci asing laporan ke modul itu RESTRICT.
+    $lap = (int) q1('SELECT COUNT(*) AS n FROM cycles c
+                       LEFT JOIN modules m ON m.id = c.module_id
+                      WHERE c.team_id = ? OR m.team_id = ?', [$teamId, $teamId])['n'];
+    return ['orang' => $orang, 'laporan' => $lap];
+}
+
+/**
+ * Mematikan atau menghidupkan sebuah tim.
+ *
+ * Yang dimatikan hilang dari semua pemilih — pemilih tim di rekap, kotak "Tim" di halaman
+ * orang, halaman Pertanyaan dan Modul — tapi laporan lamanya tetap utuh dan tetap terbaca.
+ * Inilah jalan yang benar untuk divisi yang bubar: menghapusnya berarti membuang rekap
+ * tiga bulan bersamanya.
+ */
+function repo_set_team_active(array $user, int $teamId, bool $active): void
+{
+    require_once __DIR__ . '/auth.php';
+    if (!is_manager($user)) {
+        throw new RepoError('Halaman ini untuk admin.');
+    }
+    $tim = repo_teams(true)[$teamId] ?? null;
+    if (!$tim) {
+        throw new RepoError('Tim itu tidak ada.');
+    }
+    if (!$active) {
+        $pakai = repo_team_usage($teamId);
+        if ($pakai['orang'] > 0) {
+            throw new RepoError('Masih ada ' . $pakai['orang'] . ' orang di tim ini. '
+                              . 'Pindahkan dulu mereka ke tim lain.');
+        }
+        // Selalu harus ada satu tim yang hidup: tanpa itu orang berikutnya yang ditambahkan
+        // tidak punya tim untuk ditempati, dan pelaporan harian berhenti punya pertanyaan.
+        $lain = (int) q1('SELECT COUNT(*) AS n FROM teams WHERE active = 1 AND id <> ?',
+                         [$teamId])['n'];
+        if ($lain === 0) {
+            throw new RepoError('Ini satu-satunya tim yang aktif. Buat tim lain dulu.');
+        }
+    }
+    q('UPDATE teams SET active = ? WHERE id = ?', [$active ? 1 : 0, $teamId]);
+}
+
+/**
+ * Menghapus tim — hanya yang belum pernah dipakai sama sekali.
+ *
+ * Begitu ada satu laporan yang menyebutnya, timnya jadi bagian dari riwayat: menghapusnya
+ * membuat rekap bulan lalu kehilangan namanya, dan modul beserta pertanyaannya ikut
+ * terbawa. Yang itu dimatikan, bukan dihapus.
+ *
+ * Penjagaan ini juga menyelamatkan orangnya dari pesan yang tidak bisa dibaca: tanpa ini
+ * MySQL sendiri yang menolak, lewat kunci asing laporan ke modul, dan yang muncul di layar
+ * adalah SQLSTATE[23000] — benar, tapi tidak memberi tahu apa pun tentang apa yang harus
+ * dikerjakan sekarang.
+ */
+function repo_delete_team(array $user, int $teamId): void
+{
+    require_once __DIR__ . '/auth.php';
+    if (!is_manager($user)) {
+        throw new RepoError('Halaman ini untuk admin.');
+    }
+    if (!isset(repo_teams(true)[$teamId])) {
+        throw new RepoError('Tim itu tidak ada.');
+    }
+    $pakai = repo_team_usage($teamId);
+    if ($pakai['orang'] > 0) {
+        throw new RepoError('Masih ada ' . $pakai['orang'] . ' orang di tim ini. '
+                          . 'Pindahkan dulu mereka ke tim lain.');
+    }
+    if ($pakai['laporan'] > 0) {
+        throw new RepoError('Tim ini sudah punya ' . $pakai['laporan'] . ' laporan, jadi '
+                          . 'tidak bisa dihapus — rekap lamanya akan ikut hilang. '
+                          . 'Matikan saja: namanya hilang dari semua pilihan, laporannya tetap bisa dibaca.');
+    }
+    if ((int) q1('SELECT COUNT(*) AS n FROM teams')['n'] <= 1) {
+        throw new RepoError('Ini satu-satunya tim. Buat tim lain dulu.');
+    }
+    // Modul dan setelan tim ini ikut terhapus (CASCADE) — dan itu memang yang diinginkan:
+    // keduanya tidak berarti apa-apa tanpa timnya, dan sampai di sini sudah dipastikan
+    // belum ada satu pun laporan yang menunjuk ke sana.
+    q('DELETE FROM teams WHERE id = ?', [$teamId]);
 }
 
 /** The page's ids for people and promises. Prefixed so the two can never be confused,

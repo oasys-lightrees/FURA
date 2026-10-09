@@ -569,6 +569,77 @@ with Host("messi_admin_test", seed="empty") as host, sync_playwright() as p:
     check("tiap tim punya tautan ke pertanyaannya sendiri",
           admin.eval_on_selector_all("a[href*='soal.php?team=']", "e=>e.length"), 2)
 
+    print("\n--- mengganti nama, mematikan, dan menghapus tim ---")
+
+    def timRow(nama):
+        """Baris tim dicari lewat isi kotak namanya, bukan lewat teks barisnya: nama tim
+        ada di dalam input, dan penyaring teks tidak pernah melihat value sebuah input."""
+        return admin.locator("table.tim tr").filter(
+            has=admin.locator(f"input[value='{nama}']"))
+    # Ganti nama adalah jalan yang benar untuk divisi yang berganti sebutan: laporan
+    # lamanya ikut, tidak ada satu pun yang lepas dari timnya.
+    barisHR = timRow("HR")
+    barisHR.locator("input[name=name]").fill("Lightrees All Family")
+    barisHR.locator("button:has-text('Ganti nama')").click()
+    admin.wait_for_load_state("networkidle")
+    # Nama tim ada di dalam kotak isian, bukan sebagai teks barisnya.
+    namaTim = lambda: admin.eval_on_selector_all(
+        "table.tim input[name=name]", "e=>e.map(x=>x.value)")
+    check("tim bisa diganti namanya", namaTim(),
+          lambda v: "Lightrees All Family" in v and "HR" not in v)
+
+    # Yang belum pernah dipakai boleh dihapus — tidak ada riwayat yang ikut hilang.
+    baris = timRow("Lightrees All Family")
+    check("tim yang belum dipakai menawarkan Hapus",
+          baris.locator("button:has-text('Hapus')").count(), 1)
+    admin.on("dialog", lambda d: d.accept())
+    baris.locator("button:has-text('Hapus')").click()
+    admin.wait_for_load_state("networkidle")
+    check("dan benar-benar terhapus", admin.inner_text(".note.ok"),
+          lambda s: "Tim dihapus" in s)
+    check("hilang dari daftarnya", namaTim(),
+          lambda v: "Lightrees All Family" not in v)
+
+    # Tim yang sudah berisi orang tidak boleh hilang dari bawah kaki mereka.
+    admin.fill("input[placeholder='nama tim baru']", "Sales")
+    admin.click("button:has-text('Tambah tim')")
+    admin.wait_for_load_state("networkidle")
+    barisNicho = admin.locator("table.orang tr", has_text="nicho@example.test")
+    barisNicho.locator("select[name=team]").select_option(label="Sales")
+    admin.wait_for_load_state("networkidle")
+    sales = timRow("Sales")
+    check("tim yang ada orangnya tidak menawarkan Hapus",
+          sales.locator("button:has-text('Hapus')").count(), 0)
+    sales.locator("button:has-text('Matikan')").click()
+    admin.wait_for_load_state("networkidle")
+    check("dan mematikannya pun ditolak selama orangnya masih di situ",
+          admin.inner_text(".note.bad"), lambda s: "Pindahkan dulu" in s)
+
+    # Dipindahkan keluar, barulah timnya boleh dimatikan.
+    barisNicho = admin.locator("table.orang tr", has_text="nicho@example.test")
+    # Namanya, bukan urutannya: daftar tim urut nama, jadi index 0 justru "Sales" sendiri
+    # dan orangnya tidak pindah ke mana-mana.
+    barisNicho.locator("select[name=team]").select_option(label="Tim")
+    admin.wait_for_load_state("networkidle")
+    timRow("Sales").locator("button:has-text('Matikan')").click()
+    admin.wait_for_load_state("networkidle")
+    check("sesudah kosong, timnya boleh dimatikan",
+          admin.inner_text(".note.ok"), lambda s: "Tim dimatikan" in s)
+    check("barisnya ditandai dimatikan", timRow("Sales").inner_text(),
+          lambda s: "dimatikan" in s)
+    # Yang dimatikan tidak boleh lagi jadi tujuan perpindahan: orang yang dipindah ke
+    # sana hilang dari rekap mana pun, termasuk dari mata yang memindahkannya.
+    check("dan hilang dari pilihan tim di baris orang",
+          admin.eval_on_selector_all("table.orang select[name=team] option",
+                                     "e=>e.map(x=>x.textContent)"),
+          lambda v: "Sales" not in v)
+    timRow("Sales").locator("button:has-text('Nyalakan')").click()
+    admin.wait_for_load_state("networkidle")
+    check("dinyalakan lagi, dia kembali jadi pilihan",
+          admin.eval_on_selector_all("table.orang select[name=team] option",
+                                     "e=>e.map(x=>x.textContent)"),
+          lambda v: "Sales" in v)
+
     admin.goto(host.base + "/soal.php")
     admin.wait_for_load_state("networkidle")
     check("halaman pertanyaan menyebut tim mana yang sedang diatur",

@@ -157,6 +157,15 @@ cPanel -> Software -> Select PHP Version (atau MultiPHP Manager) -> pilih 8.1 / 
    Di halaman yang sama, bagian "Tim". Tiap tim punya pertanyaan, ambang, jam buka
    dan tutup, dan space Google Chat-nya sendiri — jadi HR tidak harus menghitung
    hal yang sama dengan sales, dan pengingatnya masuk ke space masing-masing.
+   GANTI NAMA, MATIKAN, HAPUS
+   Divisi yang berganti sebutan cukup diganti namanya — ketik nama baru di kotaknya,
+   tekan "Ganti nama". Laporan lamanya ikut, tidak ada yang lepas.
+   Tim yang sudah pernah dipakai TIDAK bisa dihapus, cuma dimatikan: namanya hilang
+   dari semua pilihan, tapi rekap lamanya tetap bisa dibaca. Yang bisa dihapus hanya
+   tim yang belum punya orang dan belum punya satu laporan pun.
+   Tim yang masih ada orangnya tidak bisa dimatikan maupun dihapus — pindahkan dulu
+   orangnya, kalau tidak mereka hilang dari rekap mana pun.
+
    Satu orang satu tim. Memindahkan orang ke tim lain tidak mengubah rekap yang
    sudah lewat: tiap laporan membawa timnya sendiri.
 
